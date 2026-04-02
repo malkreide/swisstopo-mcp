@@ -126,6 +126,40 @@ async def swisstopo_get_feature(params: GetFeatureInput) -> str:
     return await get_feature(params)
 
 
+# --- Height Tools ---
+from swisstopo_mcp.height import HeightInput, get_height, ElevationProfileInput, elevation_profile
+
+
+@mcp.tool(
+    name="swisstopo_get_height",
+    annotations={
+        "title": "Höhe abfragen",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": True,
+    },
+)
+async def swisstopo_get_height(params: HeightInput) -> str:
+    """Gibt die Höhe über Meer (m ü. M.) an einer Koordinate zurück."""
+    return await get_height(params)
+
+
+@mcp.tool(
+    name="swisstopo_elevation_profile",
+    annotations={
+        "title": "Höhenprofil berechnen",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": True,
+    },
+)
+async def swisstopo_elevation_profile(params: ElevationProfileInput) -> str:
+    """Berechnet ein Höhenprofil entlang einer Linie (z.B. für Schulweg-Analyse)."""
+    return await elevation_profile(params)
+
+
 def main():
     transport = os.environ.get("MCP_TRANSPORT", "stdio").lower()
     if transport in ("sse", "streamable-http"):

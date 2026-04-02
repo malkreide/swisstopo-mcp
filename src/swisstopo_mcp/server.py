@@ -19,7 +19,77 @@ mcp = FastMCP(
     ),
 )
 
-# Tool imports will be added here as modules are implemented
+# --- REST API Tools ---
+from swisstopo_mcp.rest_api import (
+    SearchLayersInput,
+    search_layers,
+    IdentifyInput,
+    identify_features,
+    FindFeaturesInput,
+    find_features,
+    GetFeatureInput,
+    get_feature,
+)
+
+
+@mcp.tool(
+    name="swisstopo_search_layers",
+    annotations={
+        "title": "Swisstopo Layer suchen",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": True,
+    },
+)
+async def swisstopo_search_layers(params: SearchLayersInput) -> str:
+    """Durchsucht den Swisstopo-Layerkatalog (500+ Layer) nach Geodatensätzen."""
+    return await search_layers(params)
+
+
+@mcp.tool(
+    name="swisstopo_identify_features",
+    annotations={
+        "title": "Features an Koordinate identifizieren",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": True,
+    },
+)
+async def swisstopo_identify_features(params: IdentifyInput) -> str:
+    """Findet Features an einer bestimmten Koordinate (räumliche Abfrage auf Swisstopo-Layern)."""
+    return await identify_features(params)
+
+
+@mcp.tool(
+    name="swisstopo_find_features",
+    annotations={
+        "title": "Features nach Attribut suchen",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": True,
+    },
+)
+async def swisstopo_find_features(params: FindFeaturesInput) -> str:
+    """Sucht Features anhand eines Attributwerts in einem Layer (z.B. Gebäude nach EGID)."""
+    return await find_features(params)
+
+
+@mcp.tool(
+    name="swisstopo_get_feature",
+    annotations={
+        "title": "Feature-Details abrufen",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": True,
+    },
+)
+async def swisstopo_get_feature(params: GetFeatureInput) -> str:
+    """Ruft die vollständigen Attribute und Geometrie eines Features per ID ab."""
+    return await get_feature(params)
 
 
 def main():

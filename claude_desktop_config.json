@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "swisstopo": {
+      "command": "swisstopo-mcp",
+      "env": {
+        "SWISSTOPO_OEREB_CANTONS": "ZH"
+      }
+    }
+  }
+}

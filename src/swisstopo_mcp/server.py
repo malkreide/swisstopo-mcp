@@ -126,6 +126,59 @@ async def swisstopo_get_feature(params: GetFeatureInput) -> str:
     return await get_feature(params)
 
 
+# --- STAC Tools ---
+from swisstopo_mcp.stac import SearchGeodataInput, search_geodata, GetCollectionInput, get_collection
+
+
+@mcp.tool(
+    name="swisstopo_search_geodata",
+    annotations={
+        "title": "Geodaten suchen",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": True,
+    },
+)
+async def swisstopo_search_geodata(params: SearchGeodataInput) -> str:
+    """Durchsucht den STAC-Katalog nach Geodaten (Orthophotos, Höhenmodelle, 3D-Gebäude, historische Karten)."""
+    return await search_geodata(params)
+
+
+@mcp.tool(
+    name="swisstopo_get_collection",
+    annotations={
+        "title": "Geodaten-Details abrufen",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": True,
+    },
+)
+async def swisstopo_get_collection(params: GetCollectionInput) -> str:
+    """Ruft Detailinformationen und Download-Links einer STAC-Collection ab."""
+    return await get_collection(params)
+
+
+# --- WMTS Tools ---
+from swisstopo_mcp.wmts import MapUrlInput, build_map_url
+
+
+@mcp.tool(
+    name="swisstopo_map_url",
+    annotations={
+        "title": "Karten-URL generieren",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": True,
+    },
+)
+async def swisstopo_map_url(params: MapUrlInput) -> str:
+    """Generiert eine map.geo.admin.ch-URL zum Öffnen im Browser."""
+    return await build_map_url(params)
+
+
 # --- Height Tools ---
 from swisstopo_mcp.height import HeightInput, get_height, ElevationProfileInput, elevation_profile
 

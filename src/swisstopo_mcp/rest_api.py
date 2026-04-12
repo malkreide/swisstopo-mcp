@@ -9,7 +9,6 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from swisstopo_mcp.api_client import geo_admin_request, handle_api_error
 
-
 # ---------------------------------------------------------------------------
 # Input Models
 # ---------------------------------------------------------------------------
@@ -18,7 +17,9 @@ from swisstopo_mcp.api_client import geo_admin_request, handle_api_error
 class SearchLayersInput(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
 
-    query: str = Field(..., min_length=1, max_length=200, description="Suchbegriff für Layer-Katalog")
+    query: str = Field(
+        ..., min_length=1, max_length=200, description="Suchbegriff für Layer-Katalog"
+    )
     lang: str = Field(default="de", description="Sprache: de, fr, it, en")
     limit: int = Field(default=10, ge=1, le=30)
 
@@ -26,7 +27,11 @@ class SearchLayersInput(BaseModel):
 class IdentifyInput(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
 
-    layers: str = Field(..., min_length=2, description="Layer-IDs, kommagetrennt, z.B. 'ch.bfs.gebaeude_wohnungs_register'")
+    layers: str = Field(
+        ...,
+        min_length=2,
+        description="Layer-IDs, kommagetrennt, z.B. 'ch.bfs.gebaeude_wohnungs_register'",
+    )
     lat: float = Field(..., ge=45.8, le=47.9, description="Breitengrad (WGS84)")
     lon: float = Field(..., ge=5.9, le=10.5, description="Längengrad (WGS84)")
     tolerance: int = Field(default=0, ge=0, le=200, description="Suchradius in Pixeln")
@@ -143,7 +148,7 @@ def format_feature_detail(data: dict[str, Any]) -> str:
     geometry = feat.get("geometry")
     if geometry:
         geo_type = geometry.get("type", "?")
-        lines.append(f"\n### Geometrie\n")
+        lines.append("\n### Geometrie\n")
         lines.append(f"- **Typ**: {geo_type}")
         coords = geometry.get("coordinates")
         if coords and geo_type == "Point":

@@ -4,11 +4,9 @@ from __future__ import annotations
 
 import os
 
-import httpx
 from pydantic import BaseModel, ConfigDict, Field
 
 from swisstopo_mcp.api_client import _get_client, handle_api_error, wgs84_to_lv95
-
 
 # ---------------------------------------------------------------------------
 # Canton Registry
@@ -42,7 +40,9 @@ class GetEgridInput(BaseModel):
 
     lat: float = Field(..., ge=45.8, le=47.9, description="Breitengrad (WGS84)")
     lon: float = Field(..., ge=5.9, le=10.5, description="Längengrad (WGS84)")
-    canton: str = Field(..., min_length=2, max_length=2, description="Kantonskürzel (z.B. 'ZH', 'BE')")
+    canton: str = Field(
+        ..., min_length=2, max_length=2, description="Kantonskürzel (z.B. 'ZH', 'BE')"
+    )
 
 
 class GetOerebExtractInput(BaseModel):
@@ -82,13 +82,18 @@ async def get_egrid(params: GetEgridInput) -> str:
         # Parse EGRID(s) from response
         features = data.get("features", [])
         if not features:
-            return f"Kein EGRID gefunden für Koordinaten ({params.lat}, {params.lon}) in Kanton {canton}."
+            return (
+                f"Kein EGRID gefunden für Koordinaten "
+                f"({params.lat}, {params.lon}) in Kanton {canton}."
+            )
 
         results = []
         for feature in features:
             props = feature.get("properties", {})
             egrid = props.get("egrid", props.get("EGRID", "?"))
-            municipality = props.get("gemeindename", props.get("municipality", props.get("Gemeinde", "?")))
+            municipality = props.get(
+                "gemeindename", props.get("municipality", props.get("Gemeinde", "?"))
+            )
             results.append(f"EGRID: {egrid} (Gemeinde: {municipality})")
 
         return "\n".join(results)

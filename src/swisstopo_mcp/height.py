@@ -8,13 +8,11 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field
 
 from swisstopo_mcp.api_client import (
-    GEO_ADMIN_BASE,
     geo_admin_request,
     handle_api_error,
     parse_coordinate_string,
     wgs84_to_lv95,
 )
-
 
 # ---------------------------------------------------------------------------
 # Input Models
@@ -80,7 +78,11 @@ def format_elevation_profile(points: list[dict[str, Any]]) -> str:
             prev_alts = prev.get("alts", {})
             prev_height = prev_alts.get("COMB", prev_alts.get("DTM2", prev_alts.get("DTM25")))
             delta_dist = dist - prev_dist
-            if delta_dist > 0 and isinstance(height, (int, float)) and isinstance(prev_height, (int, float)):
+            if (
+                delta_dist > 0
+                and isinstance(height, (int, float))
+                and isinstance(prev_height, (int, float))
+            ):
                 gradient = ((height - prev_height) / delta_dist) * 100
                 gradient_str = f"{gradient:.1f}"
             else:

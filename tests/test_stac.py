@@ -14,7 +14,6 @@ from swisstopo_mcp.stac import (
     search_geodata,
 )
 
-
 # ---------------------------------------------------------------------------
 # Input Model Validation: SearchGeodataInput
 # ---------------------------------------------------------------------------
@@ -111,8 +110,15 @@ SAMPLE_COLLECTION = {
         "temporal": {"interval": [["2000-01-01T00:00:00Z", None]]},
     },
     "links": [
-        {"rel": "self", "href": "https://data.geo.admin.ch/api/stac/v0.9/collections/ch.swisstopo.swissalti3d"},
-        {"rel": "items", "href": "https://data.geo.admin.ch/api/stac/v0.9/collections/ch.swisstopo.swissalti3d/items", "title": "Items"},
+        {
+            "rel": "self",
+            "href": "https://data.geo.admin.ch/api/stac/v0.9/collections/ch.swisstopo.swissalti3d",
+        },
+        {
+            "rel": "items",
+            "href": "https://data.geo.admin.ch/api/stac/v0.9/collections/ch.swisstopo.swissalti3d/items",
+            "title": "Items",
+        },
         {"rel": "enclosure", "href": "https://example.com/download.zip", "title": "Download ZIP"},
     ],
 }
@@ -222,8 +228,16 @@ class TestSearchGeodataHandler:
         async def mock_stac(path, params=None):
             return {
                 "collections": [
-                    {"id": "ch.swisstopo.swissalti3d", "title": "swissALTI3D", "description": "Höhenmodell"},
-                    {"id": "ch.swisstopo.swissimage", "title": "SWISSIMAGE", "description": "Luftbilder Schweiz"},
+                    {
+                        "id": "ch.swisstopo.swissalti3d",
+                        "title": "swissALTI3D",
+                        "description": "Höhenmodell",
+                    },
+                    {
+                        "id": "ch.swisstopo.swissimage",
+                        "title": "SWISSIMAGE",
+                        "description": "Luftbilder Schweiz",
+                    },
                 ]
             }
 
@@ -236,7 +250,11 @@ class TestSearchGeodataHandler:
         async def mock_stac(path, params=None):
             return {
                 "collections": [
-                    {"id": "ch.swisstopo.swissalti3d", "title": "swissALTI3D", "description": "Höhenmodell"},
+                    {
+                        "id": "ch.swisstopo.swissalti3d",
+                        "title": "swissALTI3D",
+                        "description": "Höhenmodell",
+                    },
                 ]
             }
 
@@ -248,7 +266,11 @@ class TestSearchGeodataHandler:
         async def mock_stac(path, params=None):
             return {
                 "collections": [
-                    {"id": "ch.swisstopo.swissimage", "title": "SWISSIMAGE", "description": "Luftbilder der Schweiz"},
+                    {
+                        "id": "ch.swisstopo.swissimage",
+                        "title": "SWISSIMAGE",
+                        "description": "Luftbilder der Schweiz",
+                    },
                 ]
             }
 
@@ -260,7 +282,11 @@ class TestSearchGeodataHandler:
         async def mock_stac(path, params=None):
             return {
                 "collections": [
-                    {"id": "ch.swisstopo.swissalti3d", "title": "swissALTI3D", "description": "Höhenmodell"},
+                    {
+                        "id": "ch.swisstopo.swissalti3d",
+                        "title": "swissALTI3D",
+                        "description": "Höhenmodell",
+                    },
                 ]
             }
 

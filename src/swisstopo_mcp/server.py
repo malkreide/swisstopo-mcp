@@ -20,7 +20,12 @@ mcp = FastMCP(
 )
 
 # --- Geocoding Tools ---
-from swisstopo_mcp.geocoding import GeocodeInput, geocode, ReverseGeocodeInput, reverse_geocode
+from swisstopo_mcp.geocoding import (  # noqa: E402
+    GeocodeInput,
+    ReverseGeocodeInput,
+    geocode,
+    reverse_geocode,
+)
 
 
 @mcp.tool(
@@ -54,15 +59,15 @@ async def swisstopo_reverse_geocode(params: ReverseGeocodeInput) -> str:
 
 
 # --- REST API Tools ---
-from swisstopo_mcp.rest_api import (
-    SearchLayersInput,
-    search_layers,
-    IdentifyInput,
-    identify_features,
+from swisstopo_mcp.rest_api import (  # noqa: E402
     FindFeaturesInput,
-    find_features,
     GetFeatureInput,
+    IdentifyInput,
+    SearchLayersInput,
+    find_features,
     get_feature,
+    identify_features,
+    search_layers,
 )
 
 
@@ -127,7 +132,12 @@ async def swisstopo_get_feature(params: GetFeatureInput) -> str:
 
 
 # --- STAC Tools ---
-from swisstopo_mcp.stac import SearchGeodataInput, search_geodata, GetCollectionInput, get_collection
+from swisstopo_mcp.stac import (  # noqa: E402
+    GetCollectionInput,
+    SearchGeodataInput,
+    get_collection,
+    search_geodata,
+)
 
 
 @mcp.tool(
@@ -141,7 +151,10 @@ from swisstopo_mcp.stac import SearchGeodataInput, search_geodata, GetCollection
     },
 )
 async def swisstopo_search_geodata(params: SearchGeodataInput) -> str:
-    """Durchsucht den STAC-Katalog nach Geodaten (Orthophotos, Höhenmodelle, 3D-Gebäude, historische Karten)."""
+    """Durchsucht den STAC-Katalog nach Geodaten.
+
+    Findet Orthophotos, Höhenmodelle, 3D-Gebäude und historische Karten.
+    """
     return await search_geodata(params)
 
 
@@ -161,7 +174,7 @@ async def swisstopo_get_collection(params: GetCollectionInput) -> str:
 
 
 # --- WMTS Tools ---
-from swisstopo_mcp.wmts import MapUrlInput, build_map_url
+from swisstopo_mcp.wmts import MapUrlInput, build_map_url  # noqa: E402
 
 
 @mcp.tool(
@@ -180,7 +193,12 @@ async def swisstopo_map_url(params: MapUrlInput) -> str:
 
 
 # --- Height Tools ---
-from swisstopo_mcp.height import HeightInput, get_height, ElevationProfileInput, elevation_profile
+from swisstopo_mcp.height import (  # noqa: E402
+    ElevationProfileInput,
+    HeightInput,
+    elevation_profile,
+    get_height,
+)
 
 
 @mcp.tool(
@@ -214,7 +232,12 @@ async def swisstopo_elevation_profile(params: ElevationProfileInput) -> str:
 
 
 # --- ÖREB Tools ---
-from swisstopo_mcp.oereb import GetEgridInput, get_egrid, GetOerebExtractInput, get_oereb_extract
+from swisstopo_mcp.oereb import (  # noqa: E402
+    GetEgridInput,
+    GetOerebExtractInput,
+    get_egrid,
+    get_oereb_extract,
+)
 
 
 @mcp.tool(

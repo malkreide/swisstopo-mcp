@@ -8,7 +8,6 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from swisstopo_mcp.api_client import handle_api_error, stac_request
 
-
 # ---------------------------------------------------------------------------
 # Input Models
 # ---------------------------------------------------------------------------
@@ -97,10 +96,14 @@ def format_collection_detail(collection: dict[str, Any]) -> str:
 
     # Links (assets / downloads)
     links = collection.get("links", [])
-    download_links = [lnk for lnk in links if lnk.get("rel") in ("enclosure", "item", "items", "download")]
+    download_links = [
+        lnk for lnk in links if lnk.get("rel") in ("enclosure", "item", "items", "download")
+    ]
     if not download_links:
         # Fall back to all non-self links
-        download_links = [lnk for lnk in links if lnk.get("rel") not in ("self", "root", "parent", "collection")]
+        download_links = [
+            lnk for lnk in links if lnk.get("rel") not in ("self", "root", "parent", "collection")
+        ]
 
     if download_links:
         lines += ["", "## Links & Downloads"]

@@ -6,7 +6,6 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from swisstopo_mcp.api_client import wgs84_to_lv95
 
-
 # ---------------------------------------------------------------------------
 # Notable layers reference
 # ---------------------------------------------------------------------------

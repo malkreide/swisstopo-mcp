@@ -5,20 +5,19 @@ import pytest
 from pydantic import ValidationError
 
 from swisstopo_mcp.rest_api import (
-    SearchLayersInput,
-    IdentifyInput,
     FindFeaturesInput,
     GetFeatureInput,
-    search_layers,
-    identify_features,
+    IdentifyInput,
+    SearchLayersInput,
     find_features,
-    get_feature,
-    format_layer_results,
-    format_identify_results,
-    format_find_results,
     format_feature_detail,
+    format_find_results,
+    format_identify_results,
+    format_layer_results,
+    get_feature,
+    identify_features,
+    search_layers,
 )
-
 
 # ---------------------------------------------------------------------------
 # Input Model Validation

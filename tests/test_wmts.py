@@ -6,7 +6,6 @@ from pydantic import ValidationError
 
 from swisstopo_mcp.wmts import MapUrlInput, build_map_url
 
-
 # ---------------------------------------------------------------------------
 # Input Model Validation
 # ---------------------------------------------------------------------------

@@ -7,11 +7,10 @@ from pydantic import ValidationError
 from swisstopo_mcp.geocoding import (
     GeocodeInput,
     ReverseGeocodeInput,
+    format_geocode_results,
     geocode,
     reverse_geocode,
-    format_geocode_results,
 )
-
 
 # ---------------------------------------------------------------------------
 # Input Model Validation

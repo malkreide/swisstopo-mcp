@@ -8,7 +8,6 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from swisstopo_mcp.api_client import geo_admin_request, handle_api_error
 
-
 # ---------------------------------------------------------------------------
 # Input Models
 # ---------------------------------------------------------------------------

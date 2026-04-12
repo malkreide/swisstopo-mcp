@@ -1,17 +1,17 @@
 # tests/test_api_client.py
 from __future__ import annotations
 
+import httpx
 import pytest
+
 from swisstopo_mcp.api_client import (
-    wgs84_to_lv95,
-    lv95_to_wgs84,
-    validate_sr,
     format_coordinates,
     handle_api_error,
+    lv95_to_wgs84,
     parse_coordinate_string,
-    CH_LAT_MIN, CH_LAT_MAX, CH_LON_MIN, CH_LON_MAX,
+    validate_sr,
+    wgs84_to_lv95,
 )
-import httpx
 
 
 class TestWgs84ToLv95:

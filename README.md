@@ -29,6 +29,7 @@
 | **OEREB Cadastre** | Public-law restrictions, parcels | REST/JSON (cantonal) |
 
 **Anchor demo query:** *"What land-use restrictions apply to the parcel at Musterstrasse 5, Zurich? Show me the location on a map."*
+[→ More use cases by audience →](EXAMPLES.md)
 
 ---
 

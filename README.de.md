@@ -29,6 +29,7 @@
 | **OEREB-Kataster** | Eigentumsbeschraenkungen, Grundstuecke | REST/JSON (kantonal) |
 
 **Anker-Demo-Abfrage:** *"Welche Nutzungseinschraenkungen gelten fuer das Grundstueck an der Musterstrasse 5, Zuerich? Zeige mir den Standort auf einer Karte."*
+[→ Weitere Anwendungsbeispiele nach Zielgruppe →](EXAMPLES.md)
 
 ---
 

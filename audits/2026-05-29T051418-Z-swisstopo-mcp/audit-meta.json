@@ -1,0 +1,13 @@
+{
+  "audit_meta": {
+    "server_name": "swisstopo-mcp",
+    "run_id": "2026-05-29T051418-Z-swisstopo-mcp",
+    "started_at": "2026-05-29T05:14:18.081483+00:00",
+    "timezone_offset": "Z",
+    "skill_version": "1.0.0",
+    "output_dir": "/home/user/swisstopo-mcp/audits/2026-05-29T051418-Z-swisstopo-mcp",
+    "catalog_hash": "091f446b27965044ce658a1d5f4b2cabe2b0ab5661dcc1a53b6be8f1f2e093c0",
+    "catalog_dir": "/tmp/mcp-audit-skill/checks"
+  },
+  "agent_runs": []
+}

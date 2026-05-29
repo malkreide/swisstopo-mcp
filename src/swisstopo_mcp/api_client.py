@@ -22,14 +22,56 @@ SUPPORTED_SRS = {4326, 2056, 21781, 3857}
 
 
 # --- HTTP Client ---
+#
+# A single AsyncClient is created once at server startup (see the FastMCP
+# lifespan in server.py) and reused across all tool calls for connection
+# pooling. When no shared client is registered (e.g. in unit tests or when a
+# handler is called outside the server lifespan) we fall back to a short-lived
+# ephemeral client. follow_redirects is disabled to avoid redirect-based SSRF.
 
-async def _get_client() -> httpx.AsyncClient:
-    """Create a configured async HTTP client."""
+_shared_client: httpx.AsyncClient | None = None
+
+
+def _build_client() -> httpx.AsyncClient:
+    """Build a freshly configured AsyncClient."""
     return httpx.AsyncClient(
         timeout=REQUEST_TIMEOUT,
         headers={"User-Agent": USER_AGENT},
-        follow_redirects=True,
+        follow_redirects=False,
     )
+
+
+def create_shared_client() -> httpx.AsyncClient:
+    """Create the long-lived client used by the server lifespan."""
+    return _build_client()
+
+
+def set_shared_client(client: httpx.AsyncClient | None) -> None:
+    """Register (or clear) the process-wide shared client."""
+    global _shared_client
+    _shared_client = client
+
+
+class _NonClosingClient:
+    """Adapts the shared client to the `async with await _get_client()`
+    calling convention without closing it on context exit."""
+
+    def __init__(self, client: httpx.AsyncClient) -> None:
+        self._client = client
+
+    async def __aenter__(self) -> httpx.AsyncClient:
+        return self._client
+
+    async def __aexit__(self, *exc: object) -> bool:
+        return False
+
+
+async def _get_client() -> httpx.AsyncClient | _NonClosingClient:
+    """Return the shared client (not closed on exit) if one is registered,
+    otherwise a short-lived ephemeral client (closed on exit)."""
+    if _shared_client is not None:
+        return _NonClosingClient(_shared_client)
+    return _build_client()
 
 
 async def geo_admin_request(path: str, params: dict[str, Any] | None = None) -> dict[str, Any]:

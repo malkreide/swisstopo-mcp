@@ -7,10 +7,29 @@ Alle Endpunkte sind offen (kein API-Schluessel erforderlich, ausser OEREB-Kanton
 
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
+
 from mcp.server.fastmcp import FastMCP
+
+from swisstopo_mcp.api_client import create_shared_client, set_shared_client
+
+
+@asynccontextmanager
+async def lifespan(server: FastMCP):
+    """Create one shared httpx.AsyncClient for the server's lifetime so all
+    tool calls reuse connections (pooling) instead of opening a client per call."""
+    client = create_shared_client()
+    set_shared_client(client)
+    try:
+        yield
+    finally:
+        await client.aclose()
+        set_shared_client(None)
+
 
 mcp = FastMCP(
     "swisstopo_mcp",
+    lifespan=lifespan,
     instructions=(
         "Swiss federal geodata server with 13 tools across 6 API families. "
         "Use swisstopo_search_layers to discover layer IDs, then use "

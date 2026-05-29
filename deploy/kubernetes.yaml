@@ -10,7 +10,12 @@ metadata:
   labels:
     app: swisstopo-mcp
 spec:
-  replicas: 2
+  # SCALE-002: single replica is the safe default — MCP Streamable-HTTP sessions
+  # are held per-pod, so scaling out requires session affinity or a shared
+  # session store. To run replicas > 1, add sticky sessions on the
+  # `Mcp-Session-Id` header (see deploy/ingress-sticky-sessions.yaml) or a shared
+  # store, then raise this value. See docs/deployment.md ("Scaling out").
+  replicas: 1
   selector:
     matchLabels:
       app: swisstopo-mcp

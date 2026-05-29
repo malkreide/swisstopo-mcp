@@ -6,7 +6,12 @@ import os
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from swisstopo_mcp.api_client import _get_client, handle_api_error, wgs84_to_lv95
+from swisstopo_mcp.api_client import (
+    _get_client,
+    assert_host_allowed,
+    handle_api_error,
+    wgs84_to_lv95,
+)
 
 # ---------------------------------------------------------------------------
 # Canton Registry
@@ -74,6 +79,7 @@ async def get_egrid(params: GetEgridInput) -> str:
     try:
         e, n = wgs84_to_lv95(params.lat, params.lon)
         url = f"{base}/getegrid/json/?EN={e},{n}"
+        assert_host_allowed(url)
         async with await _get_client() as client:
             response = await client.get(url)
             response.raise_for_status()
@@ -119,6 +125,7 @@ async def get_oereb_extract(params: GetOerebExtractInput) -> str:
         if params.topics:
             url += f"&TOPICS={params.topics}"
 
+        assert_host_allowed(url)
         async with await _get_client() as client:
             response = await client.get(url)
             if response.status_code == 404:

@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+- Added an explicit code-layer egress allow-list (`ALLOWED_HOSTS` frozenset +
+  `assert_host_allowed`) checked before every outbound request; documented in
+  `docs/network-egress.md` (audit finding SEC-021).
+
 ### Changed
 - HTTP client is now created once at server startup via a FastMCP lifespan and
   reused across all tool calls (connection pooling) instead of being recreated

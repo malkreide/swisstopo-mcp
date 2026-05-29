@@ -15,6 +15,7 @@ from swisstopo_mcp.api_client import (
     handle_api_error,
 )
 from swisstopo_mcp.logging_config import log_tool_call
+from swisstopo_mcp.models import ToolResponse
 
 # ---------------------------------------------------------------------------
 # Input Models
@@ -188,9 +189,13 @@ async def search_layers(params: SearchLayersInput) -> str:
             },
         )
         results = data.get("results", [])
-        return format_layer_results(results, params.query)
+        return ToolResponse.ok(
+            format_layer_results(results, params.query),
+            results,
+            match_type="exact" if results else "none",
+        )
     except Exception as e:
-        return handle_api_error(e, "Layer-Suche")
+        return ToolResponse.error(handle_api_error(e, "Layer-Suche"))
 
 
 @log_tool_call("swisstopo_identify_features")
@@ -212,9 +217,13 @@ async def identify_features(params: IdentifyInput) -> str:
             },
         )
         results = data.get("results", [])
-        return format_identify_results(results)
+        return ToolResponse.ok(
+            format_identify_results(results),
+            results,
+            match_type="exact" if results else "none",
+        )
     except Exception as e:
-        return handle_api_error(e, "Feature-Identifikation")
+        return ToolResponse.error(handle_api_error(e, "Feature-Identifikation"))
 
 
 @log_tool_call("swisstopo_find_features")
@@ -231,9 +240,13 @@ async def find_features(params: FindFeaturesInput) -> str:
             },
         )
         results = data.get("results", [])
-        return format_find_results(results)
+        return ToolResponse.ok(
+            format_find_results(results),
+            results,
+            match_type="exact" if results else "none",
+        )
     except Exception as e:
-        return handle_api_error(e, "Feature-Suche")
+        return ToolResponse.error(handle_api_error(e, "Feature-Suche"))
 
 
 @log_tool_call("swisstopo_get_feature")
@@ -244,6 +257,12 @@ async def get_feature(params: GetFeatureInput) -> str:
             f"/rest/services/ech/MapServer/{params.layer}/{params.feature_id}",
             {"sr": params.sr},
         )
-        return format_feature_detail(data)
+        feature = data.get("feature")
+        records = [feature] if isinstance(feature, dict) else []
+        return ToolResponse.ok(
+            format_feature_detail(data),
+            records,
+            match_type="exact" if records else "none",
+        )
     except Exception as e:
-        return handle_api_error(e, "Feature-Abruf")
+        return ToolResponse.error(handle_api_error(e, "Feature-Abruf"))

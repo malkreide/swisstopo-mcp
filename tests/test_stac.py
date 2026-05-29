@@ -4,6 +4,7 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
+from swisstopo_mcp.models import ToolResponse
 from swisstopo_mcp.stac import (
     GetCollectionInput,
     SearchGeodataInput,
@@ -243,8 +244,8 @@ class TestSearchGeodataHandler:
 
         monkeypatch.setattr("swisstopo_mcp.stac.stac_request", mock_stac)
         result = await search_geodata(SearchGeodataInput(query="swissALTI3D"))
-        assert "swissALTI3D" in result
-        assert "SWISSIMAGE" not in result
+        assert "swissALTI3D" in result.summary
+        assert "SWISSIMAGE" not in result.summary
 
     async def test_search_case_insensitive(self, monkeypatch):
         async def mock_stac(path, params=None):
@@ -260,7 +261,7 @@ class TestSearchGeodataHandler:
 
         monkeypatch.setattr("swisstopo_mcp.stac.stac_request", mock_stac)
         result = await search_geodata(SearchGeodataInput(query="SWISSALTI3D"))
-        assert "swissALTI3D" in result
+        assert "swissALTI3D" in result.summary
 
     async def test_search_matches_description(self, monkeypatch):
         async def mock_stac(path, params=None):
@@ -276,7 +277,7 @@ class TestSearchGeodataHandler:
 
         monkeypatch.setattr("swisstopo_mcp.stac.stac_request", mock_stac)
         result = await search_geodata(SearchGeodataInput(query="Luftbilder"))
-        assert "SWISSIMAGE" in result
+        assert "SWISSIMAGE" in result.summary
 
     async def test_search_no_match(self, monkeypatch):
         async def mock_stac(path, params=None):
@@ -292,8 +293,8 @@ class TestSearchGeodataHandler:
 
         monkeypatch.setattr("swisstopo_mcp.stac.stac_request", mock_stac)
         result = await search_geodata(SearchGeodataInput(query="xyznotfound"))
-        assert "Keine Geodaten gefunden" in result
-        assert "xyznotfound" in result
+        assert "Keine Geodaten gefunden" in result.summary
+        assert "xyznotfound" in result.summary
 
     async def test_search_respects_limit(self, monkeypatch):
         collections = [
@@ -307,7 +308,7 @@ class TestSearchGeodataHandler:
         monkeypatch.setattr("swisstopo_mcp.stac.stac_request", mock_stac)
         result = await search_geodata(SearchGeodataInput(query="test", limit=3))
         # 3 cards means 3 occurrences of "**ID:**"
-        assert result.count("**ID:**") == 3
+        assert result.summary.count("**ID:**") == 3
 
     async def test_search_api_error(self, monkeypatch):
         import httpx
@@ -318,7 +319,7 @@ class TestSearchGeodataHandler:
 
         monkeypatch.setattr("swisstopo_mcp.stac.stac_request", mock_stac)
         result = await search_geodata(SearchGeodataInput(query="test"))
-        assert "Fehler" in result
+        assert "Fehler" in result.summary
 
     async def test_search_calls_collections_endpoint(self, monkeypatch):
         captured = {}
@@ -339,8 +340,8 @@ class TestGetCollectionHandler:
 
         monkeypatch.setattr("swisstopo_mcp.stac.stac_request", mock_stac)
         result = await get_collection(GetCollectionInput(collection_id="ch.swisstopo.swissalti3d"))
-        assert "swissALTI3D" in result
-        assert "Höhenmodell" in result
+        assert "swissALTI3D" in result.summary
+        assert "Höhenmodell" in result.summary
 
     async def test_get_collection_calls_correct_path(self, monkeypatch):
         captured = {}
@@ -362,8 +363,8 @@ class TestGetCollectionHandler:
 
         monkeypatch.setattr("swisstopo_mcp.stac.stac_request", mock_stac)
         result = await get_collection(GetCollectionInput(collection_id="ch.invalid.id"))
-        assert "Fehler" in result
-        assert "404" in result
+        assert "Fehler" in result.summary
+        assert "404" in result.summary
 
     async def test_get_collection_timeout(self, monkeypatch):
         import httpx
@@ -373,8 +374,8 @@ class TestGetCollectionHandler:
 
         monkeypatch.setattr("swisstopo_mcp.stac.stac_request", mock_stac)
         result = await get_collection(GetCollectionInput(collection_id="ch.test.id"))
-        assert "Fehler" in result
-        assert "Zeitüberschreitung" in result or "timeout" in result.lower()
+        assert "Fehler" in result.summary
+        assert "Zeitüberschreitung" in result.summary or "timeout" in result.summary.lower()
 
 
 # ---------------------------------------------------------------------------
@@ -385,7 +386,7 @@ class TestGetCollectionHandler:
 @pytest.mark.live
 async def test_live_search_swissalti3d():
     result = await search_geodata(SearchGeodataInput(query="swissALTI3D"))
-    assert isinstance(result, str)
-    assert len(result) > 0
+    assert isinstance(result, ToolResponse)
+    assert len(result.summary) > 0
     # Should find something
-    assert "Keine Geodaten gefunden" not in result
+    assert "Keine Geodaten gefunden" not in result.summary

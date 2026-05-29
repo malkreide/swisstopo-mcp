@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from swisstopo_mcp.api_client import TEXT_PATTERN, geo_admin_request, handle_api_error
 from swisstopo_mcp.logging_config import log_tool_call
+from swisstopo_mcp.models import ToolResponse
 
 # ---------------------------------------------------------------------------
 # Input Models
@@ -85,7 +86,7 @@ def format_geocode_results(results: list[dict[str, Any]]) -> str:
 
 
 @log_tool_call("swisstopo_geocode")
-async def geocode(params: GeocodeInput) -> str:
+async def geocode(params: GeocodeInput) -> ToolResponse:
     """Convert an address, place name or postcode to coordinates."""
     try:
         query_params: dict[str, Any] = {
@@ -103,13 +104,17 @@ async def geocode(params: GeocodeInput) -> str:
             query_params,
         )
         results = data.get("results", [])
-        return format_geocode_results(results)
+        return ToolResponse.ok(
+            format_geocode_results(results),
+            results,
+            match_type="exact" if results else "none",
+        )
     except Exception as e:
-        return handle_api_error(e, "Geocoding")
+        return ToolResponse.error(handle_api_error(e, "Geocoding"))
 
 
 @log_tool_call("swisstopo_reverse_geocode")
-async def reverse_geocode(params: ReverseGeocodeInput) -> str:
+async def reverse_geocode(params: ReverseGeocodeInput) -> ToolResponse:
     """Find the nearest addresses to given coordinates."""
     try:
         # Build a ~500 m bounding box (approx. 0.005 degrees)
@@ -129,6 +134,10 @@ async def reverse_geocode(params: ReverseGeocodeInput) -> str:
             },
         )
         results = data.get("results", [])
-        return format_geocode_results(results)
+        return ToolResponse.ok(
+            format_geocode_results(results),
+            results,
+            match_type="exact" if results else "none",
+        )
     except Exception as e:
-        return handle_api_error(e, "Reverse Geocoding")
+        return ToolResponse.error(handle_api_error(e, "Reverse Geocoding"))

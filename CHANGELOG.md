@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **All 13 tools now return a structured `ToolResponse` envelope** instead of a
+  plain string (audit finding SDK-002). The envelope carries machine-readable
+  `results` / `count` / `match_type` plus `source` / `license` / `provenance` /
+  `retrieved_at` and a human-readable Markdown `summary`. FastMCP exposes this
+  as structured content with an output schema. The per-response `source` /
+  `license` attribution also satisfies OGD-CH licensing (audit finding CH-004).
+
 ### Added
 - Structured logging via `structlog`, rendered as JSON to **stderr** (stdout
   stays reserved for the MCP protocol). All 13 tool handlers are wrapped to log

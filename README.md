@@ -289,6 +289,23 @@ added in a later phase if stable URI schemes emerge.
 
 ---
 
+## Response Format
+
+Every tool returns a structured `ToolResponse` (FastMCP emits it as structured
+content with an output schema, plus a JSON text block):
+
+| Field | Meaning |
+|---|---|
+| `summary` | Human-readable Markdown summary |
+| `results` | Machine-readable structured records |
+| `count` | Number of `results` |
+| `match_type` | `exact` / `fuzzy` / `none` (search-style tools) |
+| `source` / `license` | Data attribution (OGD-CH, CC/OGD terms) |
+| `provenance` / `retrieved_at` | How and when the data was obtained |
+| `is_error` | `true` for handled errors |
+
+---
+
 ## Known Limitations
 
 - **OEREB tools** require a canton parameter; not all cantons expose the same API format

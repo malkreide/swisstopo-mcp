@@ -82,29 +82,29 @@ class TestMapUrlInput:
 class TestBuildMapUrl:
     async def test_url_contains_map_geo_admin(self):
         result = await build_map_url(MapUrlInput(lat=47.38, lon=8.54))
-        assert "map.geo.admin.ch" in result
+        assert "map.geo.admin.ch" in result.summary
 
     async def test_url_contains_language(self):
         result = await build_map_url(MapUrlInput(lat=47.38, lon=8.54, lang="fr"))
-        assert "lang=fr" in result
+        assert "lang=fr" in result.summary
 
     async def test_url_contains_zoom(self):
         result = await build_map_url(MapUrlInput(lat=47.38, lon=8.54, zoom=10))
-        assert "zoom=10" in result
+        assert "zoom=10" in result.summary
 
     async def test_url_contains_lv95_coordinates(self):
         result = await build_map_url(MapUrlInput(lat=47.38, lon=8.54))
         # Zurich area: E ~2683000, N ~1248000 (approximate)
-        assert "E=" in result
-        assert "N=" in result
+        assert "E=" in result.summary
+        assert "N=" in result.summary
 
     async def test_lv95_conversion_correct(self):
         # Bern: lat=46.9480, lon=7.4474 → approx E=2600000, N=1199000
         result = await build_map_url(MapUrlInput(lat=46.9480, lon=7.4474))
         # Extract E and N values from the result
         import re
-        e_match = re.search(r"E=(\d+)", result)
-        n_match = re.search(r"N=(\d+)", result)
+        e_match = re.search(r"E=(\d+)", result.summary)
+        n_match = re.search(r"N=(\d+)", result.summary)
         assert e_match is not None
         assert n_match is not None
         e_val = int(e_match.group(1))
@@ -115,40 +115,40 @@ class TestBuildMapUrl:
 
     async def test_no_layers_param_when_none(self):
         result = await build_map_url(MapUrlInput(lat=47.38, lon=8.54))
-        assert "layers=" not in result
+        assert "layers=" not in result.summary
 
     async def test_layers_in_url_when_provided(self):
         result = await build_map_url(MapUrlInput(lat=47.38, lon=8.54, layers="ch.are.bauzonen"))
-        assert "layers=ch.are.bauzonen" in result
+        assert "layers=ch.are.bauzonen" in result.summary
 
     async def test_multiple_layers_in_url(self):
         result = await build_map_url(MapUrlInput(
             lat=47.38, lon=8.54,
             layers="ch.swisstopo.swissimage,ch.are.bauzonen"
         ))
-        assert "ch.swisstopo.swissimage" in result
-        assert "ch.are.bauzonen" in result
+        assert "ch.swisstopo.swissimage" in result.summary
+        assert "ch.are.bauzonen" in result.summary
 
     async def test_known_layer_label_displayed(self):
         result = await build_map_url(MapUrlInput(lat=47.38, lon=8.54, layers="ch.are.bauzonen"))
-        assert "Bauzonen" in result
+        assert "Bauzonen" in result.summary
 
     async def test_notable_layers_always_listed(self):
         result = await build_map_url(MapUrlInput(lat=47.38, lon=8.54))
-        assert "ch.swisstopo.pixelkarte-farbe" in result
-        assert "ch.swisstopo.swissimage" in result
-        assert "ch.are.bauzonen" in result
-        assert "ch.bfs.gebaeude_wohnungs_register" in result
+        assert "ch.swisstopo.pixelkarte-farbe" in result.summary
+        assert "ch.swisstopo.swissimage" in result.summary
+        assert "ch.are.bauzonen" in result.summary
+        assert "ch.bfs.gebaeude_wohnungs_register" in result.summary
 
     async def test_default_lang_is_de(self):
         result = await build_map_url(MapUrlInput(lat=47.38, lon=8.54))
-        assert "lang=de" in result
+        assert "lang=de" in result.summary
 
     async def test_returns_markdown_link(self):
         result = await build_map_url(MapUrlInput(lat=47.38, lon=8.54))
         # Should contain a clickable Markdown link
-        assert "[" in result and "](" in result
+        assert "[" in result.summary and "](" in result.summary
 
     async def test_unknown_layer_shows_id_as_label(self):
         result = await build_map_url(MapUrlInput(lat=47.38, lon=8.54, layers="ch.custom.unknown"))
-        assert "ch.custom.unknown" in result
+        assert "ch.custom.unknown" in result.summary

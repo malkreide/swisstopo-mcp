@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Structured logging via `structlog`, rendered as JSON to **stderr** (stdout
+  stays reserved for the MCP protocol). All 13 tool handlers are wrapped to log
+  `tool_invoked` / `tool_completed` / `tool_failed` with a bound correlation id
+  and duration; upstream requests and masked errors are logged too. Level via
+  `SWISSTOPO_LOG_LEVEL` (default INFO). Audit finding OBS-003.
+
+### Added
 - `docs/roadmap.md` and a "Security & Compliance" README section (phase
   declaration, Lethal-Trifecta assessment, MCP-primitives rationale) —
   audit findings OPS-003 / SEC-019 / ARCH-008.

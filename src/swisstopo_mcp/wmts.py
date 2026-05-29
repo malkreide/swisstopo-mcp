@@ -5,6 +5,7 @@ from __future__ import annotations
 from pydantic import BaseModel, ConfigDict, Field
 
 from swisstopo_mcp.api_client import ID_PATTERN, LANG_PATTERN, wgs84_to_lv95
+from swisstopo_mcp.logging_config import log_tool_call
 
 # ---------------------------------------------------------------------------
 # Notable layers reference
@@ -42,6 +43,7 @@ class MapUrlInput(BaseModel):
 # ---------------------------------------------------------------------------
 
 
+@log_tool_call("swisstopo_map_url")
 async def build_map_url(params: MapUrlInput) -> str:
     """Build a map.geo.admin.ch URL for the given coordinates and optional layers."""
     e, n = wgs84_to_lv95(params.lat, params.lon)

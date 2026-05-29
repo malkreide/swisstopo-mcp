@@ -6,6 +6,10 @@ from urllib.parse import urlparse
 
 import httpx
 
+from swisstopo_mcp.logging_config import get_logger
+
+_log = get_logger("swisstopo_mcp.api_client")
+
 # --- Constants ---
 
 GEO_ADMIN_BASE = "https://api3.geo.admin.ch"
@@ -119,6 +123,7 @@ async def geo_admin_request(path: str, params: dict[str, Any] | None = None) -> 
     async with await _get_client() as client:
         url = f"{GEO_ADMIN_BASE}{path}"
         assert_host_allowed(url)
+        _log.debug("upstream_request", host="api3.geo.admin.ch", path=path)
         response = await client.get(url, params=params or {})
         response.raise_for_status()
         return response.json()
@@ -129,6 +134,7 @@ async def stac_request(path: str, params: dict[str, Any] | None = None) -> Any:
     async with await _get_client() as client:
         url = f"{STAC_BASE}{path}"
         assert_host_allowed(url)
+        _log.debug("upstream_request", host="data.geo.admin.ch", path=path)
         response = await client.get(url, params=params or {})
         response.raise_for_status()
         return response.json()
@@ -160,10 +166,12 @@ def handle_api_error(e: Exception, context: str = "") -> str:
 
     # Intentional, user-facing validation errors carry helpful guidance — keep them.
     if isinstance(e, (ValueError, PermissionError)):
+        _log.warning("handled_error", context=context, error_type=type(e).__name__, detail=str(e))
         return f"{prefix}{e}"
 
     # Unexpected errors: do NOT leak the raw exception text/internals to the LLM
-    # (OBS-002). The original error should be inspected from server logs/stderr.
+    # (OBS-002). The original error is logged to stderr for diagnosis instead.
+    _log.error("unexpected_error", context=context, error_type=type(e).__name__, detail=str(e))
     return f"{prefix}Unerwarteter interner Fehler. Bitte später erneut versuchen."
 
 

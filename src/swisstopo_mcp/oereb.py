@@ -14,6 +14,7 @@ from swisstopo_mcp.api_client import (
     handle_api_error,
     wgs84_to_lv95,
 )
+from swisstopo_mcp.logging_config import log_tool_call
 
 # ---------------------------------------------------------------------------
 # Canton Registry
@@ -77,6 +78,7 @@ class GetOerebExtractInput(BaseModel):
 # ---------------------------------------------------------------------------
 
 
+@log_tool_call("swisstopo_get_egrid")
 async def get_egrid(params: GetEgridInput) -> str:
     """Return the EGRID (parcel identifier) for a WGS84 coordinate in a given canton."""
     canton = params.canton.upper()
@@ -121,6 +123,7 @@ async def get_egrid(params: GetEgridInput) -> str:
         return handle_api_error(e, f"EGRID-Abfrage Kanton {canton}")
 
 
+@log_tool_call("swisstopo_get_oereb_extract")
 async def get_oereb_extract(params: GetOerebExtractInput) -> str:
     """Return ÖREB restrictions for a parcel identified by EGRID."""
     canton = params.canton.upper()

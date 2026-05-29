@@ -12,6 +12,10 @@ from contextlib import asynccontextmanager
 from mcp.server.fastmcp import FastMCP
 
 from swisstopo_mcp.api_client import create_shared_client, set_shared_client
+from swisstopo_mcp.logging_config import configure_logging, get_logger
+
+configure_logging()
+_log = get_logger("swisstopo_mcp.server")
 
 
 @asynccontextmanager
@@ -20,11 +24,13 @@ async def lifespan(server: FastMCP):
     tool calls reuse connections (pooling) instead of opening a client per call."""
     client = create_shared_client()
     set_shared_client(client)
+    _log.info("server_started")
     try:
         yield
     finally:
         await client.aclose()
         set_shared_client(None)
+        _log.info("server_stopped")
 
 
 mcp = FastMCP(

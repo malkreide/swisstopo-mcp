@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- HTTP client is now created once at server startup via a FastMCP lifespan and
+  reused across all tool calls (connection pooling) instead of being recreated
+  per call (audit finding SDK-001).
+- Outbound requests no longer follow redirects (`follow_redirects=False`),
+  reducing redirect-based SSRF surface (audit findings SEC-004/005).
+
 ## [0.1.0] - 2026-04-02
 
 ### Added

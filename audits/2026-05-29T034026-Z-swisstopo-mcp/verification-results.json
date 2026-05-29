@@ -1,0 +1,468 @@
+{
+  "audit_meta": {
+    "server_name": "swisstopo-mcp",
+    "audit_date": "2026-05-29",
+    "skill_version": "1.0.0",
+    "catalog_version": "68 checks (catalog_hash 091f446b...)",
+    "applies_when_dsl_version": "1.0",
+    "policy": "fail-or-partial"
+  },
+  "results": {
+    "ARCH-005": {
+      "status": "partial",
+      "category": "ARCH",
+      "severity": "critical",
+      "evidence": [
+        "No hardcoded secrets in src/ (grep for api_key/password/secret/token literals: 0 hits)",
+        "Only env-var usage is non-secret: oereb.py:23 os.environ.get('SWISSTOPO_OEREB_CANTONS', 'ZH')",
+        "Server uses only public, key-less APIs (api_client.py:10-12)"
+      ],
+      "gaps": [
+        "No .gitignore in repo — a future .env would not be ignored",
+        "No .env.example present",
+        "No secret-scanning workflow (gitleaks/trufflehog) in .github/workflows/"
+      ]
+    },
+    "OBS-004": {
+      "status": "pass",
+      "category": "OBS",
+      "severity": "critical",
+      "evidence": [
+        "No print() statements anywhere in src/ (grep: 0 hits) — stdout protocol stream is not corrupted",
+        "No stdout-writing logging configured in application code"
+      ],
+      "gaps": [
+        "No explicit logging handler bound to sys.stderr — acceptable here because there is no logging at all, but add stderr-bound logging if logging is introduced"
+      ]
+    },
+    "SEC-004": {
+      "status": "partial",
+      "category": "SEC",
+      "severity": "critical",
+      "evidence": [
+        "No tool accepts a user-supplied URL; all request hosts are fixed constants (api_client.py:10-12, wmts.py:48) or a hardcoded canton registry (oereb.py:15-18)",
+        "All upstream bases are https://"
+      ],
+      "gaps": [
+        "api_client.py:31 sets follow_redirects=True — an upstream redirect could reach internal/metadata endpoints (redirect-based SSRF)",
+        "No resolved-IP blocklist for private/link-local ranges (169.254.169.254 not blocked)",
+        "No explicit https scheme enforcement before request"
+      ]
+    },
+    "SEC-009": {
+      "status": "partial",
+      "category": "SEC",
+      "severity": "critical",
+      "evidence": [
+        "No custom/insecure session handling in src/ — HTTP session IDs are fully delegated to FastMCP's streamable-http manager",
+        "auth_model=none and data is public read-only, so there is no per-user session to bind"
+      ],
+      "gaps": [
+        "Session security relies entirely on FastMCP defaults; not independently verified in-repo",
+        "No user_id:session_id binding (not applicable without auth, but undocumented)"
+      ]
+    },
+    "SEC-016": {
+      "status": "pass",
+      "category": "SEC",
+      "severity": "critical",
+      "evidence": [
+        "No 0.0.0.0 binding anywhere in src/ (grep: 0 hits)",
+        "server.py:283 mcp.run(transport='streamable-http', port=port) uses FastMCP default host 127.0.0.1"
+      ],
+      "gaps": [
+        "README does not explicitly explain local (127.0.0.1) vs container (0.0.0.0) binding differentiation"
+      ]
+    },
+    "SEC-019": {
+      "status": "partial",
+      "category": "SEC",
+      "severity": "critical",
+      "evidence": [
+        "Read vs Write/Send separation is satisfied: all 13 tools are read-only (readOnlyHint=True), no send/write capability",
+        "Trifecta score is at most 1/3: no private data (Public Open Data), no external send, content from trusted federal APIs only"
+      ],
+      "gaps": [
+        "No documented Lethal-Trifecta assessment in README or docs/"
+      ]
+    },
+    "SEC-020": {
+      "status": "pass",
+      "category": "SEC",
+      "severity": "critical",
+      "evidence": [
+        "No os.system / shell=True / eval / exec / os.popen / subprocess anywhere in src/ (grep: 0 hits)",
+        "No filesystem path construction from user input; tools only build HTTP query params"
+      ],
+      "gaps": []
+    },
+    "ARCH-004": {
+      "status": "partial",
+      "category": "ARCH",
+      "severity": "high",
+      "evidence": [
+        "Tool handlers take only typed Pydantic params, no request/transport object (server.py:45-274)",
+        "Server supports both stdio (default) and streamable-http (server.py:277-285)",
+        "Tool logic is identical across transports (registration is transport-independent)"
+      ],
+      "gaps": [
+        "Transport is selected by ad-hoc sys.argv parsing (server.py:280-283), not a pydantic-settings Settings object",
+        "No ctx: Context used for client info"
+      ]
+    },
+    "ARCH-006": {
+      "status": "pass",
+      "category": "ARCH",
+      "severity": "high",
+      "evidence": [
+        "13 tools across 6 distinct API families (within the 9-15 'review' band, justified by domain breadth)",
+        "Tools are use-case oriented (geocode, get_height, oereb_extract), not 1:1 CRUD mappings",
+        "Anchor demo query resolvable in ~2-3 calls (geocode -> get_egrid -> oereb_extract)"
+      ],
+      "gaps": [
+        "search_layers -> identify/find -> get_feature forms a discovery chain that can need 2+ calls"
+      ]
+    },
+    "ARCH-009": {
+      "status": "pass",
+      "category": "ARCH",
+      "severity": "high",
+      "evidence": [
+        "All 13 tools declare explicit annotations: readOnlyHint, destructiveHint, idempotentHint, openWorldHint (server.py:35-274)",
+        "readOnlyHint=True is consistent with read-only behavior across all tools",
+        "openWorldHint=True correctly set for tools that call external APIs"
+      ],
+      "gaps": [
+        "No tool-annotations overview table in README/docs"
+      ]
+    },
+    "OBS-001": {
+      "status": "partial",
+      "category": "OBS",
+      "severity": "high",
+      "evidence": [
+        "Execution errors are caught and returned as user-friendly text, not raised, via handle_api_error (api_client.py:55-77; used in geocoding.py:98, oereb.py:101)",
+        "Tests cover error paths (e.g. test_geocoding.py test_geocode_api_error)"
+      ],
+      "gaps": [
+        "Errors are returned as plain text, not as structured tool results with isError: true",
+        "No standardized JSON-RPC error codes (-326xx / -320xx) for protocol-level errors"
+      ]
+    },
+    "OBS-002": {
+      "status": "partial",
+      "category": "OBS",
+      "severity": "high",
+      "evidence": [
+        "handle_api_error produces clean German messages for known HTTP/timeout/connect errors (api_client.py:59-75)",
+        "No traceback.format_exc()/sys.exc_info() in any tool return"
+      ],
+      "gaps": [
+        "Generic fallback api_client.py:77 returns f'{type(e).__name__}: {e}' — raw exception string may leak internals (e.g. URLs)",
+        "FastMCP not initialized with mask_error_details=True"
+      ]
+    },
+    "OPS-001": {
+      "status": "pass",
+      "category": "OPS",
+      "severity": "high",
+      "evidence": [
+        "tests/ holds 272 tests across 7 files; far exceeds 5 unit tests/tool",
+        "Live tests are marked with @pytest.mark.live (test_geocoding/test_height/test_rest_api/test_stac)",
+        "'live' marker registered in pyproject.toml [tool.pytest.ini_options]",
+        "CI runs pytest tests/ -m 'not live' (.github/workflows/ci.yml)"
+      ],
+      "gaps": [
+        "Unit tests mock via monkeypatch.setattr rather than respx (respx is a dev dep but unused)",
+        "No separate nightly/scheduled live-test workflow"
+      ]
+    },
+    "OPS-003": {
+      "status": "partial",
+      "category": "OPS",
+      "severity": "high",
+      "evidence": [
+        "De-facto Phase 1 (read-only wrapper): all 13 tools are readOnlyHint=True, no destructive tools"
+      ],
+      "gaps": [
+        "Phase is not explicitly declared in README",
+        "No docs/roadmap.md (no docs/ directory at all)"
+      ]
+    },
+    "SCALE-002": {
+      "status": "partial",
+      "category": "SCALE",
+      "severity": "high",
+      "evidence": [
+        "Server is primarily local-stdio; HTTP mode is single-instance for local use",
+        "No multi-instance load-balanced deployment exists (is_cloud_deployed=false)"
+      ],
+      "gaps": [
+        "If scaled horizontally over HTTP, no sticky-session (LB affinity on Mcp-Session-Id) or shared-state session store is configured",
+        "No deployment manifests (railway/render/k8s) to verify affinity"
+      ]
+    },
+    "SDK-001": {
+      "status": "fail",
+      "category": "SDK",
+      "severity": "high",
+      "evidence": [
+        "FastMCP is constructed without lifespan (server.py:12-24)"
+      ],
+      "gaps": [
+        "api_client.py:26-32 _get_client() creates a NEW httpx.AsyncClient per request (used via 'async with await _get_client()' in every handler) — exactly the documented anti-pattern: no connection pooling/reuse",
+        "No @asynccontextmanager lifespan, no shared client on server.state"
+      ]
+    },
+    "SDK-004": {
+      "status": "partial",
+      "category": "SDK",
+      "severity": "high",
+      "evidence": [
+        "Streamable-HTTP transport is supported (server.py:283)"
+      ],
+      "gaps": [
+        "No CORS middleware / expose_headers configured anywhere in src/",
+        "README advertises 'Cloud Deployment (SSE for browser access)' but without Access-Control-Expose-Headers: Mcp-Session-Id, browser clients would break"
+      ]
+    },
+    "SEC-005": {
+      "status": "partial",
+      "category": "SEC",
+      "severity": "high",
+      "evidence": [
+        "Request hosts are fixed, trusted federal domains; no user-controlled hostname, so DNS-rebinding surface is minimal"
+      ],
+      "gaps": [
+        "No DNS pinning (resolve-once + pinned IP); httpx default resolution",
+        "follow_redirects=True (api_client.py:31) reintroduces a rebinding/redirect risk path"
+      ]
+    },
+    "SEC-006": {
+      "status": "pass",
+      "category": "SEC",
+      "severity": "high",
+      "evidence": [
+        "Default transport is stdio: server.py:284 else-branch calls mcp.run() (stdio) when --http absent",
+        "HTTP transport is explicit opt-in via --http flag (server.py:280)",
+        "README documents local stdio + Claude Desktop primarily, with a separate Cloud Deployment section"
+      ],
+      "gaps": [
+        "Opt-in uses a --http CLI flag rather than an MCP_TRANSPORT env var (equivalent explicit opt-in)"
+      ]
+    },
+    "SEC-007": {
+      "status": "partial",
+      "category": "SEC",
+      "severity": "high",
+      "evidence": [
+        "No container artifacts present (no Dockerfile, no k8s manifests) — no container attack surface today",
+        "Deployment is local-stdio"
+      ],
+      "gaps": [
+        "If containerized for cloud later, a hardened Dockerfile (non-root USER >=10000, readOnlyRootFilesystem, drop ALL caps, seccomp RuntimeDefault) must be added — none exists yet"
+      ]
+    },
+    "SEC-013": {
+      "status": "pass",
+      "category": "SEC",
+      "severity": "high",
+      "evidence": [
+        "Data class is Public Open Data; the server uses only key-less public APIs",
+        "Only env var is the non-secret SWISSTOPO_OEREB_CANTONS (oereb.py:23) — Level 1 plain env-var is acceptable for Public Open Data"
+      ],
+      "gaps": [
+        "No docs/secret-management.md recording the (trivial) secret posture; add one if a cantonal OEREB key is ever required"
+      ]
+    },
+    "SEC-018": {
+      "status": "partial",
+      "category": "SEC",
+      "severity": "high",
+      "evidence": [
+        "All tool inputs are Pydantic models with extra='forbid' (geocoding/rest_api/stac/height/oereb)",
+        "Numeric ranges bounded (ge/le): limit 1-50, lat 45.8-47.9, lon 5.9-10.5, zoom 1-13, tolerance 0-200",
+        "String fields bounded: min_length/max_length (e.g. search_text 2-200)"
+      ],
+      "gaps": [
+        "model_config does not set strict=True — Pydantic coercion is allowed ('1' -> 1)",
+        "Free-text fields (search_text, layer, search_field, topics) have no whitelist 'pattern' constraint"
+      ]
+    },
+    "SEC-021": {
+      "status": "partial",
+      "category": "SEC",
+      "severity": "high",
+      "evidence": [
+        "Outbound hosts are effectively constrained by hardcoded base constants and a fixed canton registry dict (api_client.py:10-12, oereb.py:15-18)"
+      ],
+      "gaps": [
+        "No explicit assert_host_allowed()/frozenset egress allow-list enforced before requests",
+        "follow_redirects=True can bypass the implicit allow-list to an arbitrary host",
+        "No network-layer egress policy and no docs/network-egress.md"
+      ]
+    },
+    "ARCH-001": {
+      "status": "pass",
+      "category": "ARCH",
+      "severity": "medium",
+      "evidence": [
+        "All tool names use consistent snake_case with a 'swisstopo_' prefix (server.py name= args)",
+        "No spaces/dots/special chars in any tool name",
+        "Descriptions provide context beyond the bare function name"
+      ],
+      "gaps": []
+    },
+    "ARCH-002": {
+      "status": "partial",
+      "category": "ARCH",
+      "severity": "medium",
+      "evidence": [
+        "Every tool has a meaningful one-sentence German description (server.py docstrings/annotations)",
+        "Server-level instructions give cross-tool usage guidance (server.py:14-23)"
+      ],
+      "gaps": [
+        "Descriptions lack <use_case> / <important_notes> / <example> tags",
+        "Most descriptions are below the ~100-char median target and omit caveats/limits"
+      ]
+    },
+    "ARCH-003": {
+      "status": "partial",
+      "category": "ARCH",
+      "severity": "medium",
+      "evidence": [
+        "OEREB tools return actionable 'not found' messages with next steps (oereb.py:84-88, 124-125)"
+      ],
+      "gaps": [
+        "Geocoding returns the bare string 'Keine Ergebnisse gefunden.' (geocoding.py:53) — classic empty-result anti-pattern",
+        "No match_type field and no fuzzy/suggestion fallback for empty results"
+      ]
+    },
+    "ARCH-007": {
+      "status": "partial",
+      "category": "ARCH",
+      "severity": "medium",
+      "evidence": [
+        "Most tools return self-contained results (geocode, get_height, oereb_extract, map_url)",
+        "elevation_profile aggregates multiple points into one result (height.py)"
+      ],
+      "gaps": [
+        "Layer discovery is a multi-call chain (search_layers -> get_feature returns IDs used in follow-ups)",
+        "No asyncio.gather-style internal aggregation across sources"
+      ]
+    },
+    "ARCH-008": {
+      "status": "partial",
+      "category": "ARCH",
+      "severity": "medium",
+      "evidence": [
+        "Server exposes Tools only; no @mcp.resource or @mcp.prompt (grep: 0 hits)"
+      ],
+      "gaps": [
+        "Uses only 1 of 3 primitives and provides no documented justification for tools-only (read-only static lookups like map layers are Resource candidates)"
+      ]
+    },
+    "ARCH-011": {
+      "status": "pass",
+      "category": "ARCH",
+      "severity": "medium",
+      "evidence": [
+        "All mandatory top-level files present: README.md, README.de.md, CHANGELOG.md, LICENSE, pyproject.toml",
+        "Directories present: src/ (src-layout src/swisstopo_mcp/), tests/, .github/workflows/ (ci.yml + publish.yml)",
+        "README.de.md mirrors README.md section inventory",
+        "Tools split across modules (geocoding/rest_api/stac/height/wmts/oereb), not one giant file"
+      ],
+      "gaps": [
+        "server.py is 285 lines (>200 guideline), though it contains only thin registration wrappers; no tools/ subpackage (flat modules used instead)"
+      ]
+    },
+    "ARCH-012": {
+      "status": "partial",
+      "category": "ARCH",
+      "severity": "medium",
+      "evidence": [
+        "CHANGELOG.md present in Keep-a-Changelog format with versioned entries"
+      ],
+      "gaps": [
+        "protocolVersion is NOT pinned in code — FastMCP default is used (silent break risk on SDK update)",
+        "No README 'MCP Protocol Version' section / update policy",
+        "No Dependabot/Renovate config for SDK update PRs"
+      ]
+    },
+    "CH-004": {
+      "status": "partial",
+      "category": "CH",
+      "severity": "medium",
+      "evidence": [
+        "README License section references swisstopo Open Government Data / opendata.swiss terms",
+        "stac.py:59 surfaces the upstream collection 'license' field"
+      ],
+      "gaps": [
+        "Tool responses generally lack a 'source'/'license'/attribution field (CC BY 4.0 requires attribution)",
+        "No per-source attribution table in README and no explicit CC BY attribution text"
+      ]
+    },
+    "OBS-003": {
+      "status": "fail",
+      "category": "OBS",
+      "severity": "medium",
+      "evidence": [
+        "No print() in src/ (no stdout pollution)"
+      ],
+      "gaps": [
+        "No structured logger (structlog/loguru) in dependencies and no logging used at all",
+        "No JSON/logfmt output, no severity levels, no per-call bound context (tool/session/correlation id)"
+      ]
+    },
+    "OPS-002": {
+      "status": "pass",
+      "category": "OPS",
+      "severity": "medium",
+      "evidence": [
+        "README has Anchor demo query, Installation, Available Tools, Configuration, Architecture (ASCII diagram), Known Limitations (4 limits), License",
+        "README.de.md mirrors all top-level sections; CONTRIBUTING.md present; CHANGELOG Keep-a-Changelog",
+        "EXAMPLES.md provides audience-specific use cases"
+      ],
+      "gaps": [
+        "No dedicated Security section in README"
+      ]
+    },
+    "SDK-002": {
+      "status": "partial",
+      "category": "SDK",
+      "severity": "medium",
+      "evidence": [
+        "Pydantic >=2.0.0 in dependencies; inputs use Pydantic v2 ConfigDict",
+        "All tool handlers have explicit '-> str' return annotations"
+      ],
+      "gaps": [
+        "Tool returns are formatted markdown/text strings, not structured BaseModel/TypedDict",
+        "No response envelope with source/provenance/results/count (limits machine-readability)"
+      ]
+    },
+    "SDK-003": {
+      "status": "partial",
+      "category": "SDK",
+      "severity": "medium",
+      "evidence": [
+        "Most tools are single fast upstream calls where progress reporting is unnecessary"
+      ],
+      "gaps": [
+        "No tool injects ctx: Context (grep: 0 hits) — no ctx.report_progress/ctx.info",
+        "Potentially slower tools (elevation_profile, oereb_extract) provide no progress feedback"
+      ]
+    },
+    "SEC-008": {
+      "status": "pass",
+      "category": "SEC",
+      "severity": "medium",
+      "evidence": [
+        "No pre/postinstall hooks; pyproject.toml uses a standard [project.scripts] entry point",
+        "README shows the full, transparent install command (clone/pip/uv)",
+        "publish.yml uses pypa/gh-action-pypi-publish with permissions: id-token: write (OIDC Trusted Publisher / Sigstore signing)",
+        "CONTRIBUTING.md documents the build process"
+      ],
+      "gaps": []
+    }
+  }
+}

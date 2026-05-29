@@ -1,0 +1,43 @@
+# Audit profile for swisstopo-mcp
+# Derived from code inspection on 2026-05-29 (no Notion tracker card available;
+# profile reconstructed from source). Authoritative for applies_when evaluation.
+name: swisstopo-mcp
+repo: https://github.com/malkreide/swisstopo-mcp
+prio: 0
+
+# Transport: stdio by default (mcp.run()); server.py also supports
+# `--http` -> streamable-http on a port. => dual.
+# FastMCP / Python SDK (mcp[cli], src/swisstopo_mcp/*.py)
+sdk_language: Python
+
+transport: dual
+
+# Auth: all swisstopo/geo.admin endpoints are open; cantonal OEREB endpoints
+# are public too. No API key, no OAuth proxy.
+auth_model: none
+
+# Swiss federal open geodata (api3.geo.admin.ch, STAC, WMTS) + cantonal OEREB
+# public-law cadastral register. Treated as Public Open Data.
+data_class: Public Open Data
+
+# All 13 tools carry readOnlyHint=True / destructiveHint=False.
+write_capable: false
+
+# claude_desktop_config.json launches `python -m swisstopo_mcp.server` (stdio).
+# No Railway/Render/Docker/K8s deployment artifacts in repo.
+deployment: [local-stdio]
+is_cloud_deployed: false
+
+uses_sampling: false
+uses_sequential_thinking: false
+tools_include_filesystem: false
+tools_make_external_requests: true
+
+# Federal swisstopo project, not a Stadt-Zürich / Schulamt / Volksschule context.
+stadt_zuerich_context: false
+schulamt_context: false
+volksschule_context: false
+enterprise_context: false
+
+data_source:
+  is_swiss_open_data: true

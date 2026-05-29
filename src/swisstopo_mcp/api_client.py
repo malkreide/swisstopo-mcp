@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from typing import Any
+from urllib.parse import urlparse
 
 import httpx
 
@@ -19,6 +20,33 @@ CH_LAT_MIN, CH_LAT_MAX = 45.8, 47.9
 CH_LON_MIN, CH_LON_MAX = 5.9, 10.5
 
 SUPPORTED_SRS = {4326, 2056, 21781, 3857}
+
+# --- Egress Allow-List (SEC-021) ---
+#
+# Every outbound request host must appear here. It is a frozenset (not loaded
+# from env) so it cannot be silently widened at runtime. Adding a host (e.g. a
+# new cantonal OEREB endpoint) is a deliberate code change — keep this in sync
+# with OEREB_ENDPOINTS in oereb.py and with docs/network-egress.md.
+ALLOWED_HOSTS: frozenset[str] = frozenset(
+    {
+        "api3.geo.admin.ch",  # REST / SearchServer / MapServer + Geocoding + Height
+        "data.geo.admin.ch",  # STAC catalog
+        "wmts.geo.admin.ch",  # WMTS tiles
+        "map.geo.admin.ch",  # shareable map viewer URLs
+        "oereb.geo.zh.ch",  # OEREB cadastre — canton ZH
+        "www.oereb2.apps.be.ch",  # OEREB cadastre — canton BE
+    }
+)
+
+
+def assert_host_allowed(url: str) -> None:
+    """Raise PermissionError if the URL's host is not on the egress allow-list."""
+    host = urlparse(url).hostname or ""
+    if host not in ALLOWED_HOSTS:
+        raise PermissionError(
+            f"Host nicht auf der Egress-Allow-List: {host!r}. "
+            f"Erlaubt: {sorted(ALLOWED_HOSTS)}"
+        )
 
 
 # --- HTTP Client ---
@@ -78,6 +106,7 @@ async def geo_admin_request(path: str, params: dict[str, Any] | None = None) -> 
     """GET request on api3.geo.admin.ch, returns parsed JSON."""
     async with await _get_client() as client:
         url = f"{GEO_ADMIN_BASE}{path}"
+        assert_host_allowed(url)
         response = await client.get(url, params=params or {})
         response.raise_for_status()
         return response.json()
@@ -87,6 +116,7 @@ async def stac_request(path: str, params: dict[str, Any] | None = None) -> Any:
     """GET request on data.geo.admin.ch STAC API, returns parsed JSON."""
     async with await _get_client() as client:
         url = f"{STAC_BASE}{path}"
+        assert_host_allowed(url)
         response = await client.get(url, params=params or {})
         response.raise_for_status()
         return response.json()

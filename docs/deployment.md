@@ -47,6 +47,17 @@ egress `NetworkPolicy`. Replace the image reference and set
 kubectl apply -f deploy/kubernetes.yaml
 ```
 
-If you scale `replicas` above 1 over HTTP, also address sticky sessions /
-shared session state (audit finding SCALE-002): enable LB affinity on the
-`Mcp-Session-Id` header or run a shared session store.
+## Scaling out (SCALE-002)
+
+The manifest ships with `replicas: 1` on purpose. MCP Streamable-HTTP keeps
+session state **per pod**, so a client's follow-up requests must reach the same
+pod. Before raising `replicas`, add one of:
+
+- **Session affinity on `Mcp-Session-Id`** — HAProxy `stick on req.hdr(Mcp-Session-Id)`
+  (preferred), or NGINX Ingress cookie affinity. See
+  [`deploy/ingress-sticky-sessions.yaml`](../deploy/ingress-sticky-sessions.yaml).
+- **A shared session store** (e.g. Redis via a FastMCP `SessionManager`) so any
+  pod can serve any session.
+
+Then raise `replicas` in `deploy/kubernetes.yaml`.
+

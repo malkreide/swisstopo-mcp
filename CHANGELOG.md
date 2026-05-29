@@ -8,58 +8,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Hardened container deployment (audit finding SEC-007): multi-stage
-  `Dockerfile` running as non-root UID 10001, `deploy/kubernetes.yaml` with
-  `runAsNonRoot` / `readOnlyRootFilesystem` / dropped capabilities / seccomp
-  RuntimeDefault and an egress `NetworkPolicy` (also covers the network layer
-  of SEC-021), a `/healthz` endpoint for liveness probes, and
-  `docs/deployment.md`.
+- Hardened container deployment (SEC-007): multi-stage `Dockerfile` (non-root
+  UID 10001), `deploy/kubernetes.yaml` (`runAsNonRoot` / `readOnlyRootFilesystem`
+  / dropped capabilities / seccomp `RuntimeDefault`) plus an egress
+  `NetworkPolicy` (also covers the network layer of SEC-021), a `/healthz`
+  liveness endpoint, and `docs/deployment.md`.
+- Horizontal-scaling guidance (SCALE-002): the Kubernetes manifest defaults to
+  `replicas: 1` with a documented sticky-session example
+  (`deploy/ingress-sticky-sessions.yaml`) and a "Scaling out" doc section.
+- Structured logging via `structlog`, rendered as JSON to **stderr**; all tool
+  handlers log `tool_invoked` / `tool_completed` / `tool_failed` with a bound
+  correlation id and duration; level via `SWISSTOPO_LOG_LEVEL` (OBS-003).
+- CORS on the Streamable-HTTP app with `expose_headers: Mcp-Session-Id` (SDK-004).
+- `.github/dependabot.yml` for monthly pip + GitHub-Actions update PRs (ARCH-012).
+- `docs/roadmap.md` and a "Security & Compliance" README section — phase
+  declaration, Lethal-Trifecta assessment, MCP-primitives rationale
+  (OPS-003 / SEC-019 / ARCH-008).
 
 ### Changed
 - **All 13 tools now return a structured `ToolResponse` envelope** instead of a
-  plain string (audit finding SDK-002). The envelope carries machine-readable
-  `results` / `count` / `match_type` plus `source` / `license` / `provenance` /
-  `retrieved_at` and a human-readable Markdown `summary`. FastMCP exposes this
-  as structured content with an output schema. The per-response `source` /
-  `license` attribution also satisfies OGD-CH licensing (audit finding CH-004).
-
-### Added
-- Structured logging via `structlog`, rendered as JSON to **stderr** (stdout
-  stays reserved for the MCP protocol). All 13 tool handlers are wrapped to log
-  `tool_invoked` / `tool_completed` / `tool_failed` with a bound correlation id
-  and duration; upstream requests and masked errors are logged too. Level via
-  `SWISSTOPO_LOG_LEVEL` (default INFO). Audit finding OBS-003.
-
-### Added
-- `docs/roadmap.md` and a "Security & Compliance" README section (phase
-  declaration, Lethal-Trifecta assessment, MCP-primitives rationale) —
-  audit findings OPS-003 / SEC-019 / ARCH-008.
-- `.github/dependabot.yml` for monthly pip + GitHub-Actions update PRs
-  (audit finding ARCH-012).
-- CORS configured on the Streamable-HTTP app with
-  `expose_headers: Mcp-Session-Id` (audit finding SDK-004).
-
-### Changed
-- All tool input models now use Pydantic `strict=True` plus whitelist
-  `pattern` constraints on free-text fields (audit finding SEC-018).
+  plain string (SDK-002): `results` / `count` / `match_type` plus `source` /
+  `license` / `provenance` / `retrieved_at` and a human-readable Markdown
+  `summary`. FastMCP emits structured content with an output schema; the
+  per-response attribution also satisfies OGD-CH licensing (CH-004).
+- HTTP client is created once at startup via a FastMCP lifespan and reused
+  across all tool calls (connection pooling) instead of per call (SDK-001).
+- Outbound requests no longer follow redirects (`follow_redirects=False`),
+  reducing redirect-based SSRF surface (SEC-004/005).
+- All tool input models use Pydantic `strict=True` plus whitelist `pattern`
+  constraints on free-text fields (SEC-018).
 - Unexpected exceptions no longer leak their raw text to the client; intentional
-  validation messages are preserved (audit finding OBS-002).
-- Empty geocoding results now return an actionable hint instead of a bare
-  "no results" string (audit finding ARCH-003).
-- Pinned `mcp[cli]` to the `1.x` major; CI now also runs on the `master`
-  branch.
+  validation messages are preserved (OBS-002).
+- Empty geocoding results return an actionable hint instead of a bare
+  "no results" string (ARCH-003).
+- Pinned `mcp[cli]` to the `1.x` major; CI now also runs on `master`
+  (ARCH-012 / CI trigger fix).
 
 ### Security
-- Added an explicit code-layer egress allow-list (`ALLOWED_HOSTS` frozenset +
+- Explicit code-layer egress allow-list (`ALLOWED_HOSTS` frozenset +
   `assert_host_allowed`) checked before every outbound request; documented in
-  `docs/network-egress.md` (audit finding SEC-021).
+  `docs/network-egress.md` (SEC-021).
 
-### Changed
-- HTTP client is now created once at server startup via a FastMCP lifespan and
-  reused across all tool calls (connection pooling) instead of being recreated
-  per call (audit finding SDK-001).
-- Outbound requests no longer follow redirects (`follow_redirects=False`),
-  reducing redirect-based SSRF surface (audit findings SEC-004/005).
 
 ## [0.1.0] - 2026-04-02
 

@@ -1,0 +1,55 @@
+# Sticky-session example for scaling swisstopo-mcp beyond one replica
+# (audit finding SCALE-002).
+#
+# MCP Streamable-HTTP keeps session state per pod, so a client's follow-up
+# requests must reach the SAME pod. The session id travels in the
+# `Mcp-Session-Id` HTTP header. Two approaches are shown.
+#
+# Apply ONE of these alongside deploy/kubernetes.yaml after raising `replicas`.
+
+# ---------------------------------------------------------------------------
+# Option A (preferred): HAProxy — stick directly on the Mcp-Session-Id header.
+# This routes by the real session identifier (no extra cookie needed).
+#
+#   backend swisstopo_mcp
+#       balance roundrobin
+#       stick-table type string len 64 size 100k expire 1h
+#       stick on req.hdr(Mcp-Session-Id)
+#       server s1 10.0.0.1:8000 check
+#       server s2 10.0.0.2:8000 check
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# Option B (NGINX Ingress): cookie-based affinity. NGINX cannot stick on an
+# arbitrary request header, so it pins clients with an affinity cookie instead.
+# Adequate for browser clients that carry cookies.
+# ---------------------------------------------------------------------------
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: swisstopo-mcp
+  annotations:
+    nginx.ingress.kubernetes.io/affinity: "cookie"
+    nginx.ingress.kubernetes.io/affinity-mode: "persistent"
+    nginx.ingress.kubernetes.io/session-cookie-name: "swisstopo-mcp-affinity"
+    nginx.ingress.kubernetes.io/session-cookie-max-age: "3600"
+    nginx.ingress.kubernetes.io/session-cookie-samesite: "Strict"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: swisstopo-mcp.example.com # <-- replace
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: swisstopo-mcp
+                port:
+                  number: 80
+
+# ---------------------------------------------------------------------------
+# Option C (shared state): run a shared session store (e.g. Redis) so any pod
+# can serve any session. This removes the affinity requirement entirely but
+# needs a SessionManager wired into FastMCP — out of scope for this manifest.
+# ---------------------------------------------------------------------------

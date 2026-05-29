@@ -1,0 +1,113 @@
+# Hardened Kubernetes manifests for swisstopo-mcp (audit finding SEC-007).
+# The egress NetworkPolicy also provides the network-layer half of SEC-021.
+#
+# Replace the image reference and ALLOWED_ORIGINS before applying.
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: swisstopo-mcp
+  labels:
+    app: swisstopo-mcp
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: swisstopo-mcp
+  template:
+    metadata:
+      labels:
+        app: swisstopo-mcp
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: swisstopo-mcp
+          image: ghcr.io/malkreide/swisstopo-mcp:latest # <-- replace
+          ports:
+            - containerPort: 8000
+          env:
+            - name: SWISSTOPO_HTTP_HOST
+              value: "0.0.0.0"
+            - name: SWISSTOPO_ALLOWED_ORIGINS
+              value: "" # <-- set explicit origins for browser clients
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8000
+            initialDelaySeconds: 3
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 64Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: swisstopo-mcp
+spec:
+  selector:
+    app: swisstopo-mcp
+  ports:
+    - port: 80
+      targetPort: 8000
+---
+# Egress allow-list at the network layer (SEC-021): only HTTPS out, private
+# ranges blocked, DNS permitted. The code-layer ALLOWED_HOSTS frozenset is the
+# complementary application-layer control.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: swisstopo-mcp-egress
+spec:
+  podSelector:
+    matchLabels:
+      app: swisstopo-mcp
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+              - 169.254.0.0/16
+      ports:
+        - protocol: TCP
+          port: 443
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53

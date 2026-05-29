@@ -273,6 +273,12 @@ Trifecta score: at most 1 of 3 — safe by design.
 Outbound requests are restricted to an explicit code-layer allow-list and
 redirects are disabled — see [docs/network-egress.md](docs/network-egress.md).
 
+### Container deployment
+
+For containerised HTTP deployments, a hardened `Dockerfile` and Kubernetes
+manifests (non-root, read-only root filesystem, dropped capabilities, egress
+NetworkPolicy) are provided — see [docs/deployment.md](docs/deployment.md).
+
 ### MCP Protocol Version
 
 The MCP protocol version is negotiated by the `mcp` SDK, which is pinned to the

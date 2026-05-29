@@ -275,6 +275,13 @@ Ausgehende Requests sind auf eine explizite Code-Layer-Allow-List beschränkt,
 Redirects sind deaktiviert — siehe
 [docs/network-egress.md](docs/network-egress.md).
 
+### Container-Deployment
+
+Für containerisierte HTTP-Deployments stehen ein gehärtetes `Dockerfile` und
+Kubernetes-Manifeste bereit (non-root, read-only Root-Dateisystem, gedroppte
+Capabilities, Egress-NetworkPolicy) — siehe
+[docs/deployment.md](docs/deployment.md).
+
 ### MCP-Protokollversion
 
 Die MCP-Protokollversion wird vom `mcp`-SDK ausgehandelt; dieses ist in

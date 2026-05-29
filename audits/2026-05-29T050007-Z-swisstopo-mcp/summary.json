@@ -1,0 +1,142 @@
+{
+  "audit_meta": {
+    "server_name": "swisstopo-mcp",
+    "audit_date": "2026-05-29",
+    "skill_version": "1.0.0",
+    "catalog_version": "68 checks (catalog_hash 091f446b...)",
+    "applies_when_dsl_version": "1.0",
+    "policy": "fail-or-partial",
+    "note": "Re-audit after remediation PRs #1,#2,#3,#7,#8,#9,#10. Compare to run 2026-05-29T034026-Z."
+  },
+  "totals": {
+    "checks_evaluated": 36,
+    "applicable": 36,
+    "by_status": {
+      "pass": 29,
+      "fail": 0,
+      "partial": 7,
+      "todo": 0,
+      "n/a": 0
+    },
+    "by_severity_among_findings": {
+      "critical": 2,
+      "high": 2,
+      "medium": 3,
+      "low": 0
+    },
+    "by_category": {
+      "ARCH": {
+        "pass": 7,
+        "fail": 0,
+        "partial": 4,
+        "todo": 0,
+        "n/a": 0
+      },
+      "CH": {
+        "pass": 1,
+        "fail": 0,
+        "partial": 0,
+        "todo": 0,
+        "n/a": 0
+      },
+      "OBS": {
+        "pass": 3,
+        "fail": 0,
+        "partial": 1,
+        "todo": 0,
+        "n/a": 0
+      },
+      "OPS": {
+        "pass": 3,
+        "fail": 0,
+        "partial": 0,
+        "todo": 0,
+        "n/a": 0
+      },
+      "SCALE": {
+        "pass": 1,
+        "fail": 0,
+        "partial": 0,
+        "todo": 0,
+        "n/a": 0
+      },
+      "SDK": {
+        "pass": 3,
+        "fail": 0,
+        "partial": 1,
+        "todo": 0,
+        "n/a": 0
+      },
+      "SEC": {
+        "pass": 11,
+        "fail": 0,
+        "partial": 1,
+        "todo": 0,
+        "n/a": 0
+      }
+    }
+  },
+  "findings": {
+    "policy": "fail-or-partial",
+    "policy_statuses": [
+      "fail",
+      "partial"
+    ],
+    "expected_count": 7,
+    "expected_ids": [
+      "ARCH-002",
+      "ARCH-004",
+      "ARCH-005",
+      "ARCH-007",
+      "OBS-001",
+      "SDK-003",
+      "SEC-009"
+    ],
+    "details": [
+      {
+        "check_id": "ARCH-002",
+        "category": "ARCH",
+        "severity": "medium",
+        "status": "partial"
+      },
+      {
+        "check_id": "ARCH-004",
+        "category": "ARCH",
+        "severity": "high",
+        "status": "partial"
+      },
+      {
+        "check_id": "ARCH-005",
+        "category": "ARCH",
+        "severity": "critical",
+        "status": "partial"
+      },
+      {
+        "check_id": "ARCH-007",
+        "category": "ARCH",
+        "severity": "medium",
+        "status": "partial"
+      },
+      {
+        "check_id": "OBS-001",
+        "category": "OBS",
+        "severity": "high",
+        "status": "partial"
+      },
+      {
+        "check_id": "SDK-003",
+        "category": "SDK",
+        "severity": "medium",
+        "status": "partial"
+      },
+      {
+        "check_id": "SEC-009",
+        "category": "SEC",
+        "severity": "critical",
+        "status": "partial"
+      }
+    ]
+  },
+  "production_ready": true,
+  "blocking_findings": []
+}

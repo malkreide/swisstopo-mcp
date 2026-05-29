@@ -14,6 +14,7 @@ from swisstopo_mcp.api_client import (
     geo_admin_request,
     handle_api_error,
 )
+from swisstopo_mcp.logging_config import log_tool_call
 
 # ---------------------------------------------------------------------------
 # Input Models
@@ -173,6 +174,7 @@ def format_feature_detail(data: dict[str, Any]) -> str:
 # ---------------------------------------------------------------------------
 
 
+@log_tool_call("swisstopo_search_layers")
 async def search_layers(params: SearchLayersInput) -> str:
     """Search the swisstopo layer catalogue."""
     try:
@@ -191,6 +193,7 @@ async def search_layers(params: SearchLayersInput) -> str:
         return handle_api_error(e, "Layer-Suche")
 
 
+@log_tool_call("swisstopo_identify_features")
 async def identify_features(params: IdentifyInput) -> str:
     """Identify features at a coordinate."""
     try:
@@ -214,6 +217,7 @@ async def identify_features(params: IdentifyInput) -> str:
         return handle_api_error(e, "Feature-Identifikation")
 
 
+@log_tool_call("swisstopo_find_features")
 async def find_features(params: FindFeaturesInput) -> str:
     """Find features by attribute value."""
     try:
@@ -232,6 +236,7 @@ async def find_features(params: FindFeaturesInput) -> str:
         return handle_api_error(e, "Feature-Suche")
 
 
+@log_tool_call("swisstopo_get_feature")
 async def get_feature(params: GetFeatureInput) -> str:
     """Get full details for a single feature."""
     try:

@@ -7,6 +7,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field
 
 from swisstopo_mcp.api_client import TEXT_PATTERN, geo_admin_request, handle_api_error
+from swisstopo_mcp.logging_config import log_tool_call
 
 # ---------------------------------------------------------------------------
 # Input Models
@@ -83,6 +84,7 @@ def format_geocode_results(results: list[dict[str, Any]]) -> str:
 # ---------------------------------------------------------------------------
 
 
+@log_tool_call("swisstopo_geocode")
 async def geocode(params: GeocodeInput) -> str:
     """Convert an address, place name or postcode to coordinates."""
     try:
@@ -106,6 +108,7 @@ async def geocode(params: GeocodeInput) -> str:
         return handle_api_error(e, "Geocoding")
 
 
+@log_tool_call("swisstopo_reverse_geocode")
 async def reverse_geocode(params: ReverseGeocodeInput) -> str:
     """Find the nearest addresses to given coordinates."""
     try:

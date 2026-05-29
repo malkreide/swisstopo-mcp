@@ -14,6 +14,7 @@ from swisstopo_mcp.api_client import (
     parse_coordinate_string,
     wgs84_to_lv95,
 )
+from swisstopo_mcp.logging_config import log_tool_call
 
 # ---------------------------------------------------------------------------
 # Input Models
@@ -111,6 +112,7 @@ def format_elevation_profile(points: list[dict[str, Any]]) -> str:
 # ---------------------------------------------------------------------------
 
 
+@log_tool_call("swisstopo_get_height")
 async def get_height(params: HeightInput) -> str:
     """Return the elevation above sea level for a WGS84 coordinate."""
     try:
@@ -135,6 +137,7 @@ async def get_height(params: HeightInput) -> str:
         return handle_api_error(e, "Höhenabfrage")
 
 
+@log_tool_call("swisstopo_elevation_profile")
 async def elevation_profile(params: ElevationProfileInput) -> str:
     """Compute an elevation profile along a line defined by coordinate pairs."""
     try:

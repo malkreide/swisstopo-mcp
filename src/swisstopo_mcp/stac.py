@@ -7,6 +7,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field
 
 from swisstopo_mcp.api_client import ID_PATTERN, TEXT_PATTERN, handle_api_error, stac_request
+from swisstopo_mcp.logging_config import log_tool_call
 
 # ---------------------------------------------------------------------------
 # Input Models
@@ -130,6 +131,7 @@ def format_search_results(collections: list[dict[str, Any]]) -> str:
 # ---------------------------------------------------------------------------
 
 
+@log_tool_call("swisstopo_search_geodata")
 async def search_geodata(params: SearchGeodataInput) -> str:
     """Search the STAC catalog for geodata matching a query string."""
     try:
@@ -155,6 +157,7 @@ async def search_geodata(params: SearchGeodataInput) -> str:
         return handle_api_error(e, "STAC-Suche")
 
 
+@log_tool_call("swisstopo_get_collection")
 async def get_collection(params: GetCollectionInput) -> str:
     """Retrieve detailed information about a specific STAC collection."""
     try:

@@ -564,10 +564,11 @@ class TestGetOerebExtractHandler:
             return MockClient()
 
         monkeypatch.setattr("swisstopo_mcp.oereb._get_client", mock_get_client)
+        # Valid EGRID format (alphanumeric) but non-existent -> upstream 404.
         result = await get_oereb_extract(
-            GetOerebExtractInput(egrid="INVALID_EGRID", canton="ZH")
+            GetOerebExtractInput(egrid="CH000000000000", canton="ZH")
         )
-        assert "nicht gefunden" in result or "INVALID_EGRID" in result
+        assert "nicht gefunden" in result or "CH000000000000" in result
 
     async def test_topics_filter_added_to_url(self, monkeypatch):
         monkeypatch.setenv("SWISSTOPO_OEREB_CANTONS", "ZH,BE")

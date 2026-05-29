@@ -6,7 +6,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from swisstopo_mcp.api_client import geo_admin_request, handle_api_error
+from swisstopo_mcp.api_client import TEXT_PATTERN, geo_admin_request, handle_api_error
 
 # ---------------------------------------------------------------------------
 # Input Models
@@ -14,16 +14,18 @@ from swisstopo_mcp.api_client import geo_admin_request, handle_api_error
 
 
 class GeocodeInput(BaseModel):
-    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid", strict=True)
 
     search_text: str = Field(
         ...,
         min_length=2,
         max_length=200,
+        pattern=TEXT_PATTERN,
         description="Adresse, Ort, PLZ oder Parzelle",
     )
     origins: str | None = Field(
         default=None,
+        pattern=r"^[a-z0-9,]+$",
         description=(
             "Filter: 'address', 'zipcode', 'gg25', 'district', "
             "'kantone', 'gazetteer', 'parcel'"
@@ -34,7 +36,7 @@ class GeocodeInput(BaseModel):
 
 
 class ReverseGeocodeInput(BaseModel):
-    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid", strict=True)
 
     lat: float = Field(..., ge=45.8, le=47.9, description="Breitengrad (WGS84)")
     lon: float = Field(..., ge=5.9, le=10.5, description="Längengrad (WGS84)")
@@ -50,7 +52,12 @@ class ReverseGeocodeInput(BaseModel):
 def format_geocode_results(results: list[dict[str, Any]]) -> str:
     """Format geocode results as a Markdown table."""
     if not results:
-        return "Keine Ergebnisse gefunden."
+        return (
+            "Keine Ergebnisse gefunden (match_type: none). "
+            "Versuche einen kürzeren oder allgemeineren Suchbegriff, prüfe die "
+            "Schreibweise, oder grenze mit dem Parameter `origins` ein "
+            "(z.B. 'address', 'zipcode', 'gg25')."
+        )
 
     lines = [
         "| Adresse | Lat | Lon | Typ |",

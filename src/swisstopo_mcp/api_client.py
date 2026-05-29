@@ -21,6 +21,18 @@ CH_LON_MIN, CH_LON_MAX = 5.9, 10.5
 
 SUPPORTED_SRS = {4326, 2056, 21781, 3857}
 
+# --- Input-Validation Patterns (SEC-018) ---
+#
+# Whitelist patterns for free-text tool arguments. They go into upstream HTTP
+# query params, so the goal is to reject control characters and obviously
+# malicious payloads while still accepting real Swiss addresses, layer IDs and
+# search terms (incl. umlauts/accents).
+TEXT_PATTERN = r"^[\w\sÀ-ÿ.,;:'’\-/()&+%°]+$"  # addresses, place names, search terms
+ID_PATTERN = r"^[\w.,\s\-]+$"  # layer / feature / collection identifiers
+COORDS_PATTERN = r"^[\d.,;\s\-]+$"  # 'lat1,lon1;lat2,lon2;...'
+LANG_PATTERN = r"^[a-z]{2}$"  # de | fr | it | en
+CANTON_PATTERN = r"^[A-Za-z]{2}$"  # ZH, BE, ...
+
 # --- Egress Allow-List (SEC-021) ---
 #
 # Every outbound request host must appear here. It is a frozenset (not loaded
@@ -146,7 +158,13 @@ def handle_api_error(e: Exception, context: str = "") -> str:
     if isinstance(e, httpx.ConnectError):
         return f"{prefix}Verbindungsfehler. Prüfe die Netzwerkverbindung."
 
-    return f"{prefix}{type(e).__name__}: {e}"
+    # Intentional, user-facing validation errors carry helpful guidance — keep them.
+    if isinstance(e, (ValueError, PermissionError)):
+        return f"{prefix}{e}"
+
+    # Unexpected errors: do NOT leak the raw exception text/internals to the LLM
+    # (OBS-002). The original error should be inspected from server logs/stderr.
+    return f"{prefix}Unerwarteter interner Fehler. Bitte später erneut versuchen."
 
 
 # --- Coordinate Helpers ---

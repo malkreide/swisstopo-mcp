@@ -6,7 +6,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from swisstopo_mcp.api_client import handle_api_error, stac_request
+from swisstopo_mcp.api_client import ID_PATTERN, TEXT_PATTERN, handle_api_error, stac_request
 
 # ---------------------------------------------------------------------------
 # Input Models
@@ -14,23 +14,25 @@ from swisstopo_mcp.api_client import handle_api_error, stac_request
 
 
 class SearchGeodataInput(BaseModel):
-    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid", strict=True)
 
     query: str = Field(
         ...,
         min_length=1,
         max_length=200,
+        pattern=TEXT_PATTERN,
         description="Suchbegriff (z.B. 'swissALTI3D', 'Orthofoto', 'Gebäude 3D')",
     )
     limit: int = Field(default=10, ge=1, le=50, description="Maximale Trefferanzahl")
 
 
 class GetCollectionInput(BaseModel):
-    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid", strict=True)
 
     collection_id: str = Field(
         ...,
         min_length=2,
+        pattern=ID_PATTERN,
         description="Collection-ID (z.B. 'ch.swisstopo.swissalti3d')",
     )
 

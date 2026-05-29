@@ -7,6 +7,8 @@ import os
 from pydantic import BaseModel, ConfigDict, Field
 
 from swisstopo_mcp.api_client import (
+    CANTON_PATTERN,
+    LANG_PATTERN,
     _get_client,
     assert_host_allowed,
     handle_api_error,
@@ -41,22 +43,33 @@ def get_oereb_endpoint(canton: str) -> str | None:
 
 
 class GetEgridInput(BaseModel):
-    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid", strict=True)
 
     lat: float = Field(..., ge=45.8, le=47.9, description="Breitengrad (WGS84)")
     lon: float = Field(..., ge=5.9, le=10.5, description="Längengrad (WGS84)")
     canton: str = Field(
-        ..., min_length=2, max_length=2, description="Kantonskürzel (z.B. 'ZH', 'BE')"
+        ...,
+        min_length=2,
+        max_length=2,
+        pattern=CANTON_PATTERN,
+        description="Kantonskürzel (z.B. 'ZH', 'BE')",
     )
 
 
 class GetOerebExtractInput(BaseModel):
-    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid", strict=True)
 
-    egrid: str = Field(..., min_length=5, description="EGRID (z.B. 'CH767982496078')")
-    canton: str = Field(..., min_length=2, max_length=2, description="Kantonskürzel")
-    topics: str | None = Field(default=None, description="Themenfilter (kommagetrennt)")
-    lang: str = Field(default="de", description="Sprache")
+    egrid: str = Field(
+        ..., min_length=5, max_length=30, pattern=r"^[A-Za-z0-9]+$",
+        description="EGRID (z.B. 'CH767982496078')",
+    )
+    canton: str = Field(
+        ..., min_length=2, max_length=2, pattern=CANTON_PATTERN, description="Kantonskürzel"
+    )
+    topics: str | None = Field(
+        default=None, max_length=200, pattern=r"^[\w,\-]+$", description="Themenfilter (kommagetrennt)"
+    )
+    lang: str = Field(default="de", pattern=LANG_PATTERN, description="Sprache")
 
 
 # ---------------------------------------------------------------------------

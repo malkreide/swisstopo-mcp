@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from swisstopo_mcp.api_client import wgs84_to_lv95
+from swisstopo_mcp.api_client import ID_PATTERN, LANG_PATTERN, wgs84_to_lv95
 
 # ---------------------------------------------------------------------------
 # Notable layers reference
@@ -24,16 +24,17 @@ NOTABLE_LAYERS: dict[str, str] = {
 
 
 class MapUrlInput(BaseModel):
-    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid", strict=True)
 
     lat: float = Field(..., ge=45.8, le=47.9, description="Breitengrad (WGS84)")
     lon: float = Field(..., ge=5.9, le=10.5, description="Längengrad (WGS84)")
     zoom: int = Field(default=8, ge=1, le=13, description="Zoomstufe 1-13")
     layers: str | None = Field(
         default=None,
+        pattern=ID_PATTERN,
         description="Layer-IDs kommagetrennt (z.B. 'ch.are.bauzonen')",
     )
-    lang: str = Field(default="de", description="Sprache (de, fr, it, en)")
+    lang: str = Field(default="de", pattern=LANG_PATTERN, description="Sprache (de, fr, it, en)")
 
 
 # ---------------------------------------------------------------------------

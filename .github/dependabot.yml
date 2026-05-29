@@ -1,0 +1,25 @@
+version: 2
+updates:
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    labels:
+      - "dependencies"
+    groups:
+      mcp-sdk:
+        patterns:
+          - "mcp"
+      # keep other deps grouped to reduce PR noise
+      python-deps:
+        patterns:
+          - "*"
+        exclude-patterns:
+          - "mcp"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    labels:
+      - "dependencies"

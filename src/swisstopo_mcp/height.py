@@ -8,6 +8,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field
 
 from swisstopo_mcp.api_client import (
+    COORDS_PATTERN,
     geo_admin_request,
     handle_api_error,
     parse_coordinate_string,
@@ -20,7 +21,7 @@ from swisstopo_mcp.api_client import (
 
 
 class HeightInput(BaseModel):
-    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid", strict=True)
 
     lat: float = Field(..., ge=45.8, le=47.9, description="Breitengrad (WGS84)")
     lon: float = Field(..., ge=5.9, le=10.5, description="Längengrad (WGS84)")
@@ -28,11 +29,13 @@ class HeightInput(BaseModel):
 
 
 class ElevationProfileInput(BaseModel):
-    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid", strict=True)
 
     coordinates: str = Field(
         ...,
         min_length=5,
+        max_length=2000,
+        pattern=COORDS_PATTERN,
         description="Koordinaten im Format 'lat1,lon1;lat2,lon2;...'",
     )
     nb_points: int = Field(

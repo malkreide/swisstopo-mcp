@@ -282,9 +282,10 @@ class TestElevationProfileHandler:
             return []
 
         monkeypatch.setattr("swisstopo_mcp.height.geo_admin_request", mock_request)
-        # Only one coordinate pair — should fail parse
+        # Only one coordinate pair — passes the input pattern but fails the
+        # >=2-pairs parse check, exercising the handler error path.
         result = await elevation_profile(
-            ElevationProfileInput(coordinates="46.9,7.4;baddata")
+            ElevationProfileInput(coordinates="46.9,7.4")
         )
         assert "Fehler" in result
 

@@ -75,9 +75,16 @@ class TestHandleApiError:
         result = handle_api_error(httpx.ConnectError("fail"), "Test")
         assert "Verbindung" in result or "verbindung" in result.lower()
 
-    def test_generic_error(self):
+    def test_generic_error_is_masked(self):
+        # OBS-002: unexpected errors must not leak raw exception text to the LLM.
         result = handle_api_error(RuntimeError("boom"), "Test")
-        assert "boom" in result
+        assert "boom" not in result
+        assert "Unerwarteter interner Fehler" in result
+
+    def test_value_error_message_preserved(self):
+        # Intentional, user-facing validation errors keep their helpful message.
+        result = handle_api_error(ValueError("Mindestens 2 Koordinatenpaare"), "Test")
+        assert "Mindestens 2 Koordinatenpaare" in result
 
 
 class TestParseCoordinateString:

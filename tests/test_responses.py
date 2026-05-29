@@ -82,3 +82,22 @@ class TestFastMCPStructuredOutput:
         assert structured["source"] == SWISSTOPO_SOURCE
         assert structured["count"] == 1
         assert structured["match_type"] == "exact"
+
+
+class TestProtocolErrors:
+    """OBS-001: protocol-level errors (bad tool / invalid params) surface as
+    errors from the SDK (mapped to standard JSON-RPC codes), distinct from the
+    structured `is_error` envelope used for handled execution errors."""
+
+    async def test_invalid_params_raises(self):
+        from swisstopo_mcp.server import mcp
+
+        with pytest.raises(Exception):
+            # search_text below min_length -> validation / -32602
+            await mcp.call_tool("swisstopo_geocode", {"params": {"search_text": "x"}})
+
+    async def test_unknown_tool_raises(self):
+        from swisstopo_mcp.server import mcp
+
+        with pytest.raises(Exception):
+            await mcp.call_tool("does_not_exist", {})

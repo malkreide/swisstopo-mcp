@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 
+from mcp.server.fastmcp import Context
 from pydantic import BaseModel, ConfigDict, Field
 
 from swisstopo_mcp.api_client import (
@@ -138,9 +139,13 @@ async def get_egrid(params: GetEgridInput) -> ToolResponse:
 
 
 @log_tool_call("swisstopo_get_oereb_extract")
-async def get_oereb_extract(params: GetOerebExtractInput) -> ToolResponse:
+async def get_oereb_extract(
+    params: GetOerebExtractInput, ctx: Context | None = None
+) -> ToolResponse:
     """Return ÖREB restrictions for a parcel identified by EGRID."""
     canton = params.canton.upper()
+    if ctx is not None:
+        await ctx.info(f"Rufe ÖREB-Auszug für {params.egrid} (Kanton {canton}) ab …")
     base = get_oereb_endpoint(canton)
     if base is None:
         available = list(get_active_cantons().keys())

@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from mcp.server.fastmcp import Context
 from pydantic import BaseModel, ConfigDict, Field
 
 from swisstopo_mcp.api_client import (
@@ -142,10 +143,14 @@ async def get_height(params: HeightInput) -> ToolResponse:
 
 
 @log_tool_call("swisstopo_elevation_profile")
-async def elevation_profile(params: ElevationProfileInput) -> ToolResponse:
+async def elevation_profile(
+    params: ElevationProfileInput, ctx: Context | None = None
+) -> ToolResponse:
     """Compute an elevation profile along a line defined by coordinate pairs."""
     try:
         coord_pairs = parse_coordinate_string(params.coordinates)
+        if ctx is not None:
+            await ctx.info(f"Berechne Höhenprofil über {len(coord_pairs)} Stützpunkte …")
 
         # Profile API only supports LV95 (2056) and LV03 (21781)
         # GeoJSON coordinates must also be in the target SR
@@ -174,6 +179,8 @@ async def elevation_profile(params: ElevationProfileInput) -> ToolResponse:
         )
         # data is a list of profile points
         if isinstance(data, list):
+            if ctx is not None:
+                await ctx.report_progress(progress=1, total=1, message=f"{len(data)} Punkte")
             return ToolResponse.ok(
                 format_elevation_profile(data),
                 data,

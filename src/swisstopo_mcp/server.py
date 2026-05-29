@@ -13,6 +13,7 @@ from mcp.server.fastmcp import FastMCP
 
 from swisstopo_mcp.api_client import create_shared_client, set_shared_client
 from swisstopo_mcp.logging_config import configure_logging, get_logger
+from swisstopo_mcp.models import ToolResponse
 
 configure_logging()
 _log = get_logger("swisstopo_mcp.server")
@@ -67,7 +68,7 @@ from swisstopo_mcp.geocoding import (  # noqa: E402
         "openWorldHint": True,
     },
 )
-async def swisstopo_geocode(params: GeocodeInput) -> str:
+async def swisstopo_geocode(params: GeocodeInput) -> ToolResponse:
     """Wandelt Adressen, Ortsnamen oder PLZ in Koordinaten um (Geocoding)."""
     return await geocode(params)
 
@@ -82,7 +83,7 @@ async def swisstopo_geocode(params: GeocodeInput) -> str:
         "openWorldHint": True,
     },
 )
-async def swisstopo_reverse_geocode(params: ReverseGeocodeInput) -> str:
+async def swisstopo_reverse_geocode(params: ReverseGeocodeInput) -> ToolResponse:
     """Findet die nächstgelegene Adresse zu gegebenen Koordinaten (Reverse Geocoding)."""
     return await reverse_geocode(params)
 
@@ -110,7 +111,7 @@ from swisstopo_mcp.rest_api import (  # noqa: E402
         "openWorldHint": True,
     },
 )
-async def swisstopo_search_layers(params: SearchLayersInput) -> str:
+async def swisstopo_search_layers(params: SearchLayersInput) -> ToolResponse:
     """Durchsucht den Swisstopo-Layerkatalog (500+ Layer) nach Geodatensätzen."""
     return await search_layers(params)
 
@@ -125,7 +126,7 @@ async def swisstopo_search_layers(params: SearchLayersInput) -> str:
         "openWorldHint": True,
     },
 )
-async def swisstopo_identify_features(params: IdentifyInput) -> str:
+async def swisstopo_identify_features(params: IdentifyInput) -> ToolResponse:
     """Findet Features an einer bestimmten Koordinate (räumliche Abfrage auf Swisstopo-Layern)."""
     return await identify_features(params)
 
@@ -140,7 +141,7 @@ async def swisstopo_identify_features(params: IdentifyInput) -> str:
         "openWorldHint": True,
     },
 )
-async def swisstopo_find_features(params: FindFeaturesInput) -> str:
+async def swisstopo_find_features(params: FindFeaturesInput) -> ToolResponse:
     """Sucht Features anhand eines Attributwerts in einem Layer (z.B. Gebäude nach EGID)."""
     return await find_features(params)
 
@@ -155,7 +156,7 @@ async def swisstopo_find_features(params: FindFeaturesInput) -> str:
         "openWorldHint": True,
     },
 )
-async def swisstopo_get_feature(params: GetFeatureInput) -> str:
+async def swisstopo_get_feature(params: GetFeatureInput) -> ToolResponse:
     """Ruft die vollständigen Attribute und Geometrie eines Features per ID ab."""
     return await get_feature(params)
 
@@ -179,7 +180,7 @@ from swisstopo_mcp.stac import (  # noqa: E402
         "openWorldHint": True,
     },
 )
-async def swisstopo_search_geodata(params: SearchGeodataInput) -> str:
+async def swisstopo_search_geodata(params: SearchGeodataInput) -> ToolResponse:
     """Durchsucht den STAC-Katalog nach Geodaten.
 
     Findet Orthophotos, Höhenmodelle, 3D-Gebäude und historische Karten.
@@ -197,7 +198,7 @@ async def swisstopo_search_geodata(params: SearchGeodataInput) -> str:
         "openWorldHint": True,
     },
 )
-async def swisstopo_get_collection(params: GetCollectionInput) -> str:
+async def swisstopo_get_collection(params: GetCollectionInput) -> ToolResponse:
     """Ruft Detailinformationen und Download-Links einer STAC-Collection ab."""
     return await get_collection(params)
 
@@ -216,7 +217,7 @@ from swisstopo_mcp.wmts import MapUrlInput, build_map_url  # noqa: E402
         "openWorldHint": True,
     },
 )
-async def swisstopo_map_url(params: MapUrlInput) -> str:
+async def swisstopo_map_url(params: MapUrlInput) -> ToolResponse:
     """Generiert eine map.geo.admin.ch-URL zum Öffnen im Browser."""
     return await build_map_url(params)
 
@@ -240,7 +241,7 @@ from swisstopo_mcp.height import (  # noqa: E402
         "openWorldHint": True,
     },
 )
-async def swisstopo_get_height(params: HeightInput) -> str:
+async def swisstopo_get_height(params: HeightInput) -> ToolResponse:
     """Gibt die Höhe über Meer (m ü. M.) an einer Koordinate zurück."""
     return await get_height(params)
 
@@ -255,7 +256,7 @@ async def swisstopo_get_height(params: HeightInput) -> str:
         "openWorldHint": True,
     },
 )
-async def swisstopo_elevation_profile(params: ElevationProfileInput) -> str:
+async def swisstopo_elevation_profile(params: ElevationProfileInput) -> ToolResponse:
     """Berechnet ein Höhenprofil entlang einer Linie (z.B. für Schulweg-Analyse)."""
     return await elevation_profile(params)
 
@@ -279,7 +280,7 @@ from swisstopo_mcp.oereb import (  # noqa: E402
         "openWorldHint": True,
     },
 )
-async def swisstopo_get_egrid(params: GetEgridInput) -> str:
+async def swisstopo_get_egrid(params: GetEgridInput) -> ToolResponse:
     """Ermittelt die EGRID (Grundstück-ID) aus Koordinaten für einen bestimmten Kanton."""
     return await get_egrid(params)
 
@@ -294,7 +295,7 @@ async def swisstopo_get_egrid(params: GetEgridInput) -> str:
         "openWorldHint": True,
     },
 )
-async def swisstopo_get_oereb_extract(params: GetOerebExtractInput) -> str:
+async def swisstopo_get_oereb_extract(params: GetOerebExtractInput) -> ToolResponse:
     """Ruft öffentlich-rechtliche Eigentumsbeschränkungen (ÖREB) für ein Grundstück ab."""
     return await get_oereb_extract(params)
 

@@ -15,6 +15,7 @@ from swisstopo_mcp.api_client import (
     wgs84_to_lv95,
 )
 from swisstopo_mcp.logging_config import log_tool_call
+from swisstopo_mcp.models import ToolResponse
 
 # ---------------------------------------------------------------------------
 # Input Models
@@ -113,7 +114,7 @@ def format_elevation_profile(points: list[dict[str, Any]]) -> str:
 
 
 @log_tool_call("swisstopo_get_height")
-async def get_height(params: HeightInput) -> str:
+async def get_height(params: HeightInput) -> ToolResponse:
     """Return the elevation above sea level for a WGS84 coordinate."""
     try:
         # Height API only supports LV95 (2056) and LV03 (21781), not WGS84
@@ -132,13 +133,16 @@ async def get_height(params: HeightInput) -> str:
             },
         )
         height = data.get("height", "?")
-        return format_height_result(params.lat, params.lon, height)
+        return ToolResponse.ok(
+            format_height_result(params.lat, params.lon, height),
+            [{"lat": params.lat, "lon": params.lon, "height": height}],
+        )
     except Exception as e:
-        return handle_api_error(e, "Höhenabfrage")
+        return ToolResponse.error(handle_api_error(e, "Höhenabfrage"))
 
 
 @log_tool_call("swisstopo_elevation_profile")
-async def elevation_profile(params: ElevationProfileInput) -> str:
+async def elevation_profile(params: ElevationProfileInput) -> ToolResponse:
     """Compute an elevation profile along a line defined by coordinate pairs."""
     try:
         coord_pairs = parse_coordinate_string(params.coordinates)
@@ -170,9 +174,13 @@ async def elevation_profile(params: ElevationProfileInput) -> str:
         )
         # data is a list of profile points
         if isinstance(data, list):
-            return format_elevation_profile(data)
-        return f"Unerwartetes Antwortformat: {type(data).__name__}"
+            return ToolResponse.ok(
+                format_elevation_profile(data),
+                data,
+                match_type="exact" if data else "none",
+            )
+        return ToolResponse.error(f"Fehler bei Höhenprofil: Unerwartetes Antwortformat: {type(data).__name__}")
     except ValueError as e:
-        return f"Fehler bei Eingabe: {e}"
+        return ToolResponse.error(f"Fehler bei Eingabe: {e}")
     except Exception as e:
-        return handle_api_error(e, "Höhenprofil")
+        return ToolResponse.error(handle_api_error(e, "Höhenprofil"))

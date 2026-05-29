@@ -12,6 +12,7 @@ from swisstopo_mcp.height import (
     format_height_result,
     get_height,
 )
+from swisstopo_mcp.models import ToolResponse
 
 # ---------------------------------------------------------------------------
 # HeightInput Validation
@@ -197,8 +198,8 @@ class TestGetHeightHandler:
 
         monkeypatch.setattr("swisstopo_mcp.height.geo_admin_request", mock_request)
         result = await get_height(HeightInput(lat=46.9481, lon=7.4474))
-        assert "553.6" in result
-        assert "m ü. M." in result
+        assert "553.6" in result.summary
+        assert "m ü. M." in result.summary
 
     async def test_passes_correct_params(self, monkeypatch):
         captured = {}
@@ -227,7 +228,7 @@ class TestGetHeightHandler:
 
         monkeypatch.setattr("swisstopo_mcp.height.geo_admin_request", mock_request)
         result = await get_height(HeightInput(lat=46.9481, lon=7.4474))
-        assert "Fehler" in result
+        assert "Fehler" in result.summary
 
     async def test_timeout_error(self, monkeypatch):
         import httpx
@@ -237,7 +238,7 @@ class TestGetHeightHandler:
 
         monkeypatch.setattr("swisstopo_mcp.height.geo_admin_request", mock_request)
         result = await get_height(HeightInput(lat=46.9481, lon=7.4474))
-        assert "Fehler" in result or "Zeitüberschreitung" in result
+        assert "Fehler" in result.summary or "Zeitüberschreitung" in result.summary
 
 
 class TestElevationProfileHandler:
@@ -252,8 +253,8 @@ class TestElevationProfileHandler:
         result = await elevation_profile(
             ElevationProfileInput(coordinates="46.9481,7.4474;46.9600,7.4600")
         )
-        assert "|" in result
-        assert "553.6" in result or "560.0" in result
+        assert "|" in result.summary
+        assert "553.6" in result.summary or "560.0" in result.summary
 
     async def test_geojson_built_correctly(self, monkeypatch):
         import json as _json
@@ -287,7 +288,7 @@ class TestElevationProfileHandler:
         result = await elevation_profile(
             ElevationProfileInput(coordinates="46.9,7.4")
         )
-        assert "Fehler" in result
+        assert "Fehler" in result.summary
 
     async def test_nb_points_passed_correctly(self, monkeypatch):
         captured = {}
@@ -313,7 +314,7 @@ class TestElevationProfileHandler:
         result = await elevation_profile(
             ElevationProfileInput(coordinates="46.9,7.4;47.0,7.5")
         )
-        assert "Fehler" in result
+        assert "Fehler" in result.summary
 
     async def test_single_coordinate_pair_rejected(self, monkeypatch):
         # parse_coordinate_string requires >= 2 pairs
@@ -325,7 +326,7 @@ class TestElevationProfileHandler:
             ElevationProfileInput(coordinates="46.9,7.4;46.9,7.4")
         )
         # Two identical pairs are valid — request should go through
-        assert isinstance(result, str)
+        assert isinstance(result, ToolResponse)
 
 
 # ---------------------------------------------------------------------------
@@ -375,7 +376,7 @@ class TestParseCoordinateString:
 @pytest.mark.live
 async def test_live_get_height():
     result = await get_height(HeightInput(lat=46.9481, lon=7.4474))
-    assert "m ü. M." in result
+    assert "m ü. M." in result.summary
 
 
 @pytest.mark.live
@@ -386,5 +387,5 @@ async def test_live_elevation_profile():
             nb_points=10,
         )
     )
-    assert "|" in result
-    assert "Distanz" in result
+    assert "|" in result.summary
+    assert "Distanz" in result.summary

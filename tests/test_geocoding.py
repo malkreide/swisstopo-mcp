@@ -11,6 +11,7 @@ from swisstopo_mcp.geocoding import (
     geocode,
     reverse_geocode,
 )
+from swisstopo_mcp.models import ToolResponse
 
 # ---------------------------------------------------------------------------
 # Input Model Validation
@@ -218,8 +219,8 @@ class TestGeocodeHandler:
 
         monkeypatch.setattr("swisstopo_mcp.geocoding.geo_admin_request", mock_request)
         result = await geocode(GeocodeInput(search_text="Bundesplatz Bern"))
-        assert "Bern" in result
-        assert "46.9466" in result or "46.947" in result
+        assert "Bern" in result.summary
+        assert "46.9466" in result.summary or "46.947" in result.summary
 
     async def test_geocode_with_origins(self, monkeypatch):
         captured = {}
@@ -250,7 +251,7 @@ class TestGeocodeHandler:
 
         monkeypatch.setattr("swisstopo_mcp.geocoding.geo_admin_request", mock_request)
         result = await geocode(GeocodeInput(search_text="xyznotfound"))
-        assert "Keine" in result or "keine" in result.lower()
+        assert "Keine" in result.summary or "keine" in result.summary.lower()
 
     async def test_geocode_api_error(self, monkeypatch):
         import httpx
@@ -261,7 +262,7 @@ class TestGeocodeHandler:
 
         monkeypatch.setattr("swisstopo_mcp.geocoding.geo_admin_request", mock_request)
         result = await geocode(GeocodeInput(search_text="Bern"))
-        assert "Fehler" in result
+        assert "Fehler" in result.summary
 
     async def test_geocode_passes_correct_params(self, monkeypatch):
         captured = {}
@@ -299,7 +300,7 @@ class TestReverseGeocodeHandler:
 
         monkeypatch.setattr("swisstopo_mcp.geocoding.geo_admin_request", mock_request)
         result = await reverse_geocode(ReverseGeocodeInput(lat=47.3769, lon=8.5417))
-        assert "Zürich" in result or "Zurich" in result or "8001" in result
+        assert "Zürich" in result.summary or "Zurich" in result.summary or "8001" in result.summary
 
     async def test_reverse_geocode_empty_results(self, monkeypatch):
         async def mock_request(path, params=None):
@@ -307,7 +308,7 @@ class TestReverseGeocodeHandler:
 
         monkeypatch.setattr("swisstopo_mcp.geocoding.geo_admin_request", mock_request)
         result = await reverse_geocode(ReverseGeocodeInput(lat=46.5, lon=6.5))
-        assert "Keine" in result or "keine" in result.lower()
+        assert "Keine" in result.summary or "keine" in result.summary.lower()
 
     async def test_reverse_geocode_bbox_params(self, monkeypatch):
         captured = {}
@@ -337,7 +338,7 @@ class TestReverseGeocodeHandler:
 
         monkeypatch.setattr("swisstopo_mcp.geocoding.geo_admin_request", mock_request)
         result = await reverse_geocode(ReverseGeocodeInput(lat=47.0, lon=8.0))
-        assert "Fehler" in result
+        assert "Fehler" in result.summary
 
 
 # ---------------------------------------------------------------------------
@@ -348,19 +349,19 @@ class TestReverseGeocodeHandler:
 @pytest.mark.live
 async def test_live_geocode():
     result = await geocode(GeocodeInput(search_text="Bundesplatz Bern"))
-    assert "Bern" in result or "bern" in result.lower()
+    assert "Bern" in result.summary or "bern" in result.summary.lower()
 
 
 @pytest.mark.live
 async def test_live_geocode_with_origins():
     result = await geocode(GeocodeInput(search_text="3000", origins="zipcode"))
-    assert isinstance(result, str)
-    assert len(result) > 0
+    assert isinstance(result, ToolResponse)
+    assert len(result.summary) > 0
 
 
 @pytest.mark.live
 async def test_live_reverse_geocode():
     # Bundesplatz Bern approximately
     result = await reverse_geocode(ReverseGeocodeInput(lat=46.9466, lon=7.4441))
-    assert isinstance(result, str)
-    assert len(result) > 0
+    assert isinstance(result, ToolResponse)
+    assert len(result.summary) > 0

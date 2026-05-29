@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from swisstopo_mcp.api_client import ID_PATTERN, TEXT_PATTERN, handle_api_error, stac_request
 from swisstopo_mcp.logging_config import log_tool_call
+from swisstopo_mcp.models import ToolResponse
 
 # ---------------------------------------------------------------------------
 # Input Models
@@ -132,7 +133,7 @@ def format_search_results(collections: list[dict[str, Any]]) -> str:
 
 
 @log_tool_call("swisstopo_search_geodata")
-async def search_geodata(params: SearchGeodataInput) -> str:
+async def search_geodata(params: SearchGeodataInput) -> ToolResponse:
     """Search the STAC catalog for geodata matching a query string."""
     try:
         data = await stac_request("/collections")
@@ -150,18 +151,25 @@ async def search_geodata(params: SearchGeodataInput) -> str:
                 break
 
         if not matched:
-            return f"Keine Geodaten gefunden für '{params.query}'."
+            return ToolResponse.ok(
+                f"Keine Geodaten gefunden für '{params.query}'.", [], match_type="none"
+            )
 
-        return format_search_results(matched)
+        return ToolResponse.ok(format_search_results(matched), matched, match_type="exact")
     except Exception as e:
-        return handle_api_error(e, "STAC-Suche")
+        return ToolResponse.error(handle_api_error(e, "STAC-Suche"))
 
 
 @log_tool_call("swisstopo_get_collection")
-async def get_collection(params: GetCollectionInput) -> str:
+async def get_collection(params: GetCollectionInput) -> ToolResponse:
     """Retrieve detailed information about a specific STAC collection."""
     try:
         collection = await stac_request(f"/collections/{params.collection_id}")
-        return format_collection_detail(collection)
+        records = [collection] if isinstance(collection, dict) else []
+        return ToolResponse.ok(
+            format_collection_detail(collection),
+            records,
+            match_type="exact" if records else "none",
+        )
     except Exception as e:
-        return handle_api_error(e, f"Collection '{params.collection_id}'")
+        return ToolResponse.error(handle_api_error(e, f"Collection '{params.collection_id}'"))

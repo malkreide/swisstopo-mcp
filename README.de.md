@@ -291,6 +291,23 @@ Resources/Prompts können in einer späteren Phase ergänzt werden.
 
 ---
 
+## Antwortformat
+
+Jedes Tool gibt ein strukturiertes `ToolResponse` zurück (FastMCP liefert es als
+strukturierten Content mit Output-Schema plus JSON-Textblock):
+
+| Feld | Bedeutung |
+|---|---|
+| `summary` | Menschenlesbare Markdown-Zusammenfassung |
+| `results` | Maschinenlesbare strukturierte Datensätze |
+| `count` | Anzahl `results` |
+| `match_type` | `exact` / `fuzzy` / `none` (bei Such-Tools) |
+| `source` / `license` | Datenquellen-Attribution (OGD-CH, CC/OGD-Bedingungen) |
+| `provenance` / `retrieved_at` | Wie und wann die Daten bezogen wurden |
+| `is_error` | `true` bei behandelten Fehlern |
+
+---
+
 ## Bekannte Einschraenkungen
 
 - **OEREB-Tools** erfordern einen Kantons-Parameter; nicht alle Kantone bieten dasselbe API-Format

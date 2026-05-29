@@ -74,7 +74,7 @@ class TestLogToolCall:
         monkeypatch.setattr("swisstopo_mcp.geocoding.geo_admin_request", mock_request)
         with structlog.testing.capture_logs() as caps:
             result = await geocode(GeocodeInput(search_text="Bern"))
-        assert "Keine" in result
+        assert "Keine" in result.summary
         assert any(c.get("tool") == "swisstopo_geocode" for c in caps)
 
 

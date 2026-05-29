@@ -15,6 +15,7 @@ from swisstopo_mcp.api_client import (
     wgs84_to_lv95,
 )
 from swisstopo_mcp.logging_config import log_tool_call
+from swisstopo_mcp.models import OEREB_LICENSE, OEREB_SOURCE, ToolResponse
 
 # ---------------------------------------------------------------------------
 # Canton Registry
@@ -79,16 +80,17 @@ class GetOerebExtractInput(BaseModel):
 
 
 @log_tool_call("swisstopo_get_egrid")
-async def get_egrid(params: GetEgridInput) -> str:
+async def get_egrid(params: GetEgridInput) -> ToolResponse:
     """Return the EGRID (parcel identifier) for a WGS84 coordinate in a given canton."""
     canton = params.canton.upper()
     base = get_oereb_endpoint(canton)
     if base is None:
         available = list(get_active_cantons().keys())
-        return (
+        return ToolResponse.error(
             f"⚠️ Kanton {canton} wird nicht unterstützt. "
             f"Verfügbar: {available}. "
-            f"Manueller Auszug: https://oereb.cadastre.ch"
+            f"Manueller Auszug: https://oereb.cadastre.ch",
+            source=OEREB_SOURCE,
         )
 
     try:
@@ -103,37 +105,50 @@ async def get_egrid(params: GetEgridInput) -> str:
         # Parse EGRID(s) from response
         features = data.get("features", [])
         if not features:
-            return (
+            return ToolResponse.ok(
                 f"Kein EGRID gefunden für Koordinaten "
-                f"({params.lat}, {params.lon}) in Kanton {canton}."
+                f"({params.lat}, {params.lon}) in Kanton {canton}.",
+                [],
+                match_type="none",
+                source=OEREB_SOURCE,
+                license=OEREB_LICENSE,
             )
 
-        results = []
+        lines = []
+        records = []
         for feature in features:
             props = feature.get("properties", {})
             egrid = props.get("egrid", props.get("EGRID", "?"))
             municipality = props.get(
                 "gemeindename", props.get("municipality", props.get("Gemeinde", "?"))
             )
-            results.append(f"EGRID: {egrid} (Gemeinde: {municipality})")
+            lines.append(f"EGRID: {egrid} (Gemeinde: {municipality})")
+            records.append({"egrid": egrid, "municipality": municipality})
 
-        return "\n".join(results)
+        return ToolResponse.ok(
+            "\n".join(lines),
+            records,
+            match_type="exact",
+            source=OEREB_SOURCE,
+            license=OEREB_LICENSE,
+        )
 
     except Exception as e:
-        return handle_api_error(e, f"EGRID-Abfrage Kanton {canton}")
+        return ToolResponse.error(handle_api_error(e, f"EGRID-Abfrage Kanton {canton}"), source=OEREB_SOURCE)
 
 
 @log_tool_call("swisstopo_get_oereb_extract")
-async def get_oereb_extract(params: GetOerebExtractInput) -> str:
+async def get_oereb_extract(params: GetOerebExtractInput) -> ToolResponse:
     """Return ÖREB restrictions for a parcel identified by EGRID."""
     canton = params.canton.upper()
     base = get_oereb_endpoint(canton)
     if base is None:
         available = list(get_active_cantons().keys())
-        return (
+        return ToolResponse.error(
             f"⚠️ Kanton {canton} wird nicht unterstützt. "
             f"Verfügbar: {available}. "
-            f"Manueller Auszug: https://oereb.cadastre.ch"
+            f"Manueller Auszug: https://oereb.cadastre.ch",
+            source=OEREB_SOURCE,
         )
 
     try:
@@ -145,7 +160,13 @@ async def get_oereb_extract(params: GetOerebExtractInput) -> str:
         async with await _get_client() as client:
             response = await client.get(url)
             if response.status_code == 404:
-                return f"EGRID '{params.egrid}' nicht gefunden in Kanton {canton}."
+                return ToolResponse.ok(
+                    f"EGRID '{params.egrid}' nicht gefunden in Kanton {canton}.",
+                    [],
+                    match_type="none",
+                    source=OEREB_SOURCE,
+                    license=OEREB_LICENSE,
+                )
             response.raise_for_status()
             data = response.json()
 
@@ -158,7 +179,13 @@ async def get_oereb_extract(params: GetOerebExtractInput) -> str:
             restriction_measures = []
 
         if not restriction_measures:
-            return f"## ÖREB-Auszug für {params.egrid}\n\nKeine Eigentumsbeschränkungen gefunden."
+            return ToolResponse.ok(
+                f"## ÖREB-Auszug für {params.egrid}\n\nKeine Eigentumsbeschränkungen gefunden.",
+                [],
+                match_type="none",
+                source=OEREB_SOURCE,
+                license=OEREB_LICENSE,
+            )
 
         # Group by topic
         topics_grouped: dict[str, list[dict]] = {}
@@ -217,7 +244,13 @@ async def get_oereb_extract(params: GetOerebExtractInput) -> str:
                     lines.append(f"- **Rechtliche Grundlage:** {legal_text}")
             lines.append("")
 
-        return "\n".join(lines).rstrip()
+        return ToolResponse.ok(
+            "\n".join(lines).rstrip(),
+            list(restriction_measures),
+            match_type="exact",
+            source=OEREB_SOURCE,
+            license=OEREB_LICENSE,
+        )
 
     except Exception as e:
-        return handle_api_error(e, f"ÖREB-Auszug Kanton {canton}")
+        return ToolResponse.error(handle_api_error(e, f"ÖREB-Auszug Kanton {canton}"), source=OEREB_SOURCE)

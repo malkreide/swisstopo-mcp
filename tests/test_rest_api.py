@@ -4,6 +4,7 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
+from swisstopo_mcp.models import ToolResponse
 from swisstopo_mcp.rest_api import (
     FindFeaturesInput,
     GetFeatureInput,
@@ -262,7 +263,7 @@ class TestSearchLayersHandler:
 
         monkeypatch.setattr("swisstopo_mcp.rest_api.geo_admin_request", mock_request)
         result = await search_layers(SearchLayersInput(query="gebaeude"))
-        assert "ch.bfs.gebaeude_wohnungs_register" in result
+        assert "ch.bfs.gebaeude_wohnungs_register" in result.summary
 
     async def test_search_layers_empty(self, monkeypatch):
         async def mock_request(path, params=None):
@@ -270,7 +271,7 @@ class TestSearchLayersHandler:
 
         monkeypatch.setattr("swisstopo_mcp.rest_api.geo_admin_request", mock_request)
         result = await search_layers(SearchLayersInput(query="xyznotfound"))
-        assert "Keine Layer gefunden" in result
+        assert "Keine Layer gefunden" in result.summary
 
 
 class TestIdentifyFeaturesHandler:
@@ -291,7 +292,7 @@ class TestIdentifyFeaturesHandler:
         result = await identify_features(
             IdentifyInput(layers="ch.bfs.gebaeude_wohnungs_register", lat=47.38, lon=8.54)
         )
-        assert "9999" in result
+        assert "9999" in result.summary
 
     async def test_identify_empty(self, monkeypatch):
         async def mock_request(path, params=None):
@@ -301,7 +302,7 @@ class TestIdentifyFeaturesHandler:
         result = await identify_features(
             IdentifyInput(layers="ch.test", lat=47.0, lon=8.0)
         )
-        assert "Keine Features gefunden" in result
+        assert "Keine Features gefunden" in result.summary
 
 
 class TestFindFeaturesHandler:
@@ -322,7 +323,7 @@ class TestFindFeaturesHandler:
         result = await find_features(
             FindFeaturesInput(layer="ch.test", search_text="Bern", search_field="name")
         )
-        assert "Bern" in result
+        assert "Bern" in result.summary
 
 
 class TestGetFeatureHandler:
@@ -339,7 +340,7 @@ class TestGetFeatureHandler:
 
         monkeypatch.setattr("swisstopo_mcp.rest_api.geo_admin_request", mock_request)
         result = await get_feature(GetFeatureInput(layer="ch.test", feature_id="42"))
-        assert "value" in result
+        assert "value" in result.summary
 
     async def test_get_feature_error(self, monkeypatch):
         import httpx
@@ -350,7 +351,7 @@ class TestGetFeatureHandler:
 
         monkeypatch.setattr("swisstopo_mcp.rest_api.geo_admin_request", mock_request)
         result = await get_feature(GetFeatureInput(layer="ch.test", feature_id="999"))
-        assert "Fehler" in result or "nicht gefunden" in result
+        assert "Fehler" in result.summary or "nicht gefunden" in result.summary
 
 
 # ---------------------------------------------------------------------------
@@ -360,7 +361,7 @@ class TestGetFeatureHandler:
 @pytest.mark.live
 async def test_live_search_layers():
     result = await search_layers(SearchLayersInput(query="gebaeude"))
-    assert "gebaeude" in result.lower() or "Gebäude" in result
+    assert "gebaeude" in result.summary.lower() or "Gebäude" in result.summary
 
 
 @pytest.mark.live
@@ -374,5 +375,5 @@ async def test_live_identify():
         )
     )
     # May or may not find features at this exact point, but should not error
-    assert isinstance(result, str)
-    assert len(result) > 0
+    assert isinstance(result, ToolResponse)
+    assert len(result.summary) > 0

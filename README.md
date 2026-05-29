@@ -286,12 +286,41 @@ The MCP protocol version is negotiated by the `mcp` SDK, which is pinned to the
 negotiated version. SDK bumps are proposed monthly via Dependabot and tracked
 in [CHANGELOG.md](CHANGELOG.md).
 
+### Sessions & Authentication
+
+The server is unauthenticated by design — it serves only public open data. Over
+HTTP, session IDs are managed entirely by the FastMCP framework; there is no
+per-user state, so there is nothing user-specific to bind a session to. If an
+authenticated deployment is ever introduced, session IDs must be bound to the
+validated user identity (audit finding SEC-009).
+
+### Error handling
+
+- **Execution errors** (upstream failure, invalid value) are returned as a
+  `ToolResponse` with `is_error: true` and a user-friendly `summary`; raw
+  exception text is never leaked to the client (it is logged to stderr instead).
+- **Protocol errors** (unknown tool, malformed/invalid arguments) are emitted by
+  the MCP SDK as JSON-RPC errors with standard codes (e.g. `-32602` invalid
+  params). Input validation happens at the Pydantic boundary (SEC-018).
+
 ## MCP Primitives
 
 This server intentionally exposes **Tools only** (no Resources or Prompts):
 it is a Phase-1 read-only wrapper, and every result is a live, parameterised
 API query rather than a static addressable document. Resources/Prompts may be
 added in a later phase if stable URI schemes emerge.
+
+### Tool workflows
+
+Most tools return a thought-complete result in a single call. Two domains use a
+short, documented discovery chain (each tool's description states the next step):
+
+- **Feature query:** `swisstopo_search_layers` (find layer IDs) →
+  `swisstopo_identify_features` / `swisstopo_find_features` →
+  `swisstopo_get_feature` (full detail).
+- **Cadastre:** `swisstopo_geocode` → `swisstopo_get_egrid` →
+  `swisstopo_get_oereb_extract`.
+- **Downloads:** `swisstopo_search_geodata` → `swisstopo_get_collection`.
 
 ---
 

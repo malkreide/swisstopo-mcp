@@ -289,12 +289,43 @@ Die MCP-Protokollversion wird vom `mcp`-SDK ausgehandelt; dieses ist in
 Version nicht stillschweigend ändert. SDK-Bumps werden monatlich via Dependabot
 vorgeschlagen und in [CHANGELOG.md](CHANGELOG.md) dokumentiert.
 
+### Sessions & Authentifizierung
+
+Der Server ist bewusst nicht authentifiziert — er liefert ausschliesslich
+öffentliche Open Data. Über HTTP werden Session-IDs vollständig vom FastMCP-
+Framework verwaltet; es gibt keinen benutzerspezifischen Zustand, also nichts,
+woran eine Session gebunden werden müsste. Würde später eine authentifizierte
+Variante eingeführt, müssen Session-IDs an die validierte Benutzeridentität
+gebunden werden (Audit-Finding SEC-009).
+
+### Fehlerbehandlung
+
+- **Ausführungsfehler** (Upstream-Fehler, ungültiger Wert) werden als
+  `ToolResponse` mit `is_error: true` und menschenlesbarer `summary` zurückgegeben;
+  rohe Exception-Texte erreichen den Client nie (sie landen stattdessen auf stderr).
+- **Protokollfehler** (unbekanntes Tool, ungültige Argumente) gibt das MCP-SDK als
+  JSON-RPC-Fehler mit Standardcodes aus (z.B. `-32602` invalid params). Die
+  Eingabevalidierung erfolgt an der Pydantic-Grenze (SEC-018).
+
 ## MCP-Primitive
 
 Dieser Server exponiert bewusst **nur Tools** (keine Resources/Prompts):
 Er ist ein Phase-1-Read-only-Wrapper, und jedes Resultat ist eine
 parametrisierte Live-API-Abfrage statt ein statisches, adressierbares Dokument.
 Resources/Prompts können in einer späteren Phase ergänzt werden.
+
+### Tool-Workflows
+
+Die meisten Tools liefern ein gedanklich abgeschlossenes Resultat in einem
+Aufruf. Zwei Domänen nutzen eine kurze, dokumentierte Discovery-Kette (jede
+Tool-Beschreibung nennt den nächsten Schritt):
+
+- **Feature-Abfrage:** `swisstopo_search_layers` (Layer-IDs finden) →
+  `swisstopo_identify_features` / `swisstopo_find_features` →
+  `swisstopo_get_feature` (Details).
+- **Kataster:** `swisstopo_geocode` → `swisstopo_get_egrid` →
+  `swisstopo_get_oereb_extract`.
+- **Downloads:** `swisstopo_search_geodata` → `swisstopo_get_collection`.
 
 ---
 

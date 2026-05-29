@@ -8,6 +8,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Centralised configuration via `pydantic-settings` (`config.py` + `.env.example`)
+  for transport/host/port/origins/log level (audit finding ARCH-004).
+- Secret-scanning CI workflow (gitleaks) and `.env.example` (audit finding ARCH-005).
+- `Context` injection with progress/info logging for the longer-running tools
+  `elevation_profile` and `get_oereb_extract` (audit finding SDK-003).
+- README "Sessions & Authentication", "Error handling" and "Tool workflows"
+  sections (DE/EN) documenting the session model (SEC-009), the execution- vs
+  protocol-error contract (OBS-001), and tool-chaining workflows (ARCH-007).
+- `<use_case>` / `<important_notes>` tags on all 13 tool descriptions
+  (audit finding ARCH-002).
 - Hardened container deployment (SEC-007): multi-stage `Dockerfile` (non-root
   UID 10001), `deploy/kubernetes.yaml` (`runAsNonRoot` / `readOnlyRootFilesystem`
   / dropped capabilities / seccomp `RuntimeDefault`) plus an egress

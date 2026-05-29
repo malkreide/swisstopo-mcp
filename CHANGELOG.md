@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Hardened container deployment (audit finding SEC-007): multi-stage
+  `Dockerfile` running as non-root UID 10001, `deploy/kubernetes.yaml` with
+  `runAsNonRoot` / `readOnlyRootFilesystem` / dropped capabilities / seccomp
+  RuntimeDefault and an egress `NetworkPolicy` (also covers the network layer
+  of SEC-021), a `/healthz` endpoint for liveness probes, and
+  `docs/deployment.md`.
+
 ### Changed
 - **All 13 tools now return a structured `ToolResponse` envelope** instead of a
   plain string (audit finding SDK-002). The envelope carries machine-readable

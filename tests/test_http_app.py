@@ -33,3 +33,10 @@ def test_http_app_defaults_to_no_origins():
 def test_http_app_retains_lifespan():
     app = build_http_app(["https://client.example.com"])
     assert app.router.lifespan_context is not None
+
+
+def test_http_app_exposes_healthz_route():
+    # Container/orchestrator liveness probe target (SEC-007 deployment).
+    app = build_http_app()
+    paths = {getattr(r, "path", None) for r in app.router.routes}
+    assert "/healthz" in paths

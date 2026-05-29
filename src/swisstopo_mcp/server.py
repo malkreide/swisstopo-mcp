@@ -307,10 +307,18 @@ def build_http_app(allowed_origins: list[str] | None = None):
     clients can read the session id and send it on follow-up requests.
     Origins must be passed explicitly (no wildcard) — by default none are
     allowed, which is the safe choice when credentials are involved.
+
+    A `/healthz` route is added for container/orchestrator liveness probes.
     """
     from starlette.middleware.cors import CORSMiddleware
+    from starlette.responses import JSONResponse
+    from starlette.routing import Route
+
+    async def _healthz(_request):
+        return JSONResponse({"status": "ok"})
 
     app = mcp.streamable_http_app()
+    app.router.routes.append(Route("/healthz", _healthz, methods=["GET"]))
     app.add_middleware(
         CORSMiddleware,
         allow_origins=allowed_origins or [],

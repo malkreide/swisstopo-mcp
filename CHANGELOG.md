@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `docs/roadmap.md` and a "Security & Compliance" README section (phase
+  declaration, Lethal-Trifecta assessment, MCP-primitives rationale) —
+  audit findings OPS-003 / SEC-019 / ARCH-008.
+- `.github/dependabot.yml` for monthly pip + GitHub-Actions update PRs
+  (audit finding ARCH-012).
+- CORS configured on the Streamable-HTTP app with
+  `expose_headers: Mcp-Session-Id` (audit finding SDK-004).
+
+### Changed
+- All tool input models now use Pydantic `strict=True` plus whitelist
+  `pattern` constraints on free-text fields (audit finding SEC-018).
+- Unexpected exceptions no longer leak their raw text to the client; intentional
+  validation messages are preserved (audit finding OBS-002).
+- Empty geocoding results now return an actionable hint instead of a bare
+  "no results" string (audit finding ARCH-003).
+- Pinned `mcp[cli]` to the `1.x` major; CI now also runs on the `master`
+  branch.
+
 ### Security
 - Added an explicit code-layer egress allow-list (`ALLOWED_HOSTS` frozenset +
   `assert_host_allowed`) checked before every outbound request; documented in

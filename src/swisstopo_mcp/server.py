@@ -293,12 +293,42 @@ async def swisstopo_get_oereb_extract(params: GetOerebExtractInput) -> str:
     return await get_oereb_extract(params)
 
 
+def build_http_app(allowed_origins: list[str] | None = None):
+    """Build the Streamable-HTTP ASGI app with CORS configured (SDK-004).
+
+    `expose_headers=["Mcp-Session-Id"]` is required so browser-based MCP
+    clients can read the session id and send it on follow-up requests.
+    Origins must be passed explicitly (no wildcard) — by default none are
+    allowed, which is the safe choice when credentials are involved.
+    """
+    from starlette.middleware.cors import CORSMiddleware
+
+    app = mcp.streamable_http_app()
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=allowed_origins or [],
+        allow_methods=["GET", "POST", "OPTIONS"],
+        allow_headers=["Content-Type", "Authorization", "Mcp-Session-Id"],
+        expose_headers=["Mcp-Session-Id"],
+    )
+    return app
+
+
 if __name__ == "__main__":
+    import os
     import sys
 
     if "--http" in sys.argv:
+        import uvicorn
+
         port_idx = sys.argv.index("--port") + 1 if "--port" in sys.argv else None
         port = int(sys.argv[port_idx]) if port_idx else 8000
-        mcp.run(transport="streamable-http", port=port)
+        host = os.environ.get("SWISSTOPO_HTTP_HOST", "127.0.0.1")
+        allowed_origins = [
+            o.strip()
+            for o in os.environ.get("SWISSTOPO_ALLOWED_ORIGINS", "").split(",")
+            if o.strip()
+        ]
+        uvicorn.run(build_http_app(allowed_origins), host=host, port=port)
     else:
         mcp.run()

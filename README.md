@@ -250,6 +250,45 @@ swisstopo-mcp/
 
 ---
 
+## Security & Compliance
+
+### Phase
+
+This server is in **Phase 1 — Read-only wrapper**. All 13 tools are
+`readOnlyHint: true` / `destructiveHint: false`; there are no write or send
+capabilities. See [docs/roadmap.md](docs/roadmap.md) for later phases.
+
+### Lethal Trifecta assessment
+
+| Capability | Status | Rationale |
+|---|---|---|
+| Access to private data | ❌ No | Public Open Data only (federal/cantonal geodata) |
+| Exposure to untrusted content | ⚠️ Limited | Reads only from a fixed allow-list of trusted geo.admin / OEREB hosts |
+| External communication (write/send) | ❌ No | Read-only; no mail/webhook/write tools |
+
+Trifecta score: at most 1 of 3 — safe by design.
+
+### Egress
+
+Outbound requests are restricted to an explicit code-layer allow-list and
+redirects are disabled — see [docs/network-egress.md](docs/network-egress.md).
+
+### MCP Protocol Version
+
+The MCP protocol version is negotiated by the `mcp` SDK, which is pinned to the
+`1.x` major in `pyproject.toml` so an update cannot silently change the
+negotiated version. SDK bumps are proposed monthly via Dependabot and tracked
+in [CHANGELOG.md](CHANGELOG.md).
+
+## MCP Primitives
+
+This server intentionally exposes **Tools only** (no Resources or Prompts):
+it is a Phase-1 read-only wrapper, and every result is a live, parameterised
+API query rather than a static addressable document. Resources/Prompts may be
+added in a later phase if stable URI schemes emerge.
+
+---
+
 ## Known Limitations
 
 - **OEREB tools** require a canton parameter; not all cantons expose the same API format

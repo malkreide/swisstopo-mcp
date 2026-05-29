@@ -250,6 +250,47 @@ swisstopo-mcp/
 
 ---
 
+## Sicherheit & Compliance
+
+### Phase
+
+Dieser Server ist in **Phase 1 — Read-only-Wrapper**. Alle 13 Tools sind
+`readOnlyHint: true` / `destructiveHint: false`; es gibt keine schreibenden
+oder versendenden Funktionen. Spätere Phasen siehe
+[docs/roadmap.md](docs/roadmap.md).
+
+### Lethal-Trifecta-Bewertung
+
+| Fähigkeit | Status | Begründung |
+|---|---|---|
+| Zugriff auf private Daten | ❌ Nein | Nur Public Open Data (Bundes-/Kantonsgeodaten) |
+| Exposition gegenüber untrusted Content | ⚠️ Eingeschränkt | Liest nur von einer fixen Allow-List vertrauenswürdiger geo.admin-/OEREB-Hosts |
+| Externe Kommunikation (write/send) | ❌ Nein | Read-only; keine Mail-/Webhook-/Schreib-Tools |
+
+Trifecta-Score: höchstens 1 von 3 — sicher konzipiert.
+
+### Egress
+
+Ausgehende Requests sind auf eine explizite Code-Layer-Allow-List beschränkt,
+Redirects sind deaktiviert — siehe
+[docs/network-egress.md](docs/network-egress.md).
+
+### MCP-Protokollversion
+
+Die MCP-Protokollversion wird vom `mcp`-SDK ausgehandelt; dieses ist in
+`pyproject.toml` auf den `1.x`-Major gepinnt, damit ein Update die ausgehandelte
+Version nicht stillschweigend ändert. SDK-Bumps werden monatlich via Dependabot
+vorgeschlagen und in [CHANGELOG.md](CHANGELOG.md) dokumentiert.
+
+## MCP-Primitive
+
+Dieser Server exponiert bewusst **nur Tools** (keine Resources/Prompts):
+Er ist ein Phase-1-Read-only-Wrapper, und jedes Resultat ist eine
+parametrisierte Live-API-Abfrage statt ein statisches, adressierbares Dokument.
+Resources/Prompts können in einer späteren Phase ergänzt werden.
+
+---
+
 ## Bekannte Einschraenkungen
 
 - **OEREB-Tools** erfordern einen Kantons-Parameter; nicht alle Kantone bieten dasselbe API-Format

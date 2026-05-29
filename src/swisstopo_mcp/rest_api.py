@@ -7,7 +7,13 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from swisstopo_mcp.api_client import geo_admin_request, handle_api_error
+from swisstopo_mcp.api_client import (
+    ID_PATTERN,
+    LANG_PATTERN,
+    TEXT_PATTERN,
+    geo_admin_request,
+    handle_api_error,
+)
 
 # ---------------------------------------------------------------------------
 # Input Models
@@ -15,21 +21,26 @@ from swisstopo_mcp.api_client import geo_admin_request, handle_api_error
 
 
 class SearchLayersInput(BaseModel):
-    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid", strict=True)
 
     query: str = Field(
-        ..., min_length=1, max_length=200, description="Suchbegriff für Layer-Katalog"
+        ...,
+        min_length=1,
+        max_length=200,
+        pattern=TEXT_PATTERN,
+        description="Suchbegriff für Layer-Katalog",
     )
-    lang: str = Field(default="de", description="Sprache: de, fr, it, en")
+    lang: str = Field(default="de", pattern=LANG_PATTERN, description="Sprache: de, fr, it, en")
     limit: int = Field(default=10, ge=1, le=30)
 
 
 class IdentifyInput(BaseModel):
-    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid", strict=True)
 
     layers: str = Field(
         ...,
         min_length=2,
+        pattern=ID_PATTERN,
         description="Layer-IDs, kommagetrennt, z.B. 'ch.bfs.gebaeude_wohnungs_register'",
     )
     lat: float = Field(..., ge=45.8, le=47.9, description="Breitengrad (WGS84)")
@@ -39,19 +50,19 @@ class IdentifyInput(BaseModel):
 
 
 class FindFeaturesInput(BaseModel):
-    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid", strict=True)
 
-    layer: str = Field(..., min_length=2, description="Layer-ID")
-    search_text: str = Field(..., min_length=1, description="Suchwert")
-    search_field: str = Field(..., min_length=1, description="Attributfeld")
+    layer: str = Field(..., min_length=2, pattern=ID_PATTERN, description="Layer-ID")
+    search_text: str = Field(..., min_length=1, max_length=200, pattern=TEXT_PATTERN, description="Suchwert")
+    search_field: str = Field(..., min_length=1, pattern=ID_PATTERN, description="Attributfeld")
     contains: bool = Field(default=True, description="Teilstring-Suche (True) oder exakt (False)")
 
 
 class GetFeatureInput(BaseModel):
-    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid", strict=True)
 
-    layer: str = Field(..., min_length=2, description="Layer-ID")
-    feature_id: str = Field(..., min_length=1, description="Feature-ID")
+    layer: str = Field(..., min_length=2, pattern=ID_PATTERN, description="Layer-ID")
+    feature_id: str = Field(..., min_length=1, pattern=ID_PATTERN, description="Feature-ID")
     sr: int = Field(default=4326, description="Koordinatensystem")
 
 

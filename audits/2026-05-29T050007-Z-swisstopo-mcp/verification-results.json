@@ -1,0 +1,379 @@
+{
+  "audit_meta": {
+    "server_name": "swisstopo-mcp",
+    "audit_date": "2026-05-29",
+    "skill_version": "1.0.0",
+    "catalog_version": "68 checks (catalog_hash 091f446b...)",
+    "applies_when_dsl_version": "1.0",
+    "policy": "fail-or-partial",
+    "note": "Re-audit after remediation PRs #1,#2,#3,#7,#8,#9,#10. Compare to run 2026-05-29T034026-Z."
+  },
+  "results": {
+    "ARCH-005": {
+      "status": "partial",
+      "category": "ARCH",
+      "severity": "critical",
+      "evidence": [
+        "No hardcoded secrets (grep: 0). Server uses only key-less public APIs.",
+        ".gitignore now present and ignores .env / .env.* (added PR #1)"
+      ],
+      "gaps": [
+        "No .env.example with placeholders",
+        "No gitleaks/trufflehog secret-scanning workflow in CI"
+      ]
+    },
+    "OBS-004": {
+      "status": "pass",
+      "category": "OBS",
+      "severity": "critical",
+      "evidence": [
+        "No print() in src/ (grep: 0)",
+        "structlog now configured to render to sys.stderr only; stdout stays the MCP channel (logging_config.py, PR #7)",
+        "Verified at runtime: GET /healthz logs to stderr, stdout clean"
+      ],
+      "gaps": []
+    },
+    "SEC-004": {
+      "status": "pass",
+      "category": "SEC",
+      "severity": "critical",
+      "evidence": [
+        "follow_redirects=False on the shared client (api_client.py, PR #1) — closes redirect-based SSRF",
+        "Code-layer egress allow-list assert_host_allowed() before every request; all hosts https (api_client.py, PR #2)",
+        "k8s NetworkPolicy blocks private + link-local ranges incl. 169.254.0.0/16 (deploy/kubernetes.yaml, PR #9)",
+        "No tool accepts a user-supplied URL — all hosts are fixed constants/registry"
+      ],
+      "gaps": []
+    },
+    "SEC-009": {
+      "status": "partial",
+      "category": "SEC",
+      "severity": "critical",
+      "evidence": [
+        "No custom session handling; HTTP session IDs delegated to FastMCP",
+        "auth_model=none and data is public read-only → no per-user session to bind; session hijacking has no privilege impact"
+      ],
+      "gaps": [
+        "No user_id:session_id binding (not applicable without auth; would be required if auth is added)"
+      ]
+    },
+    "SEC-016": {
+      "status": "pass",
+      "category": "SEC",
+      "severity": "critical",
+      "evidence": [
+        "No 0.0.0.0 default in code; FastMCP default host 127.0.0.1",
+        "0.0.0.0 is set ONLY via the container env SWISSTOPO_HTTP_HOST (Dockerfile, PR #9)",
+        "docs/deployment.md documents local vs container binding"
+      ],
+      "gaps": []
+    },
+    "SEC-019": {
+      "status": "pass",
+      "category": "SEC",
+      "severity": "critical",
+      "evidence": [
+        "All 13 tools read-only; no write/send capability",
+        "Lethal-Trifecta assessment table documented in README/README.de 'Security & Compliance' (PR #3): <=1 of 3 legs"
+      ],
+      "gaps": []
+    },
+    "SEC-020": {
+      "status": "pass",
+      "category": "SEC",
+      "severity": "critical",
+      "evidence": [
+        "No os.system / shell=True / eval / exec / os.popen / subprocess (grep: 0)",
+        "No filesystem path construction from user input"
+      ],
+      "gaps": []
+    },
+    "ARCH-004": {
+      "status": "partial",
+      "category": "ARCH",
+      "severity": "high",
+      "evidence": [
+        "Tool handlers are transport-agnostic (only typed params; no request object)",
+        "Server supports stdio + streamable-http"
+      ],
+      "gaps": [
+        "Transport/host/port selected via ad-hoc sys.argv + os.environ rather than a pydantic-settings Settings object"
+      ]
+    },
+    "ARCH-006": {
+      "status": "pass",
+      "category": "ARCH",
+      "severity": "high",
+      "evidence": ["13 use-case-oriented tools across 6 API families; anchor query in ~2-3 calls"],
+      "gaps": []
+    },
+    "ARCH-009": {
+      "status": "pass",
+      "category": "ARCH",
+      "severity": "high",
+      "evidence": ["All 13 tools declare explicit, behavior-consistent annotations (server.py)"],
+      "gaps": []
+    },
+    "OBS-001": {
+      "status": "partial",
+      "category": "OBS",
+      "severity": "high",
+      "evidence": [
+        "Execution errors are caught and returned as a structured ToolResponse with is_error=true (models.py, PR #8) instead of raising",
+        "Error paths covered by tests"
+      ],
+      "gaps": [
+        "is_error is an envelope field, not the protocol-level CallToolResult.isError",
+        "No standardized JSON-RPC error codes (-326xx/-320xx)"
+      ]
+    },
+    "OBS-002": {
+      "status": "pass",
+      "category": "OBS",
+      "severity": "high",
+      "evidence": [
+        "handle_api_error masks unexpected exceptions ('Unerwarteter interner Fehler') and never returns traceback/str(e) (api_client.py, PR #3)",
+        "Intentional ValueError/PermissionError messages preserved; originals logged to stderr via structlog (PR #7)"
+      ],
+      "gaps": [
+        "FastMCP from the mcp SDK has no mask_error_details constructor flag; equivalent masking is implemented in-handler instead"
+      ]
+    },
+    "OPS-001": {
+      "status": "pass",
+      "category": "OPS",
+      "severity": "high",
+      "evidence": [
+        "311 tests; mocked unit tests + @pytest.mark.live markers registered; CI runs 'pytest -m not live'",
+        "New regression suites: shared client, egress, input validation, http app, logging, responses"
+      ],
+      "gaps": ["No separate scheduled nightly live-test workflow"]
+    },
+    "OPS-003": {
+      "status": "pass",
+      "category": "OPS",
+      "severity": "high",
+      "evidence": [
+        "Phase 1 (read-only) declared in README 'Security & Compliance' and docs/roadmap.md (PR #3)",
+        "All tools read-only — consistent with Phase 1"
+      ],
+      "gaps": []
+    },
+    "SCALE-002": {
+      "status": "pass",
+      "category": "SCALE",
+      "severity": "high",
+      "evidence": [
+        "k8s manifest defaults to replicas: 1 (per-pod sessions safe) (PR #10)",
+        "Sticky-session example provided (HAProxy header-stick / NGINX cookie affinity / shared store) in deploy/ingress-sticky-sessions.yaml",
+        "docs/deployment.md 'Scaling out' documents the requirement before raising replicas"
+      ],
+      "gaps": []
+    },
+    "SDK-001": {
+      "status": "pass",
+      "category": "SDK",
+      "severity": "high",
+      "evidence": [
+        "FastMCP lifespan creates one shared httpx.AsyncClient reused across all calls (server.py + api_client.py, PR #1)",
+        "Regression test test_shared_client.py verifies reuse + non-closing"
+      ],
+      "gaps": []
+    },
+    "SDK-004": {
+      "status": "pass",
+      "category": "SDK",
+      "severity": "high",
+      "evidence": [
+        "build_http_app configures CORSMiddleware with expose_headers=['Mcp-Session-Id'] and explicit (non-wildcard) origins (server.py, PR #3)",
+        "test_http_app.py verifies the config"
+      ],
+      "gaps": []
+    },
+    "SEC-005": {
+      "status": "pass",
+      "category": "SEC",
+      "severity": "high",
+      "evidence": [
+        "follow_redirects=False removes the rebinding/redirect vector (PR #1)",
+        "Hosts are a fixed code-layer allow-list (frozenset) — no attacker-controlled hostname to rebind (PR #2)",
+        "k8s egress NetworkPolicy blocks private/link-local ranges (PR #9)"
+      ],
+      "gaps": [
+        "Explicit DNS resolve-once/IP-pinning is not implemented; unnecessary here because no user-controlled hostnames are fetched (documented rationale)"
+      ]
+    },
+    "SEC-006": {
+      "status": "pass",
+      "category": "SEC",
+      "severity": "high",
+      "evidence": [
+        "Default transport is stdio (mcp.run()); HTTP only via explicit --http",
+        "README documents local stdio primarily + separate cloud/container section (docs/deployment.md)"
+      ],
+      "gaps": []
+    },
+    "SEC-007": {
+      "status": "pass",
+      "category": "SEC",
+      "severity": "high",
+      "evidence": [
+        "Multi-stage Dockerfile runs as non-root UID 10001 with HEALTHCHECK (PR #9)",
+        "k8s securityContext: runAsNonRoot, readOnlyRootFilesystem, capabilities.drop ALL, seccomp RuntimeDefault, tmpfs /tmp (deploy/kubernetes.yaml)",
+        "docs/deployment.md maps each control to SEC-007"
+      ],
+      "gaps": []
+    },
+    "SEC-013": {
+      "status": "pass",
+      "category": "SEC",
+      "severity": "high",
+      "evidence": ["Public Open Data; only non-secret env var (SWISSTOPO_OEREB_CANTONS); no API keys needed"],
+      "gaps": []
+    },
+    "SEC-018": {
+      "status": "pass",
+      "category": "SEC",
+      "severity": "high",
+      "evidence": [
+        "All input models use Pydantic strict=True + extra='forbid' (PR #3)",
+        "Whitelist pattern constraints on free-text/id/coords/lang/canton/egrid fields; numeric ge/le bounds",
+        "test_input_validation.py covers rejection of control chars / path traversal / injection-style input"
+      ],
+      "gaps": []
+    },
+    "SEC-021": {
+      "status": "pass",
+      "category": "SEC",
+      "severity": "high",
+      "evidence": [
+        "Code-layer ALLOWED_HOSTS frozenset + assert_host_allowed() before each request (api_client.py, PR #2)",
+        "Network-layer egress NetworkPolicy (deploy/kubernetes.yaml, PR #9)",
+        "docs/network-egress.md documents hosts + update procedure; test_egress_allowlist.py guards drift"
+      ],
+      "gaps": []
+    },
+    "ARCH-001": {
+      "status": "pass",
+      "category": "ARCH",
+      "severity": "medium",
+      "evidence": ["Consistent snake_case swisstopo_ tool names; no special chars"],
+      "gaps": []
+    },
+    "ARCH-002": {
+      "status": "partial",
+      "category": "ARCH",
+      "severity": "medium",
+      "evidence": ["Every tool has a meaningful one-sentence description; server-level instructions give cross-tool guidance"],
+      "gaps": [
+        "Descriptions still lack <use_case>/<important_notes> tags and are mostly under the ~100-char median target"
+      ]
+    },
+    "ARCH-003": {
+      "status": "pass",
+      "category": "ARCH",
+      "severity": "medium",
+      "evidence": [
+        "Empty results now carry match_type='none' in the ToolResponse envelope (PR #8)",
+        "Geocoding empty result returns an actionable hint (refine query / use origins) (PR #3)"
+      ],
+      "gaps": []
+    },
+    "ARCH-007": {
+      "status": "partial",
+      "category": "ARCH",
+      "severity": "medium",
+      "evidence": ["Most tools return thought-complete results; elevation_profile aggregates points"],
+      "gaps": [
+        "Layer discovery (search_layers -> get_feature) remains a multi-call chain; no internal multi-source aggregation"
+      ]
+    },
+    "ARCH-008": {
+      "status": "pass",
+      "category": "ARCH",
+      "severity": "medium",
+      "evidence": ["README 'MCP Primitives' section documents and justifies the tools-only design (PR #3)"],
+      "gaps": []
+    },
+    "ARCH-011": {
+      "status": "pass",
+      "category": "ARCH",
+      "severity": "medium",
+      "evidence": ["All mandatory files/dirs present; src-layout; README.de parity; modular tools; CHANGELOG Keep-a-Changelog"],
+      "gaps": []
+    },
+    "ARCH-012": {
+      "status": "pass",
+      "category": "ARCH",
+      "severity": "medium",
+      "evidence": [
+        "mcp[cli] pinned to the 1.x major in pyproject.toml (PR #3)",
+        ".github/dependabot.yml proposes monthly SDK/action updates",
+        "README 'MCP Protocol Version' section + CHANGELOG document the policy"
+      ],
+      "gaps": [
+        "protocolVersion is not pinned as a literal in code because the mcp SDK negotiates it; mitigated via the SDK major-pin"
+      ]
+    },
+    "CH-004": {
+      "status": "pass",
+      "category": "CH",
+      "severity": "medium",
+      "evidence": [
+        "Every ToolResponse carries source + license fields (swisstopo OGD; cantonal OEREB terms) (models.py, PR #8)",
+        "README documents OGD data source/licence"
+      ],
+      "gaps": []
+    },
+    "OBS-003": {
+      "status": "pass",
+      "category": "OBS",
+      "severity": "medium",
+      "evidence": [
+        "structlog dependency; JSON to stderr; configure_logging() idempotent (logging_config.py, PR #7)",
+        "All 13 handlers wrapped with log_tool_call: tool_invoked/completed/failed + bound tool name, correlation_id, duration; upstream requests + masked errors logged",
+        "test_logging.py covers the levels and bound context"
+      ],
+      "gaps": []
+    },
+    "OPS-002": {
+      "status": "pass",
+      "category": "OPS",
+      "severity": "medium",
+      "evidence": [
+        "README has anchor demo, ASCII architecture, limits, bilingual parity, CONTRIBUTING, CHANGELOG",
+        "Added Security & Compliance, Response Format, deployment docs (PRs #3/#8/#9)"
+      ],
+      "gaps": []
+    },
+    "SDK-002": {
+      "status": "pass",
+      "category": "SDK",
+      "severity": "medium",
+      "evidence": [
+        "All 13 tools return a structured ToolResponse (results/count/match_type + source/license/provenance/retrieved_at + summary) (PR #8)",
+        "FastMCP emits structured content + output schema; verified in test_responses.py"
+      ],
+      "gaps": []
+    },
+    "SDK-003": {
+      "status": "partial",
+      "category": "SDK",
+      "severity": "medium",
+      "evidence": ["Most tools are single fast upstream calls where progress reporting is unnecessary"],
+      "gaps": [
+        "No tool injects ctx: Context; elevation_profile/oereb_extract provide no ctx.report_progress feedback"
+      ]
+    },
+    "SEC-008": {
+      "status": "pass",
+      "category": "SEC",
+      "severity": "medium",
+      "evidence": [
+        "No pre/postinstall hooks; standard entry point; README shows full install command",
+        "publish.yml uses OIDC Trusted Publisher (Sigstore) signing"
+      ],
+      "gaps": []
+    }
+  }
+}

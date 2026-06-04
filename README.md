@@ -1,6 +1,6 @@
-> **Part of the [Swiss Public Data MCP Portfolio](https://github.com/malkreide)**
+> 🇨🇭 **Part of the [Swiss Public Data MCP Portfolio](https://github.com/malkreide)**
 
-# swisstopo-mcp
+# 🗺️ swisstopo-mcp
 
 ![Version](https://img.shields.io/badge/version-0.1.0-blue)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -11,7 +11,7 @@
 
 > MCP server for Swiss federal geodata -- maps, elevation, geocoding, cadastral extracts, and downloadable datasets via Swisstopo APIs
 
-[Deutsche Version](README.de.md)
+[🇩🇪 Deutsche Version](README.de.md)
 
 ---
 
@@ -242,7 +242,10 @@ swisstopo-mcp/
 ├── .github/workflows/ci.yml     # GitHub Actions (Python 3.11/3.12/3.13)
 ├── pyproject.toml
 ├── CHANGELOG.md
-├── CONTRIBUTING.md
+├── CONTRIBUTING.md               # Contribution guide (English)
+├── CONTRIBUTING.de.md            # Contribution guide (German)
+├── SECURITY.md                   # Security policy (English)
+├── SECURITY.de.md                # Security policy (German)
 ├── LICENSE
 ├── README.md                    # This file (English)
 └── README.de.md                 # German version
@@ -251,6 +254,8 @@ swisstopo-mcp/
 ---
 
 ## Security & Compliance
+
+The full security policy and posture is documented in [SECURITY.md](SECURITY.md).
 
 ### Phase
 

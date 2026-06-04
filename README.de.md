@@ -1,8 +1,6 @@
-[English Version](README.md)
+> 🇨🇭 **Teil des [Swiss Public Data MCP Portfolios](https://github.com/malkreide)**
 
-> **Teil des [Swiss Public Data MCP Portfolios](https://github.com/malkreide)**
-
-# swisstopo-mcp
+# 🗺️ swisstopo-mcp
 
 ![Version](https://img.shields.io/badge/version-0.1.0-blue)
 [![Lizenz: MIT](https://img.shields.io/badge/Lizenz-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -12,6 +10,8 @@
 ![CI](https://github.com/malkreide/swisstopo-mcp/actions/workflows/ci.yml/badge.svg)
 
 > MCP-Server fuer schweizerische Bundesgeodaten -- Karten, Hoehenmodelle, Geocodierung, Katasterauszuege und herunterladbare Datensaetze via Swisstopo-APIs
+
+[🇬🇧 English Version](README.md)
 
 ---
 
@@ -242,7 +242,10 @@ swisstopo-mcp/
 ├── .github/workflows/ci.yml     # GitHub Actions (Python 3.11/3.12/3.13)
 ├── pyproject.toml
 ├── CHANGELOG.md
-├── CONTRIBUTING.md
+├── CONTRIBUTING.md               # Mitwirken (Englisch)
+├── CONTRIBUTING.de.md            # Mitwirken (Deutsch)
+├── SECURITY.md                   # Sicherheitsrichtlinie (Englisch)
+├── SECURITY.de.md                # Sicherheitsrichtlinie (Deutsch)
 ├── LICENSE
 ├── README.md                    # Englische Hauptversion
 └── README.de.md                 # Diese Datei (Deutsch)
@@ -251,6 +254,9 @@ swisstopo-mcp/
 ---
 
 ## Sicherheit & Compliance
+
+Die vollständige Sicherheitsrichtlinie und Sicherheitslage ist in
+[SECURITY.de.md](SECURITY.de.md) dokumentiert.
 
 ### Phase
 

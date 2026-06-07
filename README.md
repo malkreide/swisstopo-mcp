@@ -402,3 +402,5 @@ Hayal Oezkan · [malkreide](https://github.com/malkreide)
 - **Related:** [swiss-transport-mcp](https://github.com/malkreide/swiss-transport-mcp) -- Swiss public transport
 - **Related:** [swiss-cultural-heritage-mcp](https://github.com/malkreide/swiss-cultural-heritage-mcp) -- Swiss cultural heritage
 - **Portfolio:** [Swiss Public Data MCP Portfolio](https://github.com/malkreide)
+
+<!-- mcp-name: io.github.malkreide/swisstopo-mcp -->

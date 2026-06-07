@@ -48,6 +48,7 @@ dev = [
 swisstopo-mcp = "swisstopo_mcp.server:mcp.run"
 
 [project.urls]
+"mcp-name" = "io.github.malkreide/swisstopo-mcp"
 Homepage   = "https://github.com/malkreide/swisstopo-mcp"
 Repository = "https://github.com/malkreide/swisstopo-mcp"
 Issues     = "https://github.com/malkreide/swisstopo-mcp/issues"

@@ -20,6 +20,10 @@ SWISSTOPO_SOURCE = "swisstopo / geo.admin.ch"
 SWISSTOPO_LICENSE = "Swiss Open Government Data (opendata.swiss)"
 OEREB_SOURCE = "ÖREB-Kataster (Kanton)"
 OEREB_LICENSE = "Kantonale ÖREB-Nutzungsbedingungen"
+GEODIENSTE_SOURCE = "geodienste.ch (Kantone)"
+GEODIENSTE_LICENSE = "Freie Nutzung — Quellenangabe Pflicht (geodienste.ch OGD)"
+OSM_SOURCE = "OpenStreetMap — Overpass API (overpass.osm.ch)"
+OSM_LICENSE = "ODbL — © OpenStreetMap contributors"
 
 
 def _now_iso() -> str:

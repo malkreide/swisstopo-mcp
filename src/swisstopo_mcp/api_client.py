@@ -1,6 +1,7 @@
 # src/swisstopo_mcp/api_client.py
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 from urllib.parse import urlparse
 
@@ -15,6 +16,8 @@ _log = get_logger("swisstopo_mcp.api_client")
 GEO_ADMIN_BASE = "https://api3.geo.admin.ch"
 STAC_BASE = "https://data.geo.admin.ch/api/stac/v0.9"
 WMTS_BASE = "https://wmts.geo.admin.ch/1.0.0"
+GEODIENSTE_BASE = "https://geodienste.ch"
+OVERPASS_BASE = "https://overpass.osm.ch"
 
 REQUEST_TIMEOUT = 30.0
 USER_AGENT = "SwisstopoMCP/0.1 (MCP Server; +https://github.com/malkreide/swisstopo-mcp)"
@@ -51,6 +54,8 @@ ALLOWED_HOSTS: frozenset[str] = frozenset(
         "map.geo.admin.ch",  # shareable map viewer URLs
         "oereb.geo.zh.ch",  # OEREB cadastre — canton ZH
         "www.oereb2.apps.be.ch",  # OEREB cadastre — canton BE
+        "geodienste.ch",  # interkantonale Basisgeodaten (Katalog + WMS/WFS/OGC API)
+        "overpass.osm.ch",  # OpenStreetMap Overpass API (Schweizer Instanz)
     }
 )
 
@@ -118,26 +123,80 @@ async def _get_client() -> httpx.AsyncClient | _NonClosingClient:
     return _build_client()
 
 
+# --- Retry with exponential backoff (resilience default) ---
+#
+# Every upstream call goes through request_with_retry: transient failures (5xx,
+# 429, timeouts, connection errors) are retried with 2s/4s/8s backoff; genuine
+# client errors (4xx except 429) fail fast without retry. This protects against
+# the first-blip-kills-the-server failure mode — weekly dumps and community
+# instances (Overpass) routinely return transient 503s during regeneration.
+RETRY_BACKOFFS: tuple[float, ...] = (2.0, 4.0, 8.0)
+RETRYABLE_STATUS: frozenset[int] = frozenset({429, 500, 502, 503, 504})
+
+
+async def _sleep(seconds: float) -> None:
+    """Indirection so tests can patch out the real backoff delay."""
+    await asyncio.sleep(seconds)
+
+
+async def request_with_retry(
+    method: str,
+    url: str,
+    *,
+    params: dict[str, Any] | None = None,
+    content: bytes | str | None = None,
+    headers: dict[str, str] | None = None,
+    timeout: float | None = None,
+    check_host: bool = True,
+) -> httpx.Response:
+    """Perform an HTTP request with exponential-backoff retry.
+
+    Retries on 429/5xx and network/timeout errors (2s, 4s, 8s). 4xx other than
+    429 raise immediately. The host is checked against the egress allow-list
+    before the first attempt.
+    """
+    if check_host:
+        assert_host_allowed(url)
+    host = urlparse(url).hostname or ""
+    last_exc: Exception | None = None
+    for attempt in range(len(RETRY_BACKOFFS) + 1):
+        if attempt:
+            await _sleep(RETRY_BACKOFFS[attempt - 1])
+            _log.debug("upstream_retry", host=host, attempt=attempt)
+        try:
+            async with await _get_client() as client:
+                response = await client.request(
+                    method, url, params=params, content=content,
+                    headers=headers, timeout=timeout,
+                )
+        except httpx.RequestError as exc:  # timeout / connect / read errors
+            last_exc = exc
+            continue
+        if response.status_code in RETRYABLE_STATUS:
+            last_exc = httpx.HTTPStatusError(
+                f"HTTP {response.status_code}", request=response.request, response=response
+            )
+            continue
+        response.raise_for_status()  # non-retryable 4xx -> raise immediately
+        return response
+    assert last_exc is not None
+    raise last_exc
+
+
 async def geo_admin_request(path: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
     """GET request on api3.geo.admin.ch, returns parsed JSON."""
-    async with await _get_client() as client:
-        url = f"{GEO_ADMIN_BASE}{path}"
-        assert_host_allowed(url)
-        _log.debug("upstream_request", host="api3.geo.admin.ch", path=path)
-        response = await client.get(url, params=params or {})
-        response.raise_for_status()
-        return response.json()
+    url = f"{GEO_ADMIN_BASE}{path}"
+    _log.debug("upstream_request", host="api3.geo.admin.ch", path=path)
+    response = await request_with_retry("GET", url, params=params or {})
+    return response.json()
 
 
 async def stac_request(path: str, params: dict[str, Any] | None = None) -> Any:
     """GET request on data.geo.admin.ch STAC API, returns parsed JSON."""
-    async with await _get_client() as client:
-        url = f"{STAC_BASE}{path}"
-        assert_host_allowed(url)
-        _log.debug("upstream_request", host="data.geo.admin.ch", path=path)
-        response = await client.get(url, params=params or {})
-        response.raise_for_status()
-        return response.json()
+    url = f"{STAC_BASE}{path}"
+    _log.debug("upstream_request", host="data.geo.admin.ch", path=path)
+    response = await request_with_retry("GET", url, params=params or {})
+    return response.json()
 
 
 # --- Error Handling ---

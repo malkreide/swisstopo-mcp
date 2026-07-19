@@ -15,6 +15,8 @@ allow-list (audit check **SEC-021**) and complements the SSRF hardening from
 | `map.geo.admin.ch` | Shareable map viewer URLs | map_url |
 | `oereb.geo.zh.ch` | OEREB cadastre — canton ZH | get_egrid, get_oereb_extract |
 | `www.oereb2.apps.be.ch` | OEREB cadastre — canton BE | get_egrid, get_oereb_extract |
+| `geodienste.ch` | Interkantonale Basisgeodaten (services catalogue + WMS/WFS/OGC API Features) | list_available_layers, query_geodata |
+| `overpass.osm.ch` | OpenStreetMap Overpass API (Swiss instance) — POI queries (ODbL) | query_osm_features |
 
 ## Enforcement
 
@@ -22,8 +24,9 @@ allow-list (audit check **SEC-021**) and complements the SSRF hardening from
   [`src/swisstopo_mcp/api_client.py`](../src/swisstopo_mcp/api_client.py). It is
   **not** loaded from an environment variable, so it cannot be silently widened
   at runtime. `assert_host_allowed(url)` is called before every outbound request
-  in `geo_admin_request`, `stac_request`, and the OEREB handlers; a non-allowed
-  host raises `PermissionError`.
+  in `geo_admin_request`, `stac_request`, `request_with_retry`, and the OEREB
+  handlers; a non-allowed host raises `PermissionError`. The shared
+  `request_with_retry` wrapper checks the host once before the first attempt.
 - **Redirects:** the shared `httpx.AsyncClient` uses `follow_redirects=False`,
   so an upstream cannot redirect a request to an off-list host.
 - **Network layer (deployment):** the server runs locally over stdio today and

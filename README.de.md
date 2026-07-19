@@ -17,7 +17,7 @@
 
 ## Uebersicht
 
-`swisstopo-mcp` gibt KI-Assistenten Zugriff auf die offizielle schweizerische Geodateninfrastruktur ueber 13 Tools aus 6 API-Familien, alle ohne Authentifizierung:
+`swisstopo-mcp` gibt KI-Assistenten Zugriff auf die offizielle schweizerische Geodateninfrastruktur ueber 16 Tools, alle ohne Authentifizierung:
 
 | Quelle | Daten | API |
 |--------|-------|-----|
@@ -35,14 +35,14 @@
 
 ## Funktionen
 
-- 🗺️ **13 Tools** aus **6 API-Familien** (REST, Geocoding, Hoehe, STAC, WMTS, OEREB)
+- 🗺️ **16 Tools** (REST, Geocoding, Hoehe, STAC, WMTS, OEREB, geodienste.ch, OpenStreetMap/Overpass)
 - 🔍 Schweizerische Adressen geocodieren und Koordinaten rueckwaerts geocodieren
 - 🏔️ Hoehe ueber Meer abfragen und Hoehenprofile berechnen
 - 📦 Geodatensaetze entdecken und herunterladen (Orthophotos, 3D-Gebaeude, historische Karten)
 - 🏗️ Kartenobjekte an Koordinaten ueber 500+ Swisstopo-Layer identifizieren
 - 🔗 Teilbare map.geo.admin.ch-Links generieren
 - 📋 Grundstueck-IDs (EGRID) nachschlagen und OEREB-Auszuege abrufen
-- 🔓 **Kein API-Schluessel erforderlich** fuer 11 von 13 Tools
+- 🔓 **Kein API-Schluessel erforderlich** fuer alle Tools (OEREB-Auszug benoetigt einen unterstuetzten Kanton)
 - ☁️ **Dualer Transport** -- stdio (Claude Desktop) + Streamable HTTP (Cloud)
 
 ---
@@ -184,6 +184,17 @@ Fuer den Einsatz via **claude.ai im Browser** (z.B. auf verwalteten Arbeitsplaet
 | `swisstopo_get_egrid` | Kataster-Grundstueck-ID (EGRID) aus Koordinaten ermitteln |
 | `swisstopo_get_oereb_extract` | Oeffentlich-rechtliche Eigentumsbeschraenkungen (OEREB) fuer ein Grundstueck abrufen |
 
+### Konsolidierte Geodaten-Fassade
+
+Eine Fassade ueber mehrere Karten-/Layer-Quellen, bewusst unter dem 18-Tool-Budget
+(siehe [`docs/geodaten-erweiterung-phase1.md`](docs/geodaten-erweiterung-phase1.md)):
+
+| Tool | Beschreibung |
+|------|-------------|
+| `list_available_layers` | Layer-Kennungen fuer `query_geodata` entdecken (`strassenverzeichnis`, `oereb-verfuegbarkeit`, `geodienste:<topic>:<KANTON>`); zeigt nur ohne Vertrag frei nutzbare geodienste-Datensaetze |
+| `query_geodata` | Gewaehlten Layer per `point` / `bbox` / `commune` abfragen — amtliches Strassenverzeichnis, interkantonale geodienste.ch-Daten (OGC API Features) oder ÖREB-Verfuegbarkeit |
+| `query_osm_features` | OpenStreetMap-POIs (Schulen, Spielplaetze, Apotheken, …) im Umkreis via Overpass — separate Quelle, ODbL (© OpenStreetMap contributors) |
+
 ### Beispiel-Abfragen
 
 | Abfrage | Tool |
@@ -194,6 +205,8 @@ Fuer den Einsatz via **claude.ai im Browser** (z.B. auf verwalteten Arbeitsplaet
 | *"Finde Orthophoto-Datensaetze zum Download"* | `swisstopo_search_geodata` |
 | *"Zeige mir eine Karte von Bern bei Zoomstufe 10"* | `swisstopo_map_url` |
 | *"Welche Einschraenkungen gelten fuer Musterstrasse 5?"* | `swisstopo_get_egrid` + `swisstopo_get_oereb_extract` |
+| *"Welche Schulhaeuser liegen im Umkreis von 500 m um Bederstrasse 109, 8002 Zuerich, und welche Strassen fuehren dorthin?"* | `query_osm_features` + `query_geodata` (`strassenverzeichnis`) |
+| *"Welche Daten zu belasteten Standorten sind fuer den Kanton ZH frei?"* | `list_available_layers` + `query_geodata` (`geodienste:kataster_belasteter_standorte:ZH`) |
 
 ---
 
@@ -204,11 +217,11 @@ Fuer den Einsatz via **claude.ai im Browser** (z.B. auf verwalteten Arbeitsplaet
 │   Claude / KI   │────▶│  swisstopo-mcp               │────▶│  Swisstopo REST API      │
 │   (MCP Host)    │◀────│  (MCP Server)                │◀────│  api3.geo.admin.ch       │
 └─────────────────┘     │                              │     ├──────────────────────────┤
-                        │  13 Tools                    │────▶│  Geocoding               │
+                        │  16 Tools                    │────▶│  Geocoding               │
                         │  Stdio | Streamable HTTP     │◀────│  api3.geo.admin.ch       │
                         │                              │     ├──────────────────────────┤
                         │  Keine Authentifizierung     │────▶│  STAC-Katalog            │
-                        │  (11 von 13 Tools)           │◀────│  data.geo.admin.ch       │
+                        │  (alle Tools; OEREB-Kanton)  │◀────│  data.geo.admin.ch       │
                         │                              │     ├──────────────────────────┤
                         │                              │────▶│  OEREB-Kataster          │
                         │                              │◀────│  (kantonale Endpunkte)   │
@@ -230,7 +243,9 @@ swisstopo-mcp/
 │   ├── height.py                # swisstopo_get_height, swisstopo_elevation_profile
 │   ├── stac.py                  # swisstopo_search_geodata, swisstopo_get_collection
 │   ├── wmts.py                  # swisstopo_map_url
-│   └── oereb.py                 # swisstopo_get_egrid, swisstopo_get_oereb_extract
+│   ├── oereb.py                 # swisstopo_get_egrid, swisstopo_get_oereb_extract
+│   ├── geodata.py               # query_geodata + list_available_layers (Fassade)
+│   └── overpass.py              # query_osm_features (OpenStreetMap / Overpass)
 ├── tests/
 │   ├── test_api_client.py
 │   ├── test_geocoding.py
@@ -260,7 +275,7 @@ Die vollständige Sicherheitsrichtlinie und Sicherheitslage ist in
 
 ### Phase
 
-Dieser Server ist in **Phase 1 — Read-only-Wrapper**. Alle 13 Tools sind
+Dieser Server ist in **Phase 1 — Read-only-Wrapper**. Alle 16 Tools sind
 `readOnlyHint: true` / `destructiveHint: false`; es gibt keine schreibenden
 oder versendenden Funktionen. Spätere Phasen siehe
 [docs/roadmap.md](docs/roadmap.md).

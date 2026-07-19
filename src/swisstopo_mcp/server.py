@@ -1,7 +1,9 @@
 """
 swisstopo-mcp — MCP-Server fuer schweizerische Bundesgeodaten.
 
-13 Tools aus 6 API-Familien: REST, Geocoding, Hoehe, STAC, WMTS, OEREB.
+16 Tools aus 8 Quellen-Familien: REST, Geocoding, Hoehe, STAC, WMTS, OEREB,
+plus die konsolidierte Geodaten-Fassade (Strassenverzeichnis, geodienste.ch,
+OEREB-Verfuegbarkeit) und OpenStreetMap-POIs via Overpass.
 Alle Endpunkte sind offen (kein API-Schluessel erforderlich, ausser OEREB-Kanton).
 """
 
@@ -39,14 +41,19 @@ mcp = FastMCP(
     "swisstopo_mcp",
     lifespan=lifespan,
     instructions=(
-        "Swiss federal geodata server with 13 tools across 6 API families. "
+        "Swiss federal geodata server with 16 tools. "
         "Use swisstopo_search_layers to discover layer IDs, then use "
         "swisstopo_identify_features or swisstopo_find_features to query them. "
         "swisstopo_geocode converts addresses to coordinates. "
         "swisstopo_get_height returns elevation. "
         "swisstopo_search_geodata finds downloadable datasets (orthophotos, 3D models, etc.). "
         "swisstopo_map_url generates shareable map links. "
-        "ÖREB tools (swisstopo_get_egrid, swisstopo_get_oereb_extract) require a canton parameter."
+        "ÖREB tools (swisstopo_get_egrid, swisstopo_get_oereb_extract) require a canton parameter. "
+        "For interkantonale/OSM data use the consolidated façade: "
+        "list_available_layers → query_geodata (strassenverzeichnis, "
+        "geodienste:<topic>:<canton>, oereb-verfuegbarkeit). "
+        "query_osm_features returns OpenStreetMap POIs (schools, playgrounds, …) "
+        "around a point via Overpass (ODbL, separate rate-limited source)."
     ),
 )
 
@@ -356,6 +363,86 @@ async def swisstopo_get_oereb_extract(params: GetOerebExtractInput, ctx: Context
     <important_notes>Erfordert einen unterstützten Kanton.</important_notes>
     """
     return await get_oereb_extract(params, ctx=ctx)
+
+
+# --- Consolidated Geodata Façade (Phase-2 Geodaten-Erweiterung) ---
+from swisstopo_mcp.geodata import (  # noqa: E402
+    ListLayersInput,
+    QueryGeodataInput,
+    list_available_layers,
+    query_geodata,
+)
+
+
+@mcp.tool(
+    name="list_available_layers",
+    annotations={
+        "title": "Verfügbare Geodaten-Layer auflisten",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": True,
+    },
+)
+async def list_available_layers_tool(params: ListLayersInput) -> ToolResponse:
+    """Discovery-Tool: listet die Layer-Kennungen, die query_geodata akzeptiert.
+
+    <use_case>Erster Schritt vor query_geodata: herausfinden, welche Datensätze
+    (Strassenverzeichnis, ÖREB-Verfügbarkeit, interkantonale geodienste.ch-Topics)
+    verfügbar und ohne Vertrag frei nutzbar sind. Für konkrete
+    geodienste-Kennungen einen Kanton angeben (z.B. canton='ZH').</use_case>
+    """
+    return await list_available_layers(params)
+
+
+@mcp.tool(
+    name="query_geodata",
+    annotations={
+        "title": "Geodaten abfragen (Fassade)",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": True,
+    },
+)
+async def query_geodata_tool(params: QueryGeodataInput) -> ToolResponse:
+    """Einheitliche Fassade über mehrere Geodaten-Quellen anhand einer Layer-Kennung.
+
+    <use_case>Ein Tool für drei Quellen: 'strassenverzeichnis' (Strassen um einen
+    Punkt), 'oereb-verfuegbarkeit' (ÖREB-Status/Zuständigkeit an einem Punkt) und
+    'geodienste:&lt;topic&gt;:&lt;KANTON&gt;' (interkantonale Basisgeodaten via OGC API
+    Features). Genau eine Ortsangabe (point | bbox | commune) übergeben.</use_case>
+    <important_notes>Gültige Layer-Kennungen via list_available_layers.
+    geodienste-Layer erfordern bbox oder point (mit radius_m).</important_notes>
+    """
+    return await query_geodata(params)
+
+
+# --- OpenStreetMap POIs via Overpass (separate tool, ODbL) ---
+from swisstopo_mcp.overpass import QueryOsmFeaturesInput, query_osm_features  # noqa: E402
+
+
+@mcp.tool(
+    name="query_osm_features",
+    annotations={
+        "title": "OpenStreetMap-POIs abfragen (Overpass)",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": True,
+    },
+)
+async def query_osm_features_tool(params: QueryOsmFeaturesInput) -> ToolResponse:
+    """Findet OpenStreetMap-POIs (Schulen, Spielplätze, Apotheken …) im Umkreis.
+
+    <use_case>Beantwortet «Welche Schulhäuser/Spielplätze liegen im Umkreis von R
+    Metern um diesen Punkt/diese Adresse?». Ergänzt die amtlichen swisstopo-Daten
+    um Points-of-Interest aus OpenStreetMap.</use_case>
+    <important_notes>Quelle OpenStreetMap (ODbL, © OpenStreetMap contributors),
+    nicht swisstopo. Overpass hat Rate-Limits/Timeouts — kleiner Radius bevorzugt;
+    bei Überlastung kommt eine sprechende Fehlermeldung statt Daten.</important_notes>
+    """
+    return await query_osm_features(params)
 
 
 def build_http_app(allowed_origins: list[str] | None = None):

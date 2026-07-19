@@ -2,7 +2,10 @@
 
 **Datum der Probe:** 2026-07-19
 **Methodik:** [`mcp-data-source-probe`](../README.de.md) — Schritt 1 (Live-Probe vor Design).
-**Status:** Phase 1 abgeschlossen. **Phase 2 (Implementation) wartet auf Freigabe.**
+**Status:** Phase 1 abgeschlossen; **Phase 2 umgesetzt** (Freigabe: OEREB nur
+Verfügbarkeits-Layer, geodienste in `query_geodata` integriert). Die 3 neuen
+Tools (`query_geodata`, `list_available_layers`, `query_osm_features`) sind in
+`geodata.py` / `overpass.py` implementiert — siehe CHANGELOG und READMEs.
 
 Alle Ergebnisse unten sind empirisch (`curl` gegen die Live-Endpoints), nicht
 aus der Dokumentation abgeleitet. *«Dokumentation ist ein Foto, Live-Probe ist

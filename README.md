@@ -17,7 +17,7 @@
 
 ## Overview
 
-`swisstopo-mcp` gives AI assistants access to Switzerland's official geodata infrastructure through 13 tools across 6 API families, all without authentication:
+`swisstopo-mcp` gives AI assistants access to Switzerland's official geodata infrastructure through 16 tools, all without authentication:
 
 | Source | Data | API |
 |--------|------|-----|
@@ -27,6 +27,8 @@
 | **STAC Catalog** | Orthophotos, elevation models, 3D buildings | STAC 0.9 |
 | **WMTS** | National maps, aerial images, zoning maps | URL builder |
 | **OEREB Cadastre** | Public-law restrictions, parcels | REST/JSON (cantonal) |
+| **geodienste.ch** | Interkantonale Basisgeodaten (cadastral survey, contaminated sites, hazard maps, …) | OGC API Features / WMS / WFS |
+| **OpenStreetMap** | Points of interest (schools, playgrounds, pharmacies, …) | Overpass API (ODbL) |
 
 **Anchor demo query:** *"What land-use restrictions apply to the parcel at Musterstrasse 5, Zurich? Show me the location on a map."*
 [→ More use cases by audience →](EXAMPLES.md)
@@ -35,14 +37,14 @@
 
 ## Features
 
-- 🗺️ **13 tools** across **6 API families** (REST, Geocoding, Height, STAC, WMTS, OEREB)
+- 🗺️ **16 tools** (REST, Geocoding, Height, STAC, WMTS, OEREB, geodienste.ch, OpenStreetMap/Overpass)
 - 🔍 Geocode Swiss addresses and reverse-geocode coordinates
 - 🏔️ Query elevation and compute elevation profiles
 - 📦 Discover and download geodatasets (orthophotos, 3D buildings, historical maps)
 - 🏗️ Identify map features at coordinates across 500+ Swisstopo layers
 - 🔗 Generate shareable map.geo.admin.ch links
 - 📋 Look up cadastral property IDs (EGRID) and retrieve OEREB extracts
-- 🔓 **No API key required** for 11 of 13 tools
+- 🔓 **No API key required** for all tools (OEREB extract needs a supported canton)
 - ☁️ **Dual transport** -- stdio (Claude Desktop) + Streamable HTTP (cloud)
 
 ---
@@ -184,6 +186,17 @@ For use via **claude.ai in the browser** (e.g. on managed workstations without l
 | `swisstopo_get_egrid` | Resolve a cadastral property ID (EGRID) from coordinates |
 | `swisstopo_get_oereb_extract` | Retrieve public-law land-use restrictions (OEREB) for a parcel |
 
+### Consolidated Geodata Façade
+
+One façade over several map/layer sources, kept under the 18-tool budget (see
+[`docs/geodaten-erweiterung-phase1.md`](docs/geodaten-erweiterung-phase1.md)):
+
+| Tool | Description |
+|------|-------------|
+| `list_available_layers` | Discover layer keys for `query_geodata` (`strassenverzeichnis`, `oereb-verfuegbarkeit`, `geodienste:<topic>:<canton>`); filters to contract-free geodienste datasets |
+| `query_geodata` | Query a chosen layer by `point` / `bbox` / `commune` — amtliches Strassenverzeichnis, interkantonale geodienste.ch data (OGC API Features), or ÖREB availability |
+| `query_osm_features` | OpenStreetMap POIs (schools, playgrounds, pharmacies, …) around a point via Overpass — separate source, ODbL (© OpenStreetMap contributors) |
+
 ### Example Use Cases
 
 | Query | Tool |
@@ -194,6 +207,8 @@ For use via **claude.ai in the browser** (e.g. on managed workstations without l
 | *"Find orthophoto datasets for download"* | `swisstopo_search_geodata` |
 | *"Show me a map of Bern at zoom level 10"* | `swisstopo_map_url` |
 | *"What restrictions apply to parcel at Musterstrasse 5?"* | `swisstopo_get_egrid` + `swisstopo_get_oereb_extract` |
+| *"Which schools are within 500 m of Bederstrasse 109, 8002 Zürich, and which streets lead there?"* | `query_osm_features` + `query_geodata` (`strassenverzeichnis`) |
+| *"Which contaminated-sites data is free for canton ZH?"* | `list_available_layers` + `query_geodata` (`geodienste:kataster_belasteter_standorte:ZH`) |
 
 ---
 
@@ -204,11 +219,11 @@ For use via **claude.ai in the browser** (e.g. on managed workstations without l
 │   Claude / AI   │────▶│  swisstopo-mcp               │────▶│  Swisstopo REST API      │
 │   (MCP Host)    │◀────│  (MCP Server)                │◀────│  api3.geo.admin.ch       │
 └─────────────────┘     │                              │     ├──────────────────────────┤
-                        │  13 Tools                    │────▶│  Geocoding               │
+                        │  16 Tools                    │────▶│  Geocoding               │
                         │  Stdio | Streamable HTTP     │◀────│  api3.geo.admin.ch       │
                         │                              │     ├──────────────────────────┤
                         │  No authentication required  │────▶│  STAC Catalog            │
-                        │  (11 of 13 tools)            │◀────│  data.geo.admin.ch       │
+                        │  (all tools; OEREB canton opt) │◀────│  data.geo.admin.ch       │
                         │                              │     ├──────────────────────────┤
                         │                              │────▶│  OEREB Cadastre          │
                         │                              │◀────│  (cantonal endpoints)    │
@@ -230,7 +245,9 @@ swisstopo-mcp/
 │   ├── height.py                # swisstopo_get_height, swisstopo_elevation_profile
 │   ├── stac.py                  # swisstopo_search_geodata, swisstopo_get_collection
 │   ├── wmts.py                  # swisstopo_map_url
-│   └── oereb.py                 # swisstopo_get_egrid, swisstopo_get_oereb_extract
+│   ├── oereb.py                 # swisstopo_get_egrid, swisstopo_get_oereb_extract
+│   ├── geodata.py               # query_geodata + list_available_layers (façade)
+│   └── overpass.py              # query_osm_features (OpenStreetMap / Overpass)
 ├── tests/
 │   ├── test_api_client.py
 │   ├── test_geocoding.py
@@ -238,7 +255,10 @@ swisstopo-mcp/
 │   ├── test_oereb.py
 │   ├── test_rest_api.py
 │   ├── test_stac.py
-│   └── test_wmts.py
+│   ├── test_wmts.py
+│   ├── test_geodata.py
+│   ├── test_overpass.py
+│   └── test_retry.py
 ├── .github/workflows/ci.yml     # GitHub Actions (Python 3.11/3.12/3.13)
 ├── pyproject.toml
 ├── CHANGELOG.md
@@ -259,7 +279,7 @@ The full security policy and posture is documented in [SECURITY.md](SECURITY.md)
 
 ### Phase
 
-This server is in **Phase 1 — Read-only wrapper**. All 13 tools are
+This server is in **Phase 1 — Read-only wrapper**. All 16 tools are
 `readOnlyHint: true` / `destructiveHint: false`; there are no write or send
 capabilities. See [docs/roadmap.md](docs/roadmap.md) for later phases.
 

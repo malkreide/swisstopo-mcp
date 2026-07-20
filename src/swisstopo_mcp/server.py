@@ -1,9 +1,10 @@
 """
 swisstopo-mcp — MCP-Server fuer schweizerische Bundesgeodaten.
 
-16 Tools aus 8 Quellen-Familien: REST, Geocoding, Hoehe, STAC, WMTS, OEREB,
-plus die konsolidierte Geodaten-Fassade (Strassenverzeichnis, geodienste.ch,
-OEREB-Verfuegbarkeit) und OpenStreetMap-POIs via Overpass.
+19 Tools aus 9 Quellen-Familien: REST, Geocoding, Hoehe, STAC, WMTS, OEREB,
+die konsolidierte Geodaten-Fassade (Strassenverzeichnis, geodienste.ch,
+OEREB-Verfuegbarkeit), OpenStreetMap-POIs via Overpass, plus die administrative
+Adressebene via OpenPLZ (PLZ -> Gemeinde/BFS-Nr -> Bezirk -> Kanton).
 Alle Endpunkte sind offen (kein API-Schluessel erforderlich, ausser OEREB-Kanton).
 """
 
@@ -41,7 +42,7 @@ mcp = FastMCP(
     "swisstopo_mcp",
     lifespan=lifespan,
     instructions=(
-        "Swiss federal geodata server with 16 tools. "
+        "Swiss federal geodata server with 19 tools. "
         "Use swisstopo_search_layers to discover layer IDs, then use "
         "swisstopo_identify_features or swisstopo_find_features to query them. "
         "swisstopo_geocode converts addresses to coordinates. "
@@ -53,7 +54,12 @@ mcp = FastMCP(
         "list_available_layers → query_geodata (strassenverzeichnis, "
         "geodienste:<topic>:<canton>, oereb-verfuegbarkeit). "
         "query_osm_features returns OpenStreetMap POIs (schools, playgrounds, …) "
-        "around a point via Overpass (ODbL, separate rate-limited source)."
+        "around a point via Overpass (ODbL, separate rate-limited source). "
+        "For the administrative address level (PLZ → Gemeinde → Bezirk → Kanton) "
+        "use lookup_postal_code, find_commune and search_address (OpenPLZ, "
+        "separate BFS/swisstopo OGD source). These return the amtliche "
+        "BFS-Gemeindenummer (bfs_commune_number) — the join key to BFS statistics "
+        "(swiss-statistics-mcp) and zurich-opendata-mcp."
     ),
 )
 
@@ -443,6 +449,89 @@ async def query_osm_features_tool(params: QueryOsmFeaturesInput) -> ToolResponse
     bei Überlastung kommt eine sprechende Fehlermeldung statt Daten.</important_notes>
     """
     return await query_osm_features(params)
+
+
+# --- OpenPLZ: administrative address level (PLZ → Gemeinde/BFS → Bezirk → Kanton) ---
+from swisstopo_mcp.openplz import (  # noqa: E402
+    FindCommuneInput,
+    LookupPostalCodeInput,
+    SearchAddressInput,
+    find_commune,
+    lookup_postal_code,
+    search_address,
+)
+
+
+@mcp.tool(
+    name="lookup_postal_code",
+    annotations={
+        "title": "PLZ zu Gemeinde/BFS-Nummer auflösen",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": True,
+    },
+)
+async def lookup_postal_code_tool(params: LookupPostalCodeInput) -> ToolResponse:
+    """Löst eine Schweizer PLZ in Ort, Gemeinde, Bezirk und Kanton auf (OpenPLZ, amtlich).
+
+    <use_case>Beantwortet «Zu welcher Gemeinde/welchem Kanton gehört PLZ 8001?» und
+    liefert die BFS-Gemeindenummer (`bfs_commune_number`).</use_case>
+    <important_notes>`bfs_commune_number` ist der amtliche Join-Schlüssel zu
+    BFS-Statistikdaten (swiss-statistics-mcp) und zu zurich-opendata-mcp. Quelle
+    OpenPLZ (BFS/swisstopo OGD), nicht die swisstopo-Geodaten. Eine unbekannte PLZ
+    liefert eine leere Trefferliste mit erklärendem Hinweis.</important_notes>
+    """
+    return await lookup_postal_code(params)
+
+
+@mcp.tool(
+    name="find_commune",
+    annotations={
+        "title": "Gemeinde auflösen (Name ↔ BFS-Nummer, Kanton/Bezirk)",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": True,
+    },
+)
+async def find_commune_tool(params: FindCommuneInput) -> ToolResponse:
+    """Löst Gemeinden auf: Name→BFS-Nummer, BFS-Nummer→Name, oder alle Gemeinden eines Kantons/Bezirks.
+
+    <use_case>Vier Modi (genau einen Parameter angeben): `name` (Name →
+    BFS-Nummer), `bfs_number` (BFS-Nummer → Gemeinde), `canton` (alle Gemeinden
+    eines Kantons) oder `district` (alle Gemeinden eines Bezirks). Beantwortet
+    z.B. «Welche Gemeinden liegen im Bezirk Uster und wie lauten ihre
+    BFS-Nummern?».</use_case>
+    <important_notes>`bfs_commune_number` ist der amtliche Join-Schlüssel zu
+    BFS-Statistikdaten (swiss-statistics-mcp). `canton` akzeptiert Kürzel ('ZH')
+    oder BFS-Nummer ('1') — die Kürzel→Schlüssel-Auflösung erfolgt serverseitig,
+    weil der Pfad sonst still eine leere Liste liefert. Gemeindelisten sind
+    vollständig (interne Pagination), nicht auf 10 Einträge gekürzt.</important_notes>
+    """
+    return await find_commune(params)
+
+
+@mcp.tool(
+    name="search_address",
+    annotations={
+        "title": "Adressen/Orte per Volltext suchen",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": True,
+    },
+)
+async def search_address_tool(params: SearchAddressInput) -> ToolResponse:
+    """Volltextsuche über Schweizer Strassen und Ortschaften (OpenPLZ FullTextSearch).
+
+    <use_case>Findet Strassen und Orte zu einem freien Suchbegriff und liefert je
+    Treffer Gemeinde und BFS-Nummer, wenn vorhanden.</use_case>
+    <important_notes>Quelle OpenPLZ (BFS/swisstopo OGD). Ergebnisse sind paginiert
+    (max. 50/Abfrage); die Gesamttrefferzahl wird ausgewiesen. Für die exakte
+    PLZ→Gemeinde-Auflösung ist lookup_postal_code präziser.</important_notes>
+    """
+    return await search_address(params)
 
 
 def build_http_app(allowed_origins: list[str] | None = None):

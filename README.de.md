@@ -2,7 +2,7 @@
 
 # 🗺️ swisstopo-mcp
 
-![Version](https://img.shields.io/badge/version-0.1.0-blue)
+![Version](https://img.shields.io/badge/version-0.2.0-blue)
 [![Lizenz: MIT](https://img.shields.io/badge/Lizenz-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![MCP](https://img.shields.io/badge/MCP-Model%20Context%20Protocol-purple)](https://modelcontextprotocol.io/)
@@ -17,7 +17,7 @@
 
 ## Uebersicht
 
-`swisstopo-mcp` gibt KI-Assistenten Zugriff auf die offizielle schweizerische Geodateninfrastruktur ueber 16 Tools, alle ohne Authentifizierung:
+`swisstopo-mcp` gibt KI-Assistenten Zugriff auf die offizielle schweizerische Geodateninfrastruktur ueber 19 Tools, alle ohne Authentifizierung:
 
 | Quelle | Daten | API |
 |--------|-------|-----|
@@ -27,15 +27,20 @@
 | **STAC-Katalog** | Orthophotos, Hoehenmodelle, 3D-Gebaeude | STAC 0.9 |
 | **WMTS** | Landeskarten, Luftbilder, Bauzonen | URL-Builder |
 | **OEREB-Kataster** | Eigentumsbeschraenkungen, Grundstuecke | REST/JSON (kantonal) |
+| **geodienste.ch** | Interkantonale Basisgeodaten (amtliche Vermessung, belastete Standorte, Gefahrenkarten, …) | OGC API Features / WMS / WFS |
+| **OpenStreetMap** | Points of Interest (Schulen, Spielplaetze, Apotheken, …) | Overpass API (ODbL) |
+| **OpenPLZ API** | Administrative Adressebene: PLZ → Gemeinde (**BFS-Nummer**) → Bezirk → Kanton | REST/JSON (BFS + swisstopo OGD) |
 
-**Anker-Demo-Abfrage:** *"Welche Nutzungseinschraenkungen gelten fuer das Grundstueck an der Musterstrasse 5, Zuerich? Zeige mir den Standort auf einer Karte."*
+**Anker-Demo-Abfrage:** *«Welche Gemeinden liegen im Bezirk Uster, und wie lauten ihre BFS-Nummern fuer die Verknuepfung mit BFS-Statistikdaten?»*
+(Die BFS-Gemeindenummer ist der amtliche Join-Schluessel zu [`swiss-statistics-mcp`](https://github.com/malkreide) und [`zurich-opendata-mcp`](https://github.com/malkreide/zurich-opendata-mcp) — damit wird aus dem Geodaten-Wrapper ein semantischer Konnektor auf Gemeindeebene.)
 [→ Weitere Anwendungsbeispiele nach Zielgruppe →](EXAMPLES.md)
 
 ---
 
 ## Funktionen
 
-- 🗺️ **16 Tools** (REST, Geocoding, Hoehe, STAC, WMTS, OEREB, geodienste.ch, OpenStreetMap/Overpass)
+- 🗺️ **19 Tools** (REST, Geocoding, Hoehe, STAC, WMTS, OEREB, geodienste.ch, OpenStreetMap/Overpass, OpenPLZ)
+- 🏛️ Administrative Adressebene aufloesen (PLZ → Gemeinde/**BFS-Nummer** → Bezirk → Kanton) via OpenPLZ
 - 🔍 Schweizerische Adressen geocodieren und Koordinaten rueckwaerts geocodieren
 - 🏔️ Hoehe ueber Meer abfragen und Hoehenprofile berechnen
 - 📦 Geodatensaetze entdecken und herunterladen (Orthophotos, 3D-Gebaeude, historische Karten)
@@ -195,6 +200,21 @@ Eine Fassade ueber mehrere Karten-/Layer-Quellen, bewusst unter dem 18-Tool-Budg
 | `query_geodata` | Gewaehlten Layer per `point` / `bbox` / `commune` abfragen — amtliches Strassenverzeichnis, interkantonale geodienste.ch-Daten (OGC API Features) oder ÖREB-Verfuegbarkeit |
 | `query_osm_features` | OpenStreetMap-POIs (Schulen, Spielplaetze, Apotheken, …) im Umkreis via Overpass — separate Quelle, ODbL (© OpenStreetMap contributors) |
 
+### Administrative Adressebene (OpenPLZ)
+
+Die amtliche Adresshierarchie **PLZ → Gemeinde → Bezirk → Kanton**, geliefert von
+der [OpenPLZ API](https://openplzapi.org) (Daten: BFS-Gemeindeverzeichnis +
+swisstopo-Strassenverzeichnis, Swiss OGD — eine **separate Quelle und Lizenz**
+gegenueber den swisstopo-Geodaten oben). Jede Antwort mit Gemeinde exponiert
+`bfs_commune_number` als benanntes Top-Level-Feld: den amtlichen **Join-Schluessel**
+zu BFS-Statistikdaten (`swiss-statistics-mcp`) und zu `zurich-opendata-mcp`.
+
+| Tool | Beschreibung |
+|------|-------------|
+| `lookup_postal_code` | Schweizer PLZ aufloesen → Ort, Gemeinde (+**BFS-Nummer**), Bezirk, Kanton |
+| `find_commune` | Gemeinde in beide Richtungen aufloesen (`name` ↔ `bfs_number`) oder alle Gemeinden eines `canton` / `district` auflisten. Akzeptiert Kantonskuerzel (`ZH`) oder Schluessel (`1`); die Aufloesung erfolgt serverseitig |
+| `search_address` | Volltextsuche ueber Schweizer Strassen und Ortschaften, je Treffer mit Gemeinde und BFS-Nummer |
+
 ### Beispiel-Abfragen
 
 | Abfrage | Tool |
@@ -207,6 +227,9 @@ Eine Fassade ueber mehrere Karten-/Layer-Quellen, bewusst unter dem 18-Tool-Budg
 | *"Welche Einschraenkungen gelten fuer Musterstrasse 5?"* | `swisstopo_get_egrid` + `swisstopo_get_oereb_extract` |
 | *"Welche Schulhaeuser liegen im Umkreis von 500 m um Bederstrasse 109, 8002 Zuerich, und welche Strassen fuehren dorthin?"* | `query_osm_features` + `query_geodata` (`strassenverzeichnis`) |
 | *"Welche Daten zu belasteten Standorten sind fuer den Kanton ZH frei?"* | `list_available_layers` + `query_geodata` (`geodienste:kataster_belasteter_standorte:ZH`) |
+| *«Welche Gemeinden liegen im Bezirk Uster und wie lauten ihre BFS-Nummern?»* | `find_commune` (`district=109`) |
+| *«Zu welcher Gemeinde und welchem Kanton gehoert die PLZ 8001?»* | `lookup_postal_code` |
+| *«Wie lautet die BFS-Nummer von Winterthur (zur Verknuepfung mit BFS-Statistik)?»* | `find_commune` (`name=Winterthur`) |
 
 ---
 
@@ -217,7 +240,7 @@ Eine Fassade ueber mehrere Karten-/Layer-Quellen, bewusst unter dem 18-Tool-Budg
 │   Claude / KI   │────▶│  swisstopo-mcp               │────▶│  Swisstopo REST API      │
 │   (MCP Host)    │◀────│  (MCP Server)                │◀────│  api3.geo.admin.ch       │
 └─────────────────┘     │                              │     ├──────────────────────────┤
-                        │  16 Tools                    │────▶│  Geocoding               │
+                        │  19 Tools                    │────▶│  Geocoding               │
                         │  Stdio | Streamable HTTP     │◀────│  api3.geo.admin.ch       │
                         │                              │     ├──────────────────────────┤
                         │  Keine Authentifizierung     │────▶│  STAC-Katalog            │
@@ -225,6 +248,12 @@ Eine Fassade ueber mehrere Karten-/Layer-Quellen, bewusst unter dem 18-Tool-Budg
                         │                              │     ├──────────────────────────┤
                         │                              │────▶│  OEREB-Kataster          │
                         │                              │◀────│  (kantonale Endpunkte)   │
+                        │                              │     ├──────────────────────────┤
+                        │                              │────▶│  geodienste.ch (OGC API) │
+                        │                              │◀────│  overpass.osm.ch (ODbL)  │
+                        │                              │     ├──────────────────────────┤
+                        │  BFS-Nr = Join-Schluessel zu │────▶│  OpenPLZ API             │
+                        │  swiss-statistics-mcp        │◀────│  openplzapi.org (BFS/OGD)│
                         └──────────────────────────────┘     └──────────────────────────┘
 ```
 
@@ -245,12 +274,14 @@ swisstopo-mcp/
 │   ├── wmts.py                  # swisstopo_map_url
 │   ├── oereb.py                 # swisstopo_get_egrid, swisstopo_get_oereb_extract
 │   ├── geodata.py               # query_geodata + list_available_layers (Fassade)
-│   └── overpass.py              # query_osm_features (OpenStreetMap / Overpass)
+│   ├── overpass.py              # query_osm_features (OpenStreetMap / Overpass)
+│   └── openplz.py               # lookup_postal_code, find_commune, search_address (OpenPLZ)
 ├── tests/
 │   ├── test_api_client.py
 │   ├── test_geocoding.py
 │   ├── test_height.py
 │   ├── test_oereb.py
+│   ├── test_openplz.py
 │   ├── test_rest_api.py
 │   ├── test_stac.py
 │   └── test_wmts.py
@@ -275,7 +306,7 @@ Die vollständige Sicherheitsrichtlinie und Sicherheitslage ist in
 
 ### Phase
 
-Dieser Server ist in **Phase 1 — Read-only-Wrapper**. Alle 16 Tools sind
+Dieser Server ist in **Phase 1 — Read-only-Wrapper**. Alle 19 Tools sind
 `readOnlyHint: true` / `destructiveHint: false`; es gibt keine schreibenden
 oder versendenden Funktionen. Spätere Phasen siehe
 [docs/roadmap.md](docs/roadmap.md).
@@ -373,6 +404,28 @@ strukturierten Content mit Output-Schema plus JSON-Textblock):
 - **STAC-Katalog** verwendet den Swisstopo-v0.9-Endpunkt; einige Collections haben ggf. unvollstaendige Metadaten
 - **Geocoding** deckt nur Schweizer Adressen ab (kein Liechtenstein)
 - **Rate Limits** werden von Swisstopo durchgesetzt; hochfrequente Nutzung kann gedrosselt werden
+
+### Bekannte Befunde — OpenPLZ-Live-Probe (2026-07-20)
+
+Die OpenPLZ-Endpoints wurden vor der Implementation live geprueft. In die Tools
+eingeflossene Befunde:
+
+| Endpoint / Verhalten | Ergebnis | Behandlung |
+|---|---|---|
+| `/Cantons` | 200, **26** Records, `key` = BFS-Kantonsnummer (ZH = `1`) | Kantonskuerzel wird aus dieser Liste aufgeloest |
+| `/Cantons/{key}/Districts\|Communes` | 200 | Pfadparameter ist die **numerische `key`** |
+| `/Cantons/ZH/Districts` (Kuerzel) | **200 + `[]`** — kein Fehler | `ZH`→`1` serverseitig aufgeloest; leere Antwort erhaelt erklaerende Note |
+| `/Localities?postalCode=8001` | 200, `commune.key = 261` (BFS Zuerich) | `bfs_commune_number` als Top-Level-Feld ausgegeben |
+| `/Localities?postalCode=9999` (unbekannt) | **200 + `[]`** | als Note gemeldet — leer ≠ nicht vorhanden |
+| Pagination der Listen-Endpoints | Default `pageSize=10`, **hartes Maximum 50** (`100` → HTTP 400) | Tools iterieren die Seiten via `x-total-count` |
+| roher Umlaut in Query (`?name=Zürich`) | **HTTP 400** | httpx encodiert `params` automatisch |
+| Feld `historicalCode` | ≠ `key` bei Gemeinden (ID des historisierten Verzeichnisses) | nicht genutzt; Join-Schluessel ist die aktuelle `key` |
+| Bulk-Dump | keiner bei OpenPLZ (nur `/swagger`) | Architektur A (Live-API-only) — fuer einen Lookup-Konnektor ausreichend |
+
+**Die Kuerzel-vs-Key-Falle in einem Satz:** Eine leere OpenPLZ-Liste ist fast nie
+ein Beweis, dass etwas *nicht existiert* — meistens ist es ein falscher
+Pfadparameter (ein Kuerzel, wo eine numerische `key` erwartet wird). Die Tools
+loesen Kuerzel serverseitig auf und annotieren jede leere Antwort.
 
 ---
 

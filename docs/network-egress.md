@@ -17,6 +17,7 @@ allow-list (audit check **SEC-021**) and complements the SSRF hardening from
 | `www.oereb2.apps.be.ch` | OEREB cadastre — canton BE | get_egrid, get_oereb_extract |
 | `geodienste.ch` | Interkantonale Basisgeodaten (services catalogue + WMS/WFS/OGC API Features) | list_available_layers, query_geodata |
 | `overpass.osm.ch` | OpenStreetMap Overpass API (Swiss instance) — POI queries (ODbL) | query_osm_features |
+| `openplzapi.org` | OpenPLZ API — administrative address level (BFS + swisstopo OGD) | lookup_postal_code, find_commune, search_address |
 
 ## Enforcement
 

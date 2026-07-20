@@ -18,6 +18,7 @@ STAC_BASE = "https://data.geo.admin.ch/api/stac/v0.9"
 WMTS_BASE = "https://wmts.geo.admin.ch/1.0.0"
 GEODIENSTE_BASE = "https://geodienste.ch"
 OVERPASS_BASE = "https://overpass.osm.ch"
+OPENPLZ_BASE = "https://openplzapi.org/ch"
 
 REQUEST_TIMEOUT = 30.0
 USER_AGENT = "SwisstopoMCP/0.1 (MCP Server; +https://github.com/malkreide/swisstopo-mcp)"
@@ -56,6 +57,7 @@ ALLOWED_HOSTS: frozenset[str] = frozenset(
         "www.oereb2.apps.be.ch",  # OEREB cadastre — canton BE
         "geodienste.ch",  # interkantonale Basisgeodaten (Katalog + WMS/WFS/OGC API)
         "overpass.osm.ch",  # OpenStreetMap Overpass API (Schweizer Instanz)
+        "openplzapi.org",  # OpenPLZ API — PLZ/Gemeinde/BFS-Nr (BFS + swisstopo OGD)
     }
 )
 
@@ -197,6 +199,21 @@ async def stac_request(path: str, params: dict[str, Any] | None = None) -> Any:
     _log.debug("upstream_request", host="data.geo.admin.ch", path=path)
     response = await request_with_retry("GET", url, params=params or {})
     return response.json()
+
+
+async def openplz_request(
+    path: str, params: dict[str, Any] | None = None
+) -> httpx.Response:
+    """GET request on the OpenPLZ API (openplzapi.org/ch).
+
+    Returns the raw ``httpx.Response`` — unlike ``geo_admin_request`` — because
+    OpenPLZ paginates list endpoints and exposes the totals only in the
+    ``x-total-count`` / ``x-total-pages`` response headers, which callers need to
+    decide whether to fetch further pages.
+    """
+    url = f"{OPENPLZ_BASE}{path}"
+    _log.debug("upstream_request", host="openplzapi.org", path=path)
+    return await request_with_retry("GET", url, params=params or {})
 
 
 # --- Error Handling ---

@@ -24,6 +24,17 @@ GEODIENSTE_SOURCE = "geodienste.ch (Kantone)"
 GEODIENSTE_LICENSE = "Freie Nutzung — Quellenangabe Pflicht (geodienste.ch OGD)"
 OSM_SOURCE = "OpenStreetMap — Overpass API (overpass.osm.ch)"
 OSM_LICENSE = "ODbL — © OpenStreetMap contributors"
+# OpenPLZ is a *separate* source from swisstopo geodata: it serves the amtliche
+# administrative address level (PLZ → Gemeinde/BFS-Nr → Bezirk → Kanton). Its
+# data are the official BFS municipal directory plus the swisstopo street
+# directory, both Swiss OGD with mandatory source attribution. The API server
+# code is AGPL-3.0, but that is irrelevant here — we only consume the public
+# HTTP API, we do not redistribute the code.
+OPENPLZ_SOURCE = (
+    "OpenPLZ API (openplzapi.org) — Daten: BFS-Gemeindeverzeichnis "
+    "& swisstopo-Strassenverzeichnis"
+)
+OPENPLZ_LICENSE = "Freie Nutzung — Quellenangabe Pflicht (Swiss OGD / opendata.swiss)"
 
 
 def _now_iso() -> str:

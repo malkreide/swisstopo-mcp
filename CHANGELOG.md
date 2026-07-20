@@ -7,6 +7,59 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-07-20
+
+### Added
+- **OpenPLZ extension — 3 new tools for the administrative address level**
+  (16 → 19 tools, one under the 20-tool budget). This adds the layer swisstopo
+  geodata does not cover — the amtliche hierarchy **PLZ → Ort → Gemeinde →
+  Bezirk → Kanton** — and, crucially, exposes the **BFS commune number**
+  (`bfs_commune_number`) as a named top-level field on every commune-bearing
+  response. That number is the official join key to `swiss-statistics-mcp`
+  (BFS STAT-TAB) and `zurich-opendata-mcp`, turning the geodata wrapper into a
+  semantic connector at the commune level.
+  - `lookup_postal_code(postal_code)` — Swiss postal code → locality, commune
+    (+BFS number), district, canton.
+  - `find_commune(name | bfs_number | canton | district)` — resolve a commune in
+    both directions (name ↔ BFS number) or list all communes of a canton /
+    district. Canton accepts an abbreviation (`ZH`) or a numeric key (`1`);
+    abbreviation→key resolution happens server-side.
+  - `search_address(query)` — full-text search over Swiss streets and localities.
+- New source module `openplz.py` and `test_openplz.py`. Source: OpenPLZ API
+  (openplzapi.org), data from the BFS municipal directory + swisstopo street
+  directory (Swiss OGD). Egress allow-list extended with `openplzapi.org`.
+- Separate attribution for OpenPLZ (`OPENPLZ_SOURCE` / `OPENPLZ_LICENSE`), kept
+  distinct from the swisstopo geo.admin OGD attribution — two sources, two
+  licences, not conflated.
+
+### Known findings (OpenPLZ live probe, 2026-07-20)
+- **Abbreviation-vs-key trap:** path params are the numeric `key`, not the canton
+  abbreviation. `/Cantons/ZH/Districts` returns **HTTP 200 with `[]`** (not an
+  error) — the same silent-empty pattern as an unknown PLZ (`?postalCode=9999` →
+  `200 []`). An empty OpenPLZ list is almost never proof of "does not exist"; it
+  is usually a wrong path parameter. Tools resolve `ZH`→`1` from the live
+  `/Cantons` list and annotate every empty result with an explanatory note.
+- **Pagination cap:** list endpoints paginate with `pageSize` default 10 and a
+  **hard maximum of 50** (`pageSize=100` → HTTP 400). Totals live in the
+  `x-total-count` header. `find_commune` iterates pages so a canton with 160
+  communes (e.g. ZH) returns all 160, not the first 10.
+- **Umlauts must be URL-encoded:** a raw `?name=Zürich` returns HTTP 400;
+  `%C3%BC` returns 200. httpx encodes `params` dicts automatically.
+- **`historicalCode` ≠ the join key:** for communes it differs from `key` (it is
+  the historized-directory record id). The join key is the current `key`;
+  `historicalCode` is intentionally not surfaced as a top-level field.
+- **No OpenPLZ bulk dump** (only a Swagger UI); underlying dumps live upstream at
+  BFS/swisstopo. Architecture A (live-API-only) is adequate for a lookup connector.
+- **Reality-check passed:** `/Cantons` returns exactly 26; sample BFS numbers
+  match (Zürich 261, Winterthur 230, Uster 198).
+
+### Architecture decision
+- **ARCH A (live-API-only)** for the OpenPLZ source: all required endpoints are
+  stable, fast (~0.5–1.4 s) and unauthenticated; no dump layer is warranted for a
+  lookup connector.
+
+## [0.1.x — pre-0.2.0 Unreleased work]
+
 ### Added
 - **Geodaten-Erweiterung — 3 new tools consolidating 4 data sources** (13 → 16
   tools, deliberately under the 18-tool budget via a façade pattern; see

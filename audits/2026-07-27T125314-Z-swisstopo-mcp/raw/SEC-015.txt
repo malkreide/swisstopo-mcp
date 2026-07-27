@@ -1,0 +1,25 @@
+check_run:
+  id: SEC-015
+  status: partial
+  evidence_collected: 4
+  evidence_required: 2
+  findings:
+    - "No pre-flight detection layer exists: grep for `tool.poisoning|prompt.injection|sanitize.*description|INJECTION_PATTERNS|zero-width|\\\\u200B` over src/ and deploy/ returns zero hits. No scan_tool_definition / filter_tool_list equivalent is present."
+    - "No detection tests and no SIEM alerting: tests/ contains no poisoning-detection test file, and .github/workflows/security.yml runs only gitleaks — there is no rule or alert threshold for tool_poisoning_detected / tool_poisoning_warning events anywhere in deploy/ or docs/."
+    - "DOCUMENTED DEFERRAL with a structural argument — SECURITY.md:62-64 records cross-server tool-poisoning detection as a host/gateway responsibility and notes that 'this server's tool definitions are version-controlled and shipped from this repository; there is no dynamic or remote tool registration'. SECURITY.md:68-73 lists dynamic/remote tool registration as an explicit re-evaluation trigger."
+    - "That argument is verifiable in code: all 23 tool names, descriptions and annotations are static literals in src/swisstopo_mcp/server.py:87-654; there is no registration path that reads a tool definition from a network response or a config file (no mcp.add_tool / dynamic registration call anywhere in src/)."
+  gaps:
+    - "No detection layer, so none of the four required pattern classes (system prompts, override phrases, invisible characters, homoglyphs) are covered (Pass-Criteria 1-2)."
+    - "No default-deny filtering of high-risk definitions and no logging of medium-risk ones (Pass-Criteria 3-4)."
+    - "No audit events to a SIEM and no alerting threshold (Pass-Criterion 5)."
+    - "No tests for standard attack patterns (Pass-Criterion 6)."
+    - "The German/French injection-pattern extension raised in Remediation Schritt 3 is unaddressed — relevant for this portfolio since tool descriptions here are German."
+  evaluator_notes: |
+    In scope via is_cloud_deployed == true. The check targets a gateway that
+    aggregates potentially untrusted servers; this repo is a single leaf server
+    whose own tool definitions are static and version-controlled, so it is the
+    subject of such a scan rather than the place to run one. The deferral is
+    documented with a correct structural justification and a named trigger.
+    Same call as SEC-014: partial, because a documented risk acceptance is not
+    an implemented control and the check's criteria are objectively unmet. The
+    remediation belongs to whatever gateway fronts the portfolio.

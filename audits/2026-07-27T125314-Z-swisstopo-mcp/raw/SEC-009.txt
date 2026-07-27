@@ -1,0 +1,21 @@
+check_run:
+  id: SEC-009
+  status: pass
+  evidence_collected: 4
+  evidence_required: 3
+  findings:
+    - "The server implements no session handling of its own: grep for `session_id|sessionId|mcp_session|SessionStore|validate_session` over src/ returns no generation, storage or validation code. Session identity is delegated entirely to the FastMCP SDK's Streamable-HTTP implementation, which the app is built from at src/swisstopo_mcp/server.py:674 (`mcp.streamable_http_app()`)."
+    - "There is consequently no weak-PRNG failure mode to find: grep for `random\\.|time\\.time\\(\\)|hashlib` in an ID-generation context over src/ returns nothing; the only randomness-adjacent import in the package is asyncio (src/swisstopo_mcp/api_client.py:4)."
+    - "There is no per-user or per-session server state to hijack. Every tool handler is a pure request/response function over public data (e.g. src/swisstopo_mcp/coords.py:266, src/swisstopo_mcp/oereb.py:82); the only process-wide state is the shared httpx client created in the lifespan (src/swisstopo_mcp/server.py:27-39), which carries no caller identity."
+    - "The unauthenticated-by-design decision and the conditional obligation are documented in both places a maintainer would look: README.md:347-353 and SECURITY.md:44-50 ('Sessions & authentication'), which state that if an authenticated deployment is ever introduced, session IDs must be bound to the validated user identity (SEC-009). SECURITY.md:68-73 lists that as an explicit re-evaluation trigger."
+  gaps:
+    - "The Mcp-Session-Id entropy therefore depends on the pinned `mcp[cli]>=1.28.1,<2.0.0` SDK (pyproject.toml:31) and is not independently asserted by a test in this repo."
+  evaluator_notes: |
+    The profile is auth_model=none over Public Open Data with a read-only tool
+    surface, so the two-step mitigation the check asks for (crypto-secure
+    generation + binding to a validated OAuth sub) has no identity to bind to.
+    A guessed session id grants exactly the capability an anonymous caller
+    already has: querying public geodata. The decision is documented rather than
+    implicit, with a named trigger for revisiting it, which is what the check
+    rewards for this profile. The one gap is a dependency-trust note, not a
+    defect in this repo.

@@ -1,0 +1,20 @@
+check_run:
+  id: SEC-006
+  status: pass
+  evidence_collected: 5
+  evidence_required: 2
+  findings:
+    - "Default transport is stdio: the entrypoint calls mcp.run() with no transport argument unless `--http` is present on argv (src/swisstopo_mcp/server.py:686-701); the HTTP branch at server.py:689-699 is the only path that starts uvicorn."
+    - "No network binding can occur by default — the HTTP host/port only take effect inside the `--http` branch (src/swisstopo_mcp/server.py:696-698) and the configured default host is 127.0.0.1 (src/swisstopo_mcp/config.py:22), asserted by tests/test_config.py:9-10."
+    - "The published package manifest declares stdio as the transport for the registry entry: server.json:15-18 (`\"transport\": {\"type\": \"stdio\"}`, runtimeHint uvx)."
+    - "README documents the local stdio use-case first: README.md:86 (`python -m swisstopo_mcp.server` for Claude Desktop) and the claude_desktop_config.json snippets at README.md:105-130."
+    - "Cloud/HTTP deployment is a separate, explicitly-marked section with its own hardening notes: README.md:135+ ('Cloud Deployment') pointing at docs/deployment.md, which restates that the server is 'local-first (stdio)' (docs/deployment.md:2-6) and that 0.0.0.0 is container-only (docs/deployment.md:36)."
+  gaps: []
+  evaluator_notes: |
+    The stdio-vs-HTTP split is clean: HTTP requires an explicit `--http` CLI
+    flag, there is no MCP_TRANSPORT-style default that could be flipped by
+    environment, and nothing in the default path constructs a listener. README
+    leads with the local stdio configuration and separates cloud deployment.
+    All Pass-Criteria met by code review and documentation check; the runtime
+    port-check mode was not executed (no live server started), which does not
+    change the verdict since the default code path never reaches uvicorn.

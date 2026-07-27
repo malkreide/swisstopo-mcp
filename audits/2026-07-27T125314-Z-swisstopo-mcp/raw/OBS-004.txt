@@ -1,0 +1,30 @@
+check_run:
+  id: OBS-004
+  status: pass
+  evidence_collected: 5
+  evidence_required: 2
+  findings:
+    - "Zero print() statements in src/: `grep -rn 'print(' src/ --include='*.py'` returns no hits across all 16 modules (9113 LOC incl. tests). No TypeScript/console.log equivalent applies (sdk_language=Python)."
+    - "Logging is pinned to stderr at the factory level: src/swisstopo_mcp/logging_config.py:48 — `logger_factory=structlog.WriteLoggerFactory(file=sys.stderr)`, with the rationale comment naming this check at logging_config.py:47 and in the module docstring (logging_config.py:3-6). There is no logging.basicConfig call and no StreamHandler pointed at stdout anywhere in src/ (grep for stdout/StreamHandler over src/ returns only comments)."
+    - "Runtime verification: importing src/swisstopo_mcp/server.py (which executes configure_logging at server.py:23 and registers all 23 tools) and then emitting a log record produced EMPTY stdout (captured value: '') while the JSON record went to stderr: {\"k\": 1, \"event\": \"probe_event\", \"level\": \"info\", \"timestamp\": \"2026-07-27T13:01:51.633047Z\"}. Import-time side effects therefore do not corrupt the stdio protocol channel."
+    - "The configuration is transport-independent — there is no stdio-vs-HTTP switch in the logging path. server.py:23 calls configure_logging(settings.log_level) unconditionally at module import, before the transport is selected at server.py:686-701 (`--http` -> uvicorn, else mcp.run()). Dual transport therefore shares one stderr-only config, as the criterion requires."
+    - "The four handlers added since the last audit introduce no stdout writes: src/swisstopo_mcp/rest_api.py:405-505 (zoning_at, municipality_at, layer_info) and src/swisstopo_mcp/coords.py:265-310 (convert_coordinates) log exclusively through the @log_tool_call decorator and the module-level structlog logger."
+  gaps:
+    - "No CI guard against regression: .github/workflows/ci.yml runs pytest and `ruff check src/ tests/` but has no explicit 'no print() in src/' step. The ruff lint selection (pyproject.toml:[tool.ruff.lint] select = E,F,W,I,UP) does not include flake8-print (T20), so a re-introduced print() would pass CI."
+    - "No automated MCP Inspector smoke test in CI; the stdout-cleanliness evidence above is a manual runtime probe from this audit run."
+  evaluator_notes: |
+    PASS, and confirmed at runtime rather than by grep alone — the critical
+    severity of this check justified actually importing the server and capturing
+    stdout. stdout was byte-for-byte empty after importing every module and
+    registering all 23 tools, which is the failure mode this check exists to
+    catch (a dependency or module-level print corrupting the JSON-RPC stream on
+    the first Claude Desktop connection).
+
+    The tool-surface growth to 23 did not introduce any stdout writer, and the
+    logging configuration is genuinely transport-agnostic (a single
+    configure_logging() call at import, before transport selection).
+
+    The residual risk is regression, not current state: nothing in CI would stop
+    a future print() from landing in src/. Adding either the T20 ruff rule or
+    the grep guard from the check's remediation section would close that,
+    but its absence does not affect the current status.

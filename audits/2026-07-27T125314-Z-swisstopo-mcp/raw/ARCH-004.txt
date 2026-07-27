@@ -1,0 +1,27 @@
+check_run:
+  id: ARCH-004
+  status: partial
+  evidence_collected: 6
+  evidence_required: 3
+  findings:
+    - "No tool handler touches transport internals: a grep for request.headers / remote_addr / websocket / stdin / stdout across src/ returns zero hits inside handlers. The only starlette imports are function-local inside build_http_app (src/swisstopo_mcp/server.py:667-669), i.e. in transport wiring, not in tool code. The single httpx.RequestError reference (src/swisstopo_mcp/api_client.py:176) is the outbound client, not the inbound transport."
+    - "Where a handler needs session context it takes the transport-agnostic MCP Context: src/swisstopo_mcp/server.py:337 (swisstopo_elevation_profile) and server.py:484 (swisstopo_get_oereb_extract), both forwarding `ctx=ctx` to the module handler. This is the documented pass pattern."
+    - "Both transports are served from one entrypoint and one FastMCP instance: src/swisstopo_mcp/server.py:686-701 selects stdio (mcp.run()) or Streamable HTTP (uvicorn over build_http_app), and build_http_app (server.py:674) derives from the same `mcp` object, so tool behaviour is identical by construction across transports."
+    - "The lifespan is shared by both transports: src/swisstopo_mcp/server.py:27-39 creates one httpx.AsyncClient and is attached at construction time (server.py:44), so the HTTP app and the stdio run reuse the same setup/teardown."
+    - "A pydantic-settings Settings object exists and is used for transport config: src/swisstopo_mcp/config.py:12-33 (env_prefix SWISSTOPO_, .env support), consumed at src/swisstopo_mcp/server.py:23, 694, 696, 697; covered by tests/test_config.py:8-30. Container and K8s override it by environment only (Dockerfile:22-27, deploy/kubernetes.yaml:39-42), never by code fork."
+    - "Two configuration reads bypass the Settings object: src/swisstopo_mcp/oereb.py:33 reads os.environ.get('SWISSTOPO_OEREB_CANTONS', 'ZH') at every call of get_active_cantons(), and src/swisstopo_mcp/logging_config.py:32 falls back to os.environ.get('SWISSTOPO_LOG_LEVEL'). Both contradict the module docstring at src/swisstopo_mcp/config.py:3-5 ('come from a single Settings object instead of ad-hoc sys.argv / os.environ reads'), and SWISSTOPO_OEREB_CANTONS is documented in .env.example:7 but has no field in Settings."
+  gaps:
+    - "Transport is selected by CLI flag (sys.argv, src/swisstopo_mcp/server.py:689-694), not by an env var / Settings field — the pass criterion asks for env-var selectability and Settings has no `transport` field (config.py:22-26)."
+    - "src/swisstopo_mcp/oereb.py:33 reads os.environ directly at call time, so the enabled-canton set is a hidden global that is re-read per invocation; this is the 'ad-hoc env read instead of Settings object' pattern the check flags, and it makes the OEREB tool surface dependent on ambient process state rather than injected config."
+  evaluator_notes: |
+    The substance of Inversion of Control holds: handlers are transport-clean,
+    both transports run from one codebase with a shared lifespan, and tool
+    outputs cannot diverge because both paths use the same FastMCP instance.
+    Three of five pass criteria are fully met. Two are not: transport is chosen
+    via sys.argv rather than an env var, and configuration does not run
+    exclusively through the Settings object (oereb.py:33, logging_config.py:32).
+    The second point is more than cosmetic because config.py's own docstring
+    claims the opposite, and the documented SWISSTOPO_OEREB_CANTONS knob is
+    absent from Settings entirely. Low remediation cost (add `transport` and
+    `oereb_cantons` fields to Settings), but as written the criteria are unmet,
+    so partial.

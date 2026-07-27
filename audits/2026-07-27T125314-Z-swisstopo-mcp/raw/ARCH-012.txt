@@ -1,0 +1,33 @@
+check_run:
+  id: ARCH-012
+  status: partial
+  evidence_collected: 6
+  evidence_required: 3
+  findings:
+    - "There is no explicit protocolVersion pin in the server code: a case-insensitive grep for protocol.?version over src/ returns zero hits. The FastMCP instance is constructed with name, lifespan and instructions only (src/swisstopo_mcp/server.py:42-76), so the negotiated version is whatever the SDK default is."
+    - "The pin is genuinely not expressible through the SDK's public API, which mitigates the above: inspected mcp 1.28.1 in a clean venv — neither FastMCP.__init__ nor the lowlevel Server.__init__ accepts a protocol_version parameter, and mcp.types.LATEST_PROTOCOL_VERSION is '2025-11-25'. The version is negotiated during initialize and is not author-settable."
+    - "A compensating control is in place and deliberate: pyproject.toml:31-33 pins the SDK to the 1.x major with the inline rationale 'Pinned to the 1.x major so an SDK update cannot silently change the negotiated MCP protocol version (ARCH-012). Dependabot proposes bumps.' — mcp[cli]>=1.28.1,<2.0.0."
+    - "CHANGELOG.md exists in Keep-a-Changelog format with SemVer reference (CHANGELOG.md:1-6), an [Unreleased] section and dated releases ([0.2.0] - 2026-07-20, [0.1.0] - 2026-04-02). It is actively maintained — the three new tools and the 20→25 budget raise are recorded at CHANGELOG.md:11-28 — and the SDK pin decision itself is logged at CHANGELOG.md:206."
+    - "Both READMEs now carry the required section: README.md:340-345 'MCP Protocol Version' and README.de.md:341-347 'MCP-Protokollversion', each explaining the negotiate-plus-major-pin approach and pointing at Dependabot and CHANGELOG.md."
+    - "Automated SDK update PRs are configured: .github/dependabot.yml sets a monthly pip schedule with a dedicated 'mcp-sdk' group matching the mcp package (separated from a catch-all python-deps group), plus a monthly github-actions ecosystem entry."
+  gaps:
+    - "The README 'MCP Protocol Version' section names no concrete spec version — neither README.md:340-345 nor README.de.md:341-347 states which protocol version is actually negotiated (2025-11-25 under the pinned mcp 1.28.1), so the criterion 'README-Sektion mit aktuell unterstützter Version' is unmet and there is no baseline to detect a future silent change against."
+    - "No CHANGELOG entry references a spec version at all: a grep for 2024-11 / 2025-03 / 2025-06 / 2025-11 across CHANGELOG.md returns zero hits. The SDK pin is recorded (CHANGELOG.md:206) but not the protocol version it currently yields, leaving the audit-trail criterion unmet."
+    - "No breaking-change / compatibility-window policy is documented: the README section covers how updates are proposed (Dependabot, monthly) but not what happens when a spec change breaks compatibility — no semver-major trigger rule and no support window for older spec versions."
+  evaluator_notes: |
+    Two of the three gaps from the 2026-05-29 run are genuinely closed: the
+    README section now exists in both languages, and .github/dependabot.yml
+    groups the mcp package for monthly update PRs. The CHANGELOG is in the
+    required format and current.
+    The remaining shortfall is real but partly structural. The check's first
+    criterion — an explicit protocolVersion pin in server code — cannot be
+    satisfied with the Python SDK as of mcp 1.28.1, which I verified by
+    inspecting both constructor signatures rather than assuming; the major
+    pin in pyproject.toml is the best available substitute and is documented
+    as such. What is not structural, and is cheap to fix, is the missing
+    concrete version number: neither the README nor the CHANGELOG records
+    which spec version the server currently speaks, so the very drift the
+    major pin is meant to prevent would be undetectable by reading the repo.
+    Add the negotiated version (2025-11-25) to the README section, note it in
+    the CHANGELOG, and state a breaking-change policy, and this becomes a
+    pass.

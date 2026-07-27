@@ -1,0 +1,23 @@
+check_run:
+  id: SCALE-001
+  status: partial
+  evidence_collected: 5
+  evidence_required: 2
+  findings:
+    - "Transport is selectable, not hardcoded to stdio: `--http` switches to Streamable HTTP served by uvicorn, otherwise mcp.run() (stdio) — src/swisstopo_mcp/server.py:686-701. Host and port come from pydantic-settings env vars SWISSTOPO_HTTP_HOST / SWISSTOPO_HTTP_PORT (src/swisstopo_mcp/config.py:22-24), with --port as an override (src/swisstopo_mcp/server.py:693-694)"
+    - "The container/cloud path selects HTTP explicitly in the image manifest: CMD [\"python\", \"-m\", \"swisstopo_mcp.server\", \"--http\", \"--port\", \"8000\"] (Dockerfile:38) with SWISSTOPO_HTTP_HOST=0.0.0.0 set only in the container (Dockerfile:24-26); deploy/kubernetes.yaml:38-45 exposes containerPort 8000 and re-sets the env var — no stdio in the cloud path"
+    - "No legacy WebSocket transport anywhere: grep for websocket/ws:///wss:// across src/ returns nothing; the app is built from mcp.streamable_http_app() (src/swisstopo_mcp/server.py:674)"
+    - "RUNTIME (Modus 2) — the HTTP endpoint works when reached with a localhost Host header: POST /mcp initialize returns HTTP 200 with a full capabilities/serverInfo response (serverInfo swisstopo_mcp, protocolVersion 2025-06-18) and an mcp-session-id header; GET /healthz returns 200 {\"status\":\"ok\"} (src/swisstopo_mcp/server.py:671-675)"
+    - "RUNTIME DEFECT — with a realistic ingress Host header the same request fails: started with SWISSTOPO_HTTP_HOST=0.0.0.0 and called as POST /mcp with `Host: swisstopo-mcp.example.com`, the server returns HTTP 421 'Invalid Host header', while GET /healthz with the same Host still returns HTTP 200. Cause is the same unconfigured transport-security layer as SDK-004: FastMCP auto-pins allowed_hosts to [127.0.0.1:*, localhost:*, [::1]:*] because its internal host stays 127.0.0.1 (mcp 1.28.1 mcp/server/fastmcp/server.py:177-183) and src/swisstopo_mcp/server.py:42-44 never passes transport_security"
+  gaps:
+    - "As shipped, deploy/kubernetes.yaml + deploy/ingress-sticky-sessions.yaml would route MCP traffic with Host: swisstopo-mcp.example.com and every request would get HTTP 421 — while liveness/readiness probes (deploy/kubernetes.yaml:49-60, path /healthz) stay green, because /healthz is mounted outside the MCP app and is not host-validated. That is a silent-failure deployment, precisely the failure mode SCALE-001 warns about ('Server startet, Health-Check gruen, aber Client-Verbindungen schlagen fehl')."
+    - "Transport selection is by CLI flag (--http), not by an env var such as MCP_TRANSPORT; acceptable since the deployment manifest (Dockerfile:38) sets it explicitly, but it means the transport cannot be switched by env alone in a K8s Deployment without overriding the command."
+    - "No deployment-level smoke test asserts that initialize returns 200 through the public hostname."
+  evaluator_notes: |
+    The transport architecture itself is right — Streamable HTTP for the cloud
+    path, stdio for local, no WebSockets, health endpoint present. Partial
+    because the check's own runtime criterion ('Cloud-Endpoint antwortet auf
+    initialize mit HTTP 200') fails for any request carrying the deployment's
+    real hostname: HTTP 421. Fix is one constructor argument
+    (transport_security=TransportSecuritySettings(allowed_hosts=[...],
+    allowed_origins=settings.origins_list)), shared with the SDK-004 remediation.

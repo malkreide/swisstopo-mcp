@@ -1,0 +1,48 @@
+check_run:
+  id: OPS-003
+  status: partial
+  evidence_collected: 6
+  evidence_required: 3
+  findings:
+    - "A phase IS declared in the README: README.md:313-317 ('### Phase — This server is in **Phase 1 — Read-only wrapper**. All 23 tools are readOnlyHint: true / destructiveHint: false; there are no write or send capabilities.'), mirrored at README.de.md:311-316."
+    - "The declared phase is consistent with the actual tool annotations: 23 of 23 @mcp.tool registrations in src/swisstopo_mcp/server.py carry readOnlyHint: True (e.g. server.py:91, 148, 168, 352, 375, 397, 426) and `grep -rn 'destructiveHint.*True' src/` returns zero hits. No write, send, mail or webhook tool exists."
+    - "A roadmap file exists with phase-specific tasks: docs/roadmap.md — Phase 1 Read-only wrapper (:6-19, marked done, 7 checked items incl. the audit run against mcp-audit-skill), Phase 2 Semantic/richer responses (:21-30), Phase 2.5 Consolidation of swiss-geodata-mcp (:32-49), Phase 3 Write operations (:51-55, 'not planned', with an explicit requirement to re-run the Lethal-Trifecta assessment and a security review before any write tool)."
+    - "CONTRADICTION — the README's phase declaration is stale relative to the roadmap. README.md:315 says the server is in Phase 1, but docs/roadmap.md:6 marks Phase 1 '(✅ done)', docs/roadmap.md:21 marks Phase 2 '(✅ largely done)' with structured returns, structlog and match_type checked off (:23-27), and docs/roadmap.md:32 declares Phase 2.5 '(🔄 in progress)'. The three tools audited in this run were delivered under Phase 2.5 (docs/roadmap.md:45-47) and server.py:494 labels the geodata facade '(Phase-2 Geodaten-Erweiterung)'. A reader consulting the README gets a different phase than a reader consulting the roadmap."
+    - "MISSING Phase 1 -> 2 prerequisites. The check requires the transition to be gated on a completed audit run, an ISDS classification and a DSG-Verarbeitungsverzeichnis. Only the audit run exists (docs/roadmap.md:18, audits/ with four run directories). `grep -rni 'isds|verarbeitungsverzeichnis|dsg|datenschutz'` over README.md, README.de.md, docs/ and SECURITY.md returns ZERO hits — neither artefact exists, yet the roadmap already reports Phase 2 as largely done and Phase 2.5 in progress."
+    - "Phase transitions are not tracked in the CHANGELOG as the criterion asks: `grep -in 'phase' CHANGELOG.md` returns only four hits, all incidental (:133-134 and :151 referencing docs/geodaten-erweiterung-phase1.md and its live probe; :186 mentioning that a roadmap and a README security section were added). No entry records the Phase 1 -> Phase 2 or Phase 2 -> Phase 2.5 transition or its sign-off."
+  gaps:
+    - "README declares Phase 1 while docs/roadmap.md declares Phase 2 largely done and Phase 2.5 in progress — the single authoritative phase statement the check requires does not exist."
+    - "No ISDS classification document (docs/isds-klassifikation.md or equivalent) anywhere in the repo."
+    - "No DSG-Verarbeitungsverzeichnis (docs/dsg-processing-record.md or equivalent) anywhere in the repo."
+    - "No phase-transition entries in CHANGELOG.md; the Phase 1 -> 2 gate was passed without a recorded decision or sign-off."
+    - "docs/roadmap.md:49 lists 'Re-run the audit against the changed surface' as an open Phase-2.5 item — i.e. the roadmap itself acknowledges the current run was still outstanding."
+  evaluator_notes: |
+    PARTIAL. Three of the five criteria are solidly met: a phase is declared in
+    the README, the roadmap file exists with real phase-specific task lists, and
+    — most importantly for a `high` severity check — the declared phase matches
+    reality on the code side. 23/23 tools are readOnlyHint with zero
+    destructiveHint, so the failure mode this check exists to prevent ('we built
+    writes because we could') has not occurred. Phase 3 is explicitly gated
+    behind a re-run of SEC-019 and a security review (docs/roadmap.md:53-55),
+    which is exactly the discipline the check asks for.
+
+    Two criteria fail. First, the phase declaration is not single-sourced: the
+    README says Phase 1 and the roadmap says Phase 2 largely done plus Phase 2.5
+    in progress. The check's anti-pattern table names 'Phase nicht deklariert ->
+    Maintainer und Reviewer unsicher, was zugelassen ist'; two contradictory
+    declarations produce the same uncertainty. This matters concretely here,
+    because the tools audited in this run (zoning_at, municipality_at,
+    layer_info, convert_coordinates) were shipped under a Phase-2.5 heading
+    while the README still advertises Phase 1.
+
+    Second, the Phase 1 -> 2 gate was crossed without the ISDS classification
+    and DSG-Verarbeitungsverzeichnis the criterion names; neither artefact
+    exists in the repo at all. For a Public-Open-Data, auth-none, read-only
+    server the substantive risk is low (no personal data is processed, so a
+    Verarbeitungsverzeichnis would be near-empty), but 'low risk' is a reason to
+    write a short document, not a reason to skip the gate — and nothing in the
+    repo records that the exemption was considered.
+
+    Remediation is cheap: make the README the single phase authority and update
+    it to match the roadmap (or vice versa), add the two short compliance
+    documents under docs/, and record phase transitions in the CHANGELOG.

@@ -1,0 +1,22 @@
+check_run:
+  id: ARCH-008
+  status: pass
+  evidence_collected: 4
+  evidence_required: 2
+  findings:
+    - "Confirmed at runtime that the server is tools-only: against the live FastMCP instance (src/swisstopo_mcp/server.py:42), list_tools() returns 23, while list_resources(), list_resource_templates() and list_prompts() each return 0. A grep for @mcp.resource / @mcp.prompt across src/ likewise returns zero hits."
+    - "The tools-only choice is documented with a reason, satisfying the alternative pass criterion: README.md:364-369 ('MCP Primitives — This server intentionally exposes Tools only (no Resources or Prompts): it is a Phase-1 read-only wrapper, and every result is a live, parameterised API query rather than a static addressable document. Resources/Prompts may be added in a later phase if stable URI schemes emerge.')."
+    - "The justification is mirrored in the German documentation at README.de.md:366, keeping the bilingual section inventory in parity."
+    - "The Resources-migration-potential criterion is evidenced as an assessed, tracked item rather than an omission: docs/roadmap.md:34 lists '[ ] Resources for static catalogs (e.g. notable map layers) (ARCH-008)' as an open Phase-2 entry, and README.md:371-383 documents the tool workflows that would feed such a catalog."
+  gaps:
+    - "Still only 1 of 3 primitives in use. The strongest concrete Resource candidate — a static catalog of notable map layers, which would take load off the 23-entry tool manifest (see ARCH-006) — remains unimplemented and open on the roadmap."
+  evaluator_notes: |
+    The check passes on its documented-rationale branch: the server uses one
+    primitive, but README.md:364 and README.de.md:366 explain why, tie it to
+    the declared Phase-1 posture, and name the condition for revisiting
+    (stable URI schemes). This closes the 2026-05-29 gap, which was precisely
+    'no documented justification for tools-only'. The Resource-candidate
+    review the check asks for is evidenced by the roadmap entry. The remaining
+    gap is a maturity item, not a criteria failure — every result here is a
+    parameterised live query, which is legitimately tool-shaped rather than
+    resource-shaped.

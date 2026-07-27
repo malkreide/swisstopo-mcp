@@ -1,0 +1,27 @@
+check_run:
+  id: SEC-005
+  status: partial
+  evidence_collected: 5
+  evidence_required: 2
+  findings:
+    - "GAP — no DNS pinning of any kind. grep -rE 'getaddrinfo|gethostbyname|dns\\.resolve|sni_hostname|SSLContext' over src/ returns zero hits. Requests are issued with the hostname URL (src/swisstopo_mcp/api_client.py:171-175), so httpx performs its own resolution at connect time; there is no single-resolution-then-pin path."
+    - "GAP — no custom transport and no egress proxy. The client is built with only timeout, User-Agent and follow_redirects (src/swisstopo_mcp/api_client.py:88-94); no PinnedTransport subclass, no `proxy=` argument, and no Smokescreen sidecar in Dockerfile or deploy/kubernetes.yaml."
+    - "GAP — no test asserts a single DNS lookup per request. tests/ contains no mocked resolver; the network tests use respx transport mocking (e.g. tests/test_coords.py:116, tests/test_lv95_input.py), which never exercises resolution."
+    - "MISLABELLED CONTROL — SECURITY.md:25 claims `follow_redirects=False ... (SEC-005)`. Redirect suppression (src/swisstopo_mcp/api_client.py:93) prevents redirect-based host switching, which is a SEC-004 concern; it provides no protection against a TOCTOU rebind of an already-allowed hostname."
+    - "COMPENSATING CONTROL — for the containerised deployment a rebind to the canonical payload target is dropped at the network layer: deploy/kubernetes.yaml:100-111 permits egress only on TCP/443 and excludes 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 and 169.254.0.0/16. TLS certificate verification is left at the httpx default (no verify=False anywhere in src/), so a rebound connection would also fail hostname validation for an attacker without a valid cert."
+  gaps:
+    - "DNS resolution is not performed once and pinned; the connect-time lookup is httpx's own."
+    - "Original hostname is not carried via an explicit Host header / SNI extension because no pinning exists to require it."
+    - "No regression test proving one resolution per request."
+    - "Compensating network-layer control is absent for the local-stdio and plain-`docker run` deployment modes."
+  evaluator_notes: |
+    None of the five SEC-005 Pass-Criteria are implemented in code. Status is
+    partial rather than fail only because the exploit path is narrow and one
+    real compensating control exists: the reachable hostname set is a fixed
+    frozenset of federal/cantonal domains (api_client.py:51-64), so rebinding
+    requires control over DNS for geo.admin.ch or a cantonal OEREB domain, and
+    in the K8s deployment the resulting connection to a private/link-local
+    address is dropped by the egress NetworkPolicy. That compensation does not
+    apply to local stdio or plain Docker runs.
+    Also worth flagging to the maintainer: SECURITY.md:25 attributes SEC-005 to
+    follow_redirects=False, which will read as "handled" to a future reviewer.

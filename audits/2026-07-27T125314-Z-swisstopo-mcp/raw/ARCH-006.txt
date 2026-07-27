@@ -1,0 +1,25 @@
+check_run:
+  id: ARCH-006
+  status: partial
+  evidence_collected: 5
+  evidence_required: 2
+  findings:
+    - "23 tools are exposed, confirmed at runtime via mcp.list_tools() against the instance built at src/swisstopo_mcp/server.py:42. That is in the check's '16–25: ernste Zweifel, ob alle nötig sind' band and roughly double the ideal of <= 12."
+    - "The budget is an explicit, documented decision rather than drift: CHANGELOG.md:24-28 records 'Tool budget raised from 20 to 25 to accommodate the consolidation', docs/roadmap.md:46 records the same under Phase 2.5, and docs/merge-plan-swiss-geodata-mcp.md:182 and :241 record the decision and its date. README.md:198 states the façade is 'kept under the 25-tool budget'."
+    - "Real aggregation exists and is documented: query_geodata fronts three distinct sources behind one tool (src/swisstopo_mcp/geodata.py:236-248 routes strassenverzeichnis / oereb-verfuegbarkeit / geodienste:<topic>:<canton>), explicitly to avoid one tool per source (src/swisstopo_mcp/geodata.py:4-13). Two new convenience tools collapse previously multi-call questions into one call (src/swisstopo_mcp/rest_api.py:405 zoning_at, rest_api.py:435 municipality_at)."
+    - "Endpoint-shaped clusters remain and are not argued for in the README: five tools sit on the single api3 MapServer/SearchServer API — swisstopo_search_layers (rest_api.py:288, /SearchServer), swisstopo_layer_info (rest_api.py:470, /MapServer/{layer}), swisstopo_identify_features (rest_api.py:311, /identify), swisstopo_find_features (rest_api.py:339, /find), swisstopo_get_feature (rest_api.py:362, /{layer}/{id}) — a close 1:1 mapping of upstream endpoints. Two further search→detail pairs exist: swisstopo_search_geodata → swisstopo_get_collection and swisstopo_get_egrid → swisstopo_get_oereb_extract."
+    - "Budget figures have drifted out of sync across the repo: src/swisstopo_mcp/geodata.py:5 still says the façade keeps the server 'well under its 18-tool budget' and docs/geodaten-erweiterung-phase1.md:253 still states 'Budget: 18', while README/CHANGELOG/roadmap now say 25."
+  gaps:
+    - "Tool count (23) is nearly double the check's ideal of <= 12 and the README documents the budget number but not why the remaining endpoint-shaped clusters (search_layers/layer_info/identify/find/get_feature; search_geodata→get_collection; get_egrid→get_oereb_extract) cannot be aggregated further."
+    - "Stale budget numbers in src/swisstopo_mcp/geodata.py:5 and docs/geodaten-erweiterung-phase1.md:253 (both say 18) contradict the current documented budget of 25."
+  evaluator_notes: |
+    Two of the five pass criteria are clearly met — the anchor demo queries in
+    README.md:222-238 are answerable in 1–2 calls (the new zoning_at and
+    municipality_at made this true for point questions), and genuine façade
+    aggregation exists in geodata.py. Two are not: the count is far above the
+    stated ideal, and the documented justification covers the budget *number*
+    without arguing the non-aggregation of the remaining clusters. The repo's
+    own merge plan (docs/merge-plan-swiss-geodata-mcp.md:246-251) names
+    'Tool-Budget-Inflation' as risk #1 of this expansion, which corroborates
+    rather than contradicts a partial. Not a fail: the growth was deliberate,
+    reviewed, and offset by consolidation elsewhere.

@@ -1,0 +1,24 @@
+check_run:
+  id: SEC-014
+  status: partial
+  evidence_collected: 4
+  evidence_required: 2
+  findings:
+    - "No tool allow-list configuration exists in the repo: `find . -iname '*allowlist*' -o -iname '*tool-policy*' -o -iname '*gateway-config*'` returns nothing, and grep for `allowed_tools|tool_allowlist|whitelist` over deploy/ and src/ returns no match. All 23 tools registered in src/swisstopo_mcp/server.py:87-654 are exposed unconditionally to every caller."
+    - "No server-side defence-in-depth role/group check: grep for `group|role|team` combined with check/validate/require over src/ returns nothing. There is no require_group decorator and no ctx.user_claims usage — consistent with auth_model=none, which leaves no claims to check against."
+    - "DOCUMENTED DEFERRAL — SECURITY.md:52-61 records tool allow-listing as a portfolio/gateway-layer control with an explicit rationale ('belongs to the MCP host/gateway that aggregates multiple servers, not to an individual server exposing a fixed, read-only tool set') and states the residual risk is bounded by the egress allow-list and the read-only tool surface. SECURITY.md:68-73 names the re-evaluation trigger ('is aggregated behind a shared MCP gateway')."
+    - "The risk-bounding claims are verifiable: every one of the 23 tools carries readOnlyHint: true / destructiveHint: false in its annotations (e.g. src/swisstopo_mcp/server.py:89-95, 349-357, 636-643), and outbound reach is capped by the frozenset at src/swisstopo_mcp/api_client.py:51-64."
+  gaps:
+    - "No per-team/per-role allow-list is documented anywhere (Pass-Criterion 1)."
+    - "No default-deny tool exposure — tools/list returns the full 23-tool manifest to every caller (Pass-Criterion 2 and 5)."
+    - "No server-side group/role check as defence-in-depth (Pass-Criterion 3)."
+    - "No audit logging of denied tool calls, because no call can be denied (Pass-Criterion 4)."
+  evaluator_notes: |
+    applies_when is satisfied via is_cloud_deployed == true, so the check is in
+    scope. None of the five Pass-Criteria are implemented, which would normally
+    read as fail — but the deferral is explicit, reasoned and carries a named
+    re-evaluation trigger in SECURITY.md rather than being an oversight, and the
+    controls it leans on (read-only annotations on all 23 tools, frozenset
+    egress cap) were verified to exist. That combination is partial: a documented
+    risk acceptance is not an implemented control. The action for the maintainer
+    is at the portfolio layer, not in this repo.

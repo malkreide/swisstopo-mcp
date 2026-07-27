@@ -1,0 +1,20 @@
+check_run:
+  id: SDK-001
+  status: pass
+  evidence_collected: 5
+  evidence_required: 2
+  findings:
+    - "Lifespan is a @asynccontextmanager coroutine taking the FastMCP server: src/swisstopo_mcp/server.py:27-39"
+    - "FastMCP constructor receives it explicitly: mcp = FastMCP(\"swisstopo_mcp\", lifespan=lifespan, ...) at src/swisstopo_mcp/server.py:42-44"
+    - "Cleanup runs in a finally block (await client.aclose(); set_shared_client(None)): src/swisstopo_mcp/server.py:34-39"
+    - "One shared httpx.AsyncClient is built once (timeout=30s, fixed User-Agent, follow_redirects=False) and reused; _NonClosingClient adapts it to the `async with await _get_client()` convention without closing it per call: src/swisstopo_mcp/api_client.py:85-127, used by every upstream call at src/swisstopo_mcp/api_client.py:171"
+    - "Repo-wide grep for httpx.AsyncClient( finds exactly one construction site (src/swisstopo_mcp/api_client.py:90); no tool module, including the new src/swisstopo_mcp/coords.py, creates a client per call — coords.py routes through reframe_request -> request_with_retry (src/swisstopo_mcp/coords.py:269, src/swisstopo_mcp/api_client.py:210-222)"
+    - "Regression test asserts the lifespan registers/reuses/closes the shared client: tests/test_shared_client.py:1-30 (479 tests pass in this environment)"
+  gaps:
+    - "None. AsyncExitStack criterion is not applicable: a single FastMCP instance is mounted, no multi-server ASGI composition (src/swisstopo_mcp/server.py:657-683 builds one app from mcp.streamable_http_app())."
+    - "Minor, non-blocking: outside the lifespan (unit tests, direct handler calls) _get_client() falls back to an ephemeral per-call client (src/swisstopo_mcp/api_client.py:122-127). This is documented and does not apply to the served paths."
+  evaluator_notes: |
+    All four applicable pass criteria are met and verified in source plus a
+    regression test. The new REFRAME host (geodesy.geo.admin.ch) added since the
+    last audit goes through the same shared-client path, so the tool-surface
+    growth 19 -> 23 did not reintroduce per-call client construction.

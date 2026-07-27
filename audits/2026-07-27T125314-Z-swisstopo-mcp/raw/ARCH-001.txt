@@ -1,0 +1,19 @@
+check_run:
+  id: ARCH-001
+  status: pass
+  evidence_collected: 4
+  evidence_required: 2
+  findings:
+    - "All 23 registered tools use exactly one convention (snake_case), verified at runtime via mcp.list_tools(): swisstopo_geocode … search_address. Registration is explicit `name=` on every decorator, e.g. src/swisstopo_mcp/server.py:88, src/swisstopo_mcp/server.py:349, src/swisstopo_mcp/server.py:423."
+    - "No tool name contains spaces, dots, parentheses or non-ASCII characters; all match ^[a-z][a-z0-9_]*$ (23/23 checked at runtime against the live FastMCP instance built from src/swisstopo_mcp/server.py:42)."
+    - "Descriptions carry use-case context, not just function: measured runtime description length median 369 chars, min 181 chars (swisstopo_reverse_geocode), max 835 chars (find_commune) — every tool is far above the one-sentence anti-pattern. Example src/swisstopo_mcp/server.py:359-367 (swisstopo_zoning_at, 561 chars incl. legal caveat)."
+    - "Near-duplicate tools are disambiguated in the description text itself: src/swisstopo_mcp/server.py:200-201 (find_features: 'Im Gegensatz zu swisstopo_identify_features (Punktabfrage) wird hier nach einem Attribut gesucht') and src/swisstopo_mcp/server.py:179-180 (the reciprocal note on identify_features)."
+  gaps:
+    - "Two prefix families coexist: 17 tools are namespaced `swisstopo_*` while 6 (list_available_layers, query_geodata, query_osm_features, lookup_postal_code, find_commune, search_address — src/swisstopo_mcp/server.py:504, 525, 552, 586, 609, 636) are not. This is a namespacing inconsistency, not a naming-convention violation; the unprefixed six are the non-swisstopo sources (geodienste/OSM/OpenPLZ), so the split is semantically motivated but undocumented."
+  evaluator_notes: |
+    Verified by importing the server into a clean venv and enumerating
+    mcp.list_tools() rather than trusting grep. One convention (snake_case),
+    no illegal characters, and every description carries <use_case> context
+    well beyond a single sentence. All four pass criteria met. The prefix
+    split is noted as a gap but does not break discovery or parsing and does
+    not mix conventions, so it does not reduce the status.

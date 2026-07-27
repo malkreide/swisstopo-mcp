@@ -1,0 +1,49 @@
+check_run:
+  id: CH-004
+  status: partial
+  evidence_collected: 8
+  evidence_required: 2
+  findings:
+    - "Envelope carries both fields by construction: src/swisstopo_mcp/models.py:70-71 defines `source` (default SWISSTOPO_SOURCE) and `license` (default SWISSTOPO_LICENSE) on every ToolResponse; ToolResponse.ok() takes both as keyword args (models.py:83-84)."
+    - "NEW SOURCE ARE — attribution incomplete: src/swisstopo_mcp/rest_api.py:429 passes only `source=ARE_SOURCE` to ToolResponse.ok(); no `license=` is passed, so the ch.are.bauzonen response silently inherits SWISSTOPO_LICENSE. Empirically confirmed with a respx-mocked call: source='ch.are.bauzonen (ARE) / geo.admin.ch', license='Swiss Open Government Data (opendata.swiss)' (== SWISSTOPO_LICENSE default). models.py defines ARE_SOURCE (models.py:25) but there is NO ARE_LICENSE constant."
+    - "Same omission on the other two new sources: src/swisstopo_mcp/rest_api.py:462 (swissBOUNDARIES3D) and src/swisstopo_mcp/coords.py:280,303,306,309 (REFRAME) pass `source=` only. models.py:24,26 define REFRAME_SOURCE and SWISSBOUNDARIES_SOURCE with no matching *_LICENSE constants. For these two the swisstopo fallback is materially correct (both are swisstopo products); for ARE (Bundesamt fuer Raumentwicklung, a different federal office) the licence statement is inherited rather than asserted."
+    - "This breaks the pattern every other non-swisstopo source in the repo follows: OEREB (oereb.py:113-114,132-133,171-172,190-191,255-256), geodienste (geodata.py:454,490-491), OSM/ODbL (overpass.py:211) and OpenPLZ (openplz.py:406-407,438-439,455-456,474-475,496-497,517-518) all pass `source=` AND `license=` explicitly."
+    - "Error envelopes cannot carry a licence at all: src/swisstopo_mcp/models.py:99-100 — `ToolResponse.error()` accepts `source` but not `license`, so every handled error from ARE / OEREB / OSM / OpenPLZ / geodienste reports SWISSTOPO_LICENSE (e.g. rest_api.py:432, coords.py:306,309, overpass.py:214, openplz.py:411)."
+    - "Per-record provenance for the ARE legal caveat IS correctly implemented: src/swisstopo_mcp/rest_api.py:421 attaches `legal_note: ARE_ZONING_CAVEAT` to every zoning record (models.py:30-33), not only to the prose summary (rest_api.py:152). Regression-tested at tests/test_places.py:110-115. Verified empirically: results[0]['legal_note'] present."
+    - "README licence documentation is incomplete: README.md:461 / README.de.md:462 name only 'Data provided by swisstopo ... under Open Government Data terms'. There is no 'Data sources & licences' table. The Overview source table (README.md:22-33) lists 9 sources but has no licence column and does not list ARE / ch.are.bauzonen, swissBOUNDARIES3D or the REFRAME service (geodesy.geo.admin.ch) at all. README.md:157-159 mentions swisstopo_zoning_at as '(not legally binding)' but never names ARE as the data producer."
+    - "No test asserts the licence field of the new sources: tests/test_places.py (300 lines, covers zoning/municipality/layer_info) and tests/test_coords.py never assert `out.source` or `out.license`; tests/test_responses.py:18-19,42,66 only assert SWISSTOPO_SOURCE and OEREB_SOURCE."
+  gaps:
+    - "No ARE_LICENSE constant in models.py and no `license=` argument at rest_api.py:429/432 — ch.are.bauzonen data ships under the swisstopo default licence constant rather than an ARE-specific attribution."
+    - "No SWISSBOUNDARIES_LICENSE / REFRAME_LICENSE constants; licence is inherited by omission rather than asserted (correct by accident for these two swisstopo products)."
+    - "ToolResponse.error() (models.py:99) has no `license` parameter, so error envelopes for every non-swisstopo source mis-state the licence."
+    - "README.md / README.de.md have no per-source licence table; ARE, swissBOUNDARIES3D and REFRAME are not documented as distinct sources with their licences."
+    - "The ARE non-binding caveat is on every record but not in the ToolResponse-level fields; the empty-result path (rest_api.py:145) returns no record and therefore no caveat."
+    - "No regression test asserts source/license for the three new sources."
+  evaluator_notes: |
+    PARTIAL, not pass and not fail.
+
+    What passes: every tool answer carries a populated `source` and `license`
+    field (models.py:70-71), the three new tools set `source` to the correct
+    producer, and the ARE non-binding caveat genuinely travels per record
+    (rest_api.py:421) rather than living only in the summary — which is exactly
+    what the re-audit brief asked to verify. Provenance survives aggregation
+    (geodata.py:532-533 marks mixed-source results 'gemischt — siehe je Layer').
+
+    What fails the criteria: (a) "Attribution-Text genau gemaess Lizenz-Vorgabe" —
+    ch.are.bauzonen is published by the ARE, not swisstopo, yet its licence
+    string is the swisstopo default inherited through an omitted keyword
+    argument. The emitted text ("Swiss Open Government Data (opendata.swiss)")
+    happens to be generically true for federal OGD, which is why this is partial
+    rather than fail, but it is inherited by accident, not asserted — every
+    other non-swisstopo source in this repo passes `license=` explicitly.
+    (b) "README dokumentiert alle verwendeten Datenquellen mit Lizenzen" — the
+    README documents one source (swisstopo) with one licence; ARE,
+    swissBOUNDARIES3D, REFRAME, geodienste, OEREB and OpenPLZ are not listed
+    with their licences anywhere in either README.
+
+    Remediation is small: add ARE_LICENSE (and SWISSBOUNDARIES_LICENSE /
+    REFRAME_LICENSE for explicitness) to models.py, pass `license=` at
+    rest_api.py:429/432/462/466 and coords.py:280/303/306/309, give
+    ToolResponse.error() a `license` parameter, add a Data-sources-and-licences
+    table to README.md + README.de.md, and assert source/license in
+    tests/test_places.py and tests/test_coords.py.

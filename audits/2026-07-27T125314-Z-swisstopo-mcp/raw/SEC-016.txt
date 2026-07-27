@@ -1,0 +1,24 @@
+check_run:
+  id: SEC-016
+  status: pass
+  evidence_collected: 5
+  evidence_required: 2
+  findings:
+    - "No 0.0.0.0 binding is hardcoded in the code. The configured default host is 127.0.0.1 with an inline rationale naming this check: src/swisstopo_mcp/config.py:20-22 ('Default host stays 127.0.0.1 — a container sets SWISSTOPO_HTTP_HOST=0.0.0.0 itself (SEC-016)'). The uvicorn call reads that setting rather than a literal: src/swisstopo_mcp/server.py:695-699."
+    - "grep -rE 'host\\s*=\\s*[\"\\x27]0\\.0\\.0\\.0' over src/ returns no match; the only occurrences of 0.0.0.0 in the repo are the two deliberate container overrides (Dockerfile:26, deploy/kubernetes.yaml:41) and documentation lines."
+    - "The container override is set only in the image/manifest, with an explanatory comment: Dockerfile:24-26 ('In a container we must bind all interfaces — set ONLY here, never as a code default (SEC-016). The code default stays 127.0.0.1') and deploy/kubernetes.yaml:39-41."
+    - "A regression test pins the default: tests/test_config.py:9-10 asserts `Settings(_env_file=None).http_host == '127.0.0.1'`, and tests/test_config.py:16-23 asserts the env override path works."
+    - "The local-vs-container differentiation is documented: docs/deployment.md:36 ('`0.0.0.0` only in container, never a code default | `SWISSTOPO_HTTP_HOST` env (code default stays `127.0.0.1`, SEC-016)') and .env.example:9-11."
+  gaps:
+    - "README.md itself does not explain the local/container binding distinction; it delegates via the 'Container deployment' section (README.md:334-338) to docs/deployment.md. A reader who never opens that file will not see the NeighborJack rationale."
+    - "The optional warn-on-dangerous-binding heuristic (log a WARNING when binding 0.0.0.0 without /.dockerenv or KUBERNETES_SERVICE_HOST) is not implemented — Pass-Criterion 5, marked optional."
+    - "docs/deployment.md:19 documents `docker run ... -p 8000:8000` without a 127.0.0.1 bind prefix, which publishes the container port on all host interfaces."
+  evaluator_notes: |
+    The four mandatory Pass-Criteria are met: no code default of 0.0.0.0, host
+    driven by an env var defaulting to 127.0.0.1, the 0.0.0.0 override confined
+    to Dockerfile/K8s manifest, and the differentiation documented (in
+    docs/deployment.md rather than README, which is a placement nit). The
+    optional runtime warning is absent. Worth passing to the maintainer as a
+    small hardening item: the documented `docker run -p 8000:8000` at
+    docs/deployment.md:19 re-exposes the port on every host interface and would
+    read better as `-p 127.0.0.1:8000:8000` for local experimentation.

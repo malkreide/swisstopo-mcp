@@ -1,0 +1,23 @@
+check_run:
+  id: SEC-020
+  status: pass
+  evidence_collected: 5
+  evidence_required: 3
+  findings:
+    - "Zero forbidden patterns in the codebase: `grep -rnE 'os\\.system\\(|shell\\s*=\\s*True|\\beval\\(|\\bexec\\(|os\\.popen\\(|subprocess|pickle\\.|__import__' src/ tests/` returns no matches at all. There is no subprocess site to audit."
+    - "No shell-out is needed by design — every capability is an HTTP call through the single httpx client (src/swisstopo_mcp/api_client.py:88-94, :146-187); the check's 'library instead of CLI' criterion is satisfied trivially (httpx rather than curl, no image/PDF/git tooling)."
+    - "No filesystem or path handling exists, so the pathlib/base-dir criterion is vacuous: grep over src/ finds no `open(`, no `os.path`, no `pathlib` and no file-serving tool. The only I/O is network I/O and stderr logging (src/swisstopo_mcp/logging_config.py)."
+    - "Timeouts are set on every outbound call, covering the resource-exhaustion criterion: REQUEST_TIMEOUT = 30.0 applied at client construction (src/swisstopo_mcp/api_client.py:24, :91), with a per-call override honoured at api_client.py:173-174 and used for the slower Overpass endpoint (src/swisstopo_mcp/overpass.py:164)."
+    - "User input that flows outward is whitelist-validated at the Pydantic boundary, not sanitised by blacklist: the anchored positive patterns at src/swisstopo_mcp/api_client.py:39-43 are applied to every free-text field, and tests/test_input_validation.py:14-31 asserts rejection of null bytes, angle brackets, double quotes and backticks — the same metacharacter class the check's injection suite uses."
+  gaps:
+    - "No CI guard against regression: .github/workflows/ci.yml runs pytest and `ruff check` with select = ['E','F','W','I','UP'] (pyproject.toml:71) — no bandit, no semgrep, and no grep-based step for os.system / shell=True / eval / exec as suggested in Remediation Schritt 4. Nothing would fail the build if such a call were introduced."
+    - "The parametrised injection suite from Modus 3 does not exist as such; coverage comes indirectly from the pattern tests in tests/test_input_validation.py."
+  evaluator_notes: |
+    Cleanest check in the set: the attack surface this check targets is entirely
+    absent — no subprocess, no eval/exec, no shell, no filesystem access. All
+    Pass-Criteria are met, most of them vacuously, and the one non-vacuous
+    criterion (whitelist validation of outward-flowing input) is implemented and
+    tested.
+    Only forward-looking item: ruff's current rule selection would not catch a
+    reintroduced `shell=True`, so the CI grep-guard from the remediation section
+    is worth adding cheaply before the server gains any local-processing tool.

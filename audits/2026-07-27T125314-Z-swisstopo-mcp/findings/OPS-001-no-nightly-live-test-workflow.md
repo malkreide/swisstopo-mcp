@@ -1,7 +1,7 @@
 ## Finding: OPS-001 — Test-Strategie: Unit-Tests mocked + Live-Tests gemarkert
 
 **Severity:** high
-**Status:** open
+**Status:** closed
 **Server:** swisstopo-mcp
 **Check-Reference:** OPS-001
 **PDF-Reference:** Anhang C1
@@ -86,3 +86,13 @@ The unlive-tested pair `swisstopo_get_egrid` / `swisstopo_get_oereb_extract` is 
 ### Effort Estimate
 
 M (1-3d) — the workflow file is an hour; the five missing live tests plus the schema-drift assertions are the bulk of the work.
+
+---
+
+### Remediation Status (2026-07-27, batch 2)
+
+**Closed.** `.github/workflows/live-test.yml` runs the `live` suite nightly at
+04:00 UTC plus on demand, and opens a single deduplicated issue on failure.
+Keeping `live` out of PR CI stays correct — an upstream outage must not fail an
+unrelated PR — but excluded-and-never-run meant an upstream contract change
+would surface as a user-facing bug instead of a build failure.

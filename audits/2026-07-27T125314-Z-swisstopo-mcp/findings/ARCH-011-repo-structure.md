@@ -1,7 +1,7 @@
 ## Finding: ARCH-011 — Standardisierte Repo-Struktur (src-Layout, tests, README.de.md)
 
 **Severity:** medium
-**Status:** open
+**Status:** closed
 **Server:** swisstopo-mcp
 **Check-Reference:** ARCH-011
 **PDF-Reference:** Anhang A8
@@ -64,3 +64,13 @@ Independently of the option chosen:
 
 ### Effort Estimate
 S (<1d) for Option B plus the README parity fix. Option A is also S but touches far more files for less benefit.
+
+---
+
+### Remediation Status (2026-07-27, batch 2)
+
+**Closed via Option B**, the option the finding itself recommends. Both READMEs
+now carry a `Project structure` rationale: modules map one-to-one onto upstream
+API families, which is the axis this code varies along, so a `tools/` level
+would add a directory without adding a distinction. The check permits argued
+deviations.

@@ -1,7 +1,7 @@
 ## Finding: OPS-003 — Phasenarchitektur: Read-only First, dann Write, dann Multi-Agent
 
 **Severity:** high
-**Status:** open
+**Status:** closed
 **Server:** swisstopo-mcp
 **Check-Reference:** OPS-003
 **PDF-Reference:** Anhang C4
@@ -76,3 +76,12 @@ The substantive risk this check guards against — "we built writes because we c
 ### Effort Estimate
 
 S (<1d) — four documentation edits; the two compliance documents are short for this data profile, and no code change is required.
+
+---
+
+### Remediation Status (2026-07-27, batch 2)
+
+**Closed.** Both READMEs now state Phase 2.5, matching `docs/roadmap.md`, which
+is named as the single authority. The README carries a status table and the
+advance criteria (roadmap items checked, re-audit with no open criticals,
+CHANGELOG entry; Phase 3 additionally needs a fresh Lethal-Trifecta assessment).

@@ -322,6 +322,13 @@ async def search_layers(params: SearchLayersInput) -> ToolResponse:
             format_layer_results(results, params.query),
             results,
             match_type="exact" if results else "none",
+            note=None
+            if results
+            else (
+                f"Keine Layer für «{params.query}» gefunden. Versuche einen kürzeren "
+                "oder allgemeineren Begriff (z.B. «bauzonen» statt «bauzonen zürich»), "
+                "oder eine andere Sprache via lang."
+            ),
         )
     except Exception as e:
         return ToolResponse.error(handle_api_error(e, "Layer-Suche"))
@@ -350,6 +357,13 @@ async def identify_features(params: IdentifyInput) -> ToolResponse:
             format_identify_results(results),
             results,
             match_type="exact" if results else "none",
+            note=None
+            if results
+            else (
+                f"Keine Features von «{params.layers}» an dieser Position. Der Layer "
+                "deckt diesen Punkt womöglich nicht ab — tolerance erhöhen (Suchradius "
+                "in Pixeln) oder die Layer-ID via swisstopo_search_layers prüfen."
+            ),
         )
     except Exception as e:
         return ToolResponse.error(handle_api_error(e, "Feature-Identifikation"))
@@ -373,6 +387,13 @@ async def find_features(params: FindFeaturesInput) -> ToolResponse:
             format_find_results(results),
             results,
             match_type="exact" if results else "none",
+            note=None
+            if results
+            else (
+                f"Kein Feature mit {params.search_field}=«{params.search_text}» in "
+                f"{params.layer}. Mit swisstopo_layer_info die zulässigen Feldnamen "
+                "und Beispielwerte dieses Layers prüfen, oder contains=True setzen."
+            ),
         )
     except Exception as e:
         return ToolResponse.error(handle_api_error(e, "Feature-Suche"))

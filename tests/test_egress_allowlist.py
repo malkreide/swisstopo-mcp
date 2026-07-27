@@ -100,3 +100,44 @@ class TestResolvedIpGuard:
 
         monkeypatch.setattr(api_client, "_resolve", boom)
         api_client.assert_resolved_ip_public("api3.geo.admin.ch")
+
+
+# ---------------------------------------------------------------------------
+# Documentation consistency (audit SEC-021)
+#
+# The allow-list drifted from its own documentation before. A review item does
+# not catch that reliably; a failing test does.
+# ---------------------------------------------------------------------------
+
+
+class TestAllowListMatchesDocumentation:
+    @staticmethod
+    def _doc_text() -> str:
+        import pathlib
+
+        return (
+            pathlib.Path(__file__).resolve().parent.parent / "docs" / "network-egress.md"
+        ).read_text(encoding="utf-8")
+
+    @pytest.mark.parametrize("host", sorted(ALLOWED_HOSTS))
+    def test_every_allowed_host_is_documented(self, host):
+        assert host in self._doc_text(), (
+            f"{host} is on ALLOWED_HOSTS but missing from docs/network-egress.md. "
+            "The comment on ALLOWED_HOSTS requires the two to stay in sync."
+        )
+
+    def test_documentation_lists_no_unknown_hosts(self):
+        """The reverse direction: a host removed from code must leave the docs."""
+        import re
+
+        table_rows = [
+            ln for ln in self._doc_text().splitlines() if ln.startswith("| `") and "." in ln
+        ]
+        documented = {
+            m.group(1)
+            for ln in table_rows
+            for m in [re.match(r"\| `([^`]+)`", ln)]
+            if m and "." in m.group(1) and "/" not in m.group(1)
+        }
+        stale = documented - set(ALLOWED_HOSTS)
+        assert not stale, f"Documented but not on ALLOWED_HOSTS: {sorted(stale)}"

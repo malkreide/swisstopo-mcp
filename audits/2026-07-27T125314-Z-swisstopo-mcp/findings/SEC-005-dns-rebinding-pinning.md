@@ -1,7 +1,7 @@
 ## Finding: SEC-005 — DNS-Rebinding-Prevention: DNS-Pinning gegen TOCTOU
 
 **Severity:** high
-**Status:** open
+**Status:** in-remediation
 **Server:** swisstopo-mcp
 **Check-Reference:** SEC-005
 **PDF-Reference:** Sec 4.4
@@ -64,3 +64,18 @@ Wire it in at the client construction site (`src/swisstopo_mcp/api_client.py:88-
 
 ### Effort Estimate
 M (1-3d)
+
+---
+
+### Remediation Status (2026-07-27, batch 2)
+
+**Partially closed.** `SECURITY.md` no longer miscredits `follow_redirects=False`
+to this finding — that control belongs to SEC-004 and is listed there. An honest
+SEC-005 row now states that DNS pinning is *not* implemented, names the residual
+rebinding window, and notes that the network-layer compensation applies to the
+Kubernetes deployment only.
+
+**Still open:** the pinned transport itself. A custom `httpx` transport that
+resolves once and reuses the address while preserving SNI and the `Host` header
+touches every outbound request; it deserves its own change and its own
+verification against real TLS, not a corner of a documentation batch.

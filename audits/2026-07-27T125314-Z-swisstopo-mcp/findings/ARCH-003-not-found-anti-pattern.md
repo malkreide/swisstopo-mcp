@@ -1,7 +1,7 @@
 ## Finding: ARCH-003 — «Not Found» Anti-Pattern: Heuristiken statt leerer Antworten
 
 **Severity:** medium
-**Status:** open
+**Status:** closed
 **Server:** swisstopo-mcp
 **Check-Reference:** ARCH-003
 **PDF-Reference:** Sec 2.2
@@ -81,3 +81,13 @@ if not results:
 
 ### Effort Estimate
 M (1-3d)
+
+---
+
+### Remediation Status (2026-07-27, batch 2)
+
+**Closed.** `ToolResponse` gained a `note` field, and the bare-negative sites in
+`rest_api.py` (layer search, identify, find) and `stac.py` now populate it with
+an actionable next step rather than returning an empty list alone. The field is
+additive, so no client breaks; the tool hashes are unaffected because they cover
+the input schema.

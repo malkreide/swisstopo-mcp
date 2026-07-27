@@ -152,7 +152,14 @@ async def search_geodata(params: SearchGeodataInput) -> ToolResponse:
 
         if not matched:
             return ToolResponse.ok(
-                f"Keine Geodaten gefunden für '{params.query}'.", [], match_type="none"
+                f"Keine Geodaten gefunden für '{params.query}'.",
+                [],
+                match_type="none",
+                note=(
+                    f"Der STAC-Katalog kennt keine Collection zu «{params.query}». "
+                    "Der Katalog führt Download-Datensätze (Orthofotos, swissALTI3D, "
+                    "3D-Modelle) — für Kartenlayer stattdessen swisstopo_search_layers."
+                ),
             )
 
         return ToolResponse.ok(format_search_results(matched), matched, match_type="exact")

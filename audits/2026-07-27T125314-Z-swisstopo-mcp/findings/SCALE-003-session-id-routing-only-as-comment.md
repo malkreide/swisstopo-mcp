@@ -1,7 +1,7 @@
 ## Finding: SCALE-003 — Mcp-Session-Id Routing via Edge-LB (HAProxy Stick-Tables)
 
 **Severity:** high
-**Status:** open
+**Status:** closed
 **Server:** swisstopo-mcp
 **Check-Reference:** SCALE-003
 **PDF-Reference:** Sec 5.2
@@ -67,3 +67,12 @@ The exposure is latent while `replicas: 1`, which is why this is not urgent toda
 ### Effort Estimate
 
 M (1-3d) — the config itself is small; the failover test and the deployment documentation are the bulk.
+
+---
+
+### Remediation Status (2026-07-27, batch 2)
+
+**Closed.** `deploy/haproxy.cfg` is a real, mountable configuration with the
+stick-table keyed on `Mcp-Session-Id`, sensible streaming timeouts and a
+`/healthz` check. Previously the routing block existed only as a comment inside
+the Ingress manifest, which is not deployable. The manifest now points at it.

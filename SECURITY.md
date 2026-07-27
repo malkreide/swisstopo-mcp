@@ -21,8 +21,10 @@ Hardening already in place:
 
 | Area | Control |
 |---|---|
-| Egress | Code-layer HTTPS allow-list (`ALLOWED_HOSTS` frozenset) restricted to `*.geo.admin.ch` and the cantonal OEREB endpoints (SEC-004 / SEC-021) — see [docs/network-egress.md](docs/network-egress.md) |
-| Redirects | `follow_redirects=False` on the shared `httpx` client, so an upstream cannot redirect to an off-list host (SEC-005) |
+| Egress | Code-layer allow-list (`ALLOWED_HOSTS` frozenset) enforcing HTTPS-only and a fixed host set. The authoritative list lives in [docs/network-egress.md](docs/network-egress.md) — it is deliberately not repeated here, so it cannot go stale (SEC-004 / SEC-021) |
+| Redirects | `follow_redirects=False` on the shared `httpx` client, so an upstream cannot redirect to an off-list host (SEC-004) |
+| SSRF | Scheme check plus a resolved-IP guard rejecting hosts that answer with a private or link-local address (SEC-004) |
+| DNS pinning | **Not implemented** (SEC-005). The reachable host set is a fixed frozenset resolved per request, so a rebinding window exists between the guard's lookup and the connection. Mitigating factors: no authentication, no secrets in requests, public data only. The Kubernetes deployment additionally restricts egress at the network layer; the local stdio path has no such compensation |
 | TLS | Certificate verification on by default for all upstream requests |
 | Input | Pydantic v2 strict validation at every tool boundary (SEC-018) |
 | Secrets | Env-vars only; `.gitignore` guards `.env`; no hardcoded secrets (ARCH-005) |

@@ -310,10 +310,45 @@ Die vollständige Sicherheitsrichtlinie und Sicherheitslage ist in
 
 ### Phase
 
-Dieser Server ist in **Phase 1 — Read-only-Wrapper**. Alle 23 Tools sind
+Dieser Server ist in **Phase 2.5 — Konsolidierung von `swiss-geodata-mcp`**
+(siehe [docs/roadmap.md](docs/roadmap.md), die alleinige Autorität für den
+Phasenstand). Alle 23 Tools sind
 `readOnlyHint: true` / `destructiveHint: false`; es gibt keine schreibenden
 oder versendenden Funktionen. Spätere Phasen siehe
 [docs/roadmap.md](docs/roadmap.md).
+
+### Datenquellen und Lizenzen
+
+Jede Antwort traegt `source` und `license`. Das ARE ist ein anderes Bundesamt
+als swisstopo, seine Lizenz wird deshalb explizit gesetzt statt geerbt.
+
+| Quelle | Genutzt von | Lizenz |
+|---|---|---|
+| swisstopo / geo.admin.ch | die meisten Tools | Swiss OGD (opendata.swiss) |
+| swisstopo REFRAME (geodesy.geo.admin.ch) | `swisstopo_convert_coordinates` | Swiss OGD (opendata.swiss) |
+| swissBOUNDARIES3D (swisstopo) | `swisstopo_municipality_at` | Swiss OGD (opendata.swiss) |
+| `ch.are.bauzonen` (**ARE**) | `swisstopo_zoning_at` | Swiss OGD — Bundesamt fuer Raumentwicklung ARE |
+| Kantonaler ÖREB-Kataster | `swisstopo_get_egrid`, `swisstopo_get_oereb_extract` | Kantonale ÖREB-Nutzungsbedingungen |
+| geodienste.ch (Kantone) | `swisstopo_query_geodata` | Freie Nutzung — Quellenangabe Pflicht |
+| OpenStreetMap (Overpass) | `swisstopo_query_osm_features` | ODbL — © OpenStreetMap contributors |
+| OpenPLZ (BFS + swisstopo) | `swisstopo_lookup_postal_code`, `swisstopo_find_commune`, `swisstopo_search_address` | Freie Nutzung — Quellenangabe Pflicht |
+
+`ch.are.bauzonen` ist eine Synthese des Bundes fuer die schweizweite
+Vergleichbarkeit und **nicht rechtsverbindlich** — verbindlich ist allein die
+kantonale bzw. kommunale Nutzungsplanung. Der Hinweis steht in jedem
+Ergebnis-Datensatz von `swisstopo_zoning_at`.
+
+### Projektstruktur
+
+Die Tool-Module liegen flach unter `src/swisstopo_mcp/` statt in einem
+`tools/`-Unterpaket. Jedes Modul entspricht genau einer Upstream-API-Familie —
+`rest_api.py` → api3 MapServer, `stac.py` → STAC, `oereb.py` → kantonaler ÖREB,
+`openplz.py` → OpenPLZ, `overpass.py` → OSM, `coords.py` → REFRAME. Das ist die
+Achse, entlang der dieser Code tatsaechlich variiert; eine `tools/`-Ebene wuerde
+ein Verzeichnis hinzufuegen, aber keine Unterscheidung.
+
+`server.py` enthaelt ausschliesslich Tool-Registrierungen; jeder Tool-Rumpf
+liegt im jeweiligen Domaenenmodul.
 
 ### Lethal-Trifecta-Bewertung
 

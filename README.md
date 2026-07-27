@@ -35,6 +35,10 @@
 (The BFS commune number is the official join key to [`swiss-statistics-mcp`](https://github.com/malkreide) and [`zurich-opendata-mcp`](https://github.com/malkreide/zurich-opendata-mcp) — this is what turns a geodata wrapper into a semantic connector at the commune level.)
 [→ More use cases by audience →](EXAMPLES.md)
 
+### Demo
+
+![Demo: Claude using swisstopo_find_commune and swisstopo_lookup_postal_code](docs/assets/demo.svg)
+
 ---
 
 ## Features
@@ -505,6 +509,14 @@ See [CHANGELOG.md](CHANGELOG.md)
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md)
+
+---
+
+## Security
+
+Read-only, no authentication, public geodata only. See [SECURITY.md](SECURITY.md)
+([Deutsch](SECURITY.de.md)) for the security posture and how to report a
+vulnerability.
 
 ---
 

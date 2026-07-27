@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **OpenTelemetry tracing (OBS-006).** `structlog` already reported a
+  `duration_ms` per tool call; tracing adds the causal view, so a slow tool call
+  can be attributed to the upstream request inside it.
+  - **Off unless configured.** `setup_tracing()` is a no-op when
+    `OTEL_EXPORTER_OTLP_ENDPOINT` is unset, so the local stdio workflow is
+    unaffected and emits nothing. The packages ship as regular dependencies so
+    a deployment needs no separate install.
+  - httpx is auto-instrumented, so upstream requests nest under the tool span.
+    Initialisation runs *before* the shared client is created — the
+    instrumentation patches the client class, and a client built earlier would
+    never be traced.
+  - Spans carry `mcp.tool.name` and `mcp.tool.result.is_error`. A handled error
+    returns normally, so the flag is read from the response envelope rather
+    than inferred from an exception.
+  - **Tool arguments are never span attributes.** Coordinates, addresses and
+    search terms are user input and do not belong in an observability backend.
+    A test asserts a geocoding argument does not appear in any attribute.
+  - Configured via the standard `OTEL_` variables (documented in
+    `.env.example`, `docs/deployment.md` and `deploy/kubernetes.yaml`) rather
+    than a `SWISSTOPO_`-prefixed setting, so existing OTel tooling works
+    unchanged.
+
 ### Security
 - **Audit remediation batch 1 — five findings closed** (SEC-004, SEC-018,
   SDK-002, ARCH-004, ARCH-012). No breaking changes for clients.

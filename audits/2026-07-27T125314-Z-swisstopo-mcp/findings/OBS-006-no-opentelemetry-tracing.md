@@ -1,7 +1,7 @@
 ## Finding: OBS-006 — OpenTelemetry Distributed Tracing pro Tool-Call
 
 **Severity:** medium
-**Status:** open
+**Status:** closed
 **Server:** swisstopo-mcp
 **Check-Reference:** OBS-006
 **PDF-Reference:** Anhang B10
@@ -62,3 +62,25 @@ Given structlog already emits `duration_ms`, this is an increment rather than a 
 ### Effort Estimate
 
 M (1-3d) — SDK setup, one new module, decorator extension, deployment wiring and a collector endpoint to point at.
+
+---
+
+### Remediation Status (2026-07-27, follow-up PR)
+
+**Closed.** `src/swisstopo_mcp/observability.py` installs a `TracerProvider`
+with a `BatchSpanProcessor(OTLPSpanExporter())` and instruments httpx, wired
+into the server lifespan before `create_shared_client()` so the shared client
+is actually traced.
+
+Tracing is inert without `OTEL_EXPORTER_OTLP_ENDPOINT`, which keeps the stdio
+path unchanged. The existing `log_tool_call` decorator was wrapped in a span
+rather than joined by a second decorator, as the finding specified — it already
+knows the tool name, duration and outcome.
+
+Both privacy constraints from the finding are implemented and tested: no tool
+arguments in attributes, and no `mcp.user.id`. The argument test asserts a
+geocoding search string and a latitude appear in no attribute value, and that
+the attribute set is exactly `{mcp.tool.name, mcp.tool.result.is_error}`.
+
+Spans are verified with a real `InMemorySpanExporter` rather than mocks, so the
+tests fail if spans stop being emitted. 8 tests added.

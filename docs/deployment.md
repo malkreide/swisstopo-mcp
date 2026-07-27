@@ -47,6 +47,30 @@ needs no configuration.
 Do **not** work around a 421 by disabling DNS-rebinding protection — SEC-005
 depends on it. The fix is to name the right hosts.
 
+## Tracing (OBS-006)
+
+`structlog` already emits a `duration_ms` per tool call. Tracing adds the
+causal view: a slow tool call is attributable to the upstream request inside it
+only if the two share a trace, which the httpx auto-instrumentation provides.
+
+| Variable | Effect |
+|---|---|
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | **The switch.** Unset or empty → tracing is entirely off. |
+| `OTEL_SERVICE_NAME` | Service name in the backend (default `swisstopo-mcp`). |
+| `OTEL_RESOURCE_ATTRIBUTES` | Extra resource attributes, e.g. `deployment.environment=production`. |
+
+These use the standard `OTEL_` prefix rather than `SWISSTOPO_`, so existing
+OpenTelemetry tooling and collector sidecars pick them up unchanged.
+
+Spans carry the tool name and whether the result was an error — **never the
+tool arguments**. Coordinates, addresses and search terms are user input and do
+not belong in an observability backend. There is also no `mcp.user.id`: the
+server is unauthenticated, so no such identity exists.
+
+Tracing initialises *before* the shared httpx client, because the
+instrumentation patches the client class; a client built earlier would never
+be traced.
+
 ## Hardening applied (SEC-007)
 
 | Control | Where |

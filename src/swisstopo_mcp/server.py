@@ -21,6 +21,7 @@ from swisstopo_mcp.api_client import create_shared_client, set_shared_client
 from swisstopo_mcp.config import settings
 from swisstopo_mcp.logging_config import configure_logging, get_logger
 from swisstopo_mcp.models import ToolResponse
+from swisstopo_mcp.observability import setup_tracing, shutdown_tracing
 
 configure_logging(settings.log_level)
 _log = get_logger("swisstopo_mcp.server")
@@ -30,6 +31,9 @@ _log = get_logger("swisstopo_mcp.server")
 async def lifespan(server: FastMCP):
     """Create one shared httpx.AsyncClient for the server's lifetime so all
     tool calls reuse connections (pooling) instead of opening a client per call."""
+    # Before create_shared_client(): the httpx auto-instrumentation patches the
+    # client class, so a client built earlier would never be traced (OBS-006).
+    setup_tracing()
     client = create_shared_client()
     set_shared_client(client)
     _log.info("server_started")
@@ -38,6 +42,7 @@ async def lifespan(server: FastMCP):
     finally:
         await client.aclose()
         set_shared_client(None)
+        shutdown_tracing()
         _log.info("server_stopped")
 
 

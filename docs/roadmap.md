@@ -25,6 +25,9 @@ README ("Security & Compliance" section).
       `match_type: "none"` rather than as errors (ARCH-003)
 - [ ] Suggestion mechanism for empty results — still open (ARCH-003)
 - [ ] Resources for static catalogs (e.g. notable map layers) (ARCH-008)
+- [x] OpenTelemetry tracing, opt-in via `OTEL_EXPORTER_OTLP_ENDPOINT`, with
+      httpx auto-instrumentation so upstream calls nest under the tool span
+      (OBS-006)
 
 ## Phase 2.5 — Consolidation of `swiss-geodata-mcp` (🔄 in progress)
 

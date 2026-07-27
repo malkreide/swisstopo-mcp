@@ -47,6 +47,13 @@ spec:
             # readiness probe stays green and hides it (audit SCALE-001).
             - name: SWISSTOPO_ALLOWED_HOSTS
               value: "" # <-- set to the ingress hostname, e.g. swisstopo-mcp.example.com
+            # Tracing (OBS-006). Leave the endpoint empty to disable entirely.
+            - name: OTEL_SERVICE_NAME
+              value: "swisstopo-mcp"
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: "" # <-- e.g. http://otel-collector.observability:4318
+            - name: OTEL_RESOURCE_ATTRIBUTES
+              value: "deployment.environment=production"
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true

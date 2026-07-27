@@ -33,6 +33,12 @@ dependencies = [
     "pydantic>=2.0.0",
     "pydantic-settings>=2.0.0",
     "structlog>=24.1.0",
+    # OBS-006: tracing is inert unless OTEL_EXPORTER_OTLP_ENDPOINT is set, but
+    # the packages ship by default so a deployment needs no separate install.
+    "opentelemetry-api>=1.27.0",
+    "opentelemetry-sdk>=1.27.0",
+    "opentelemetry-exporter-otlp>=1.27.0",
+    "opentelemetry-instrumentation-httpx>=0.48b0",
 ]
 
 [project.optional-dependencies]

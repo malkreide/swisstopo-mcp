@@ -7,6 +7,7 @@ per-call context (tool name + correlation id + duration).
 """
 from __future__ import annotations
 
+import contextlib
 import functools
 import logging
 import os
@@ -70,21 +71,49 @@ def log_tool_call(tool_name: str) -> Callable[[Callable[..., Awaitable[T]]], Cal
             log = get_logger().bind(tool=tool_name, correlation_id=uuid.uuid4().hex[:12])
             log.info("tool_invoked")
             start = perf_counter()
-            try:
-                result = await func(*args, **kwargs)
-            except Exception:
-                log.error(
-                    "tool_failed",
-                    duration_ms=round((perf_counter() - start) * 1000, 1),
-                    exc_info=True,
-                )
-                raise
-            log.info(
-                "tool_completed",
-                duration_ms=round((perf_counter() - start) * 1000, 1),
-                result_chars=len(result) if isinstance(result, str) else None,
+
+            # One span per tool call, wrapping the existing decorator rather
+            # than stacking a second one — this already knows the tool name,
+            # the duration and the outcome (OBS-006). Imported lazily so the
+            # logging module stays independent of the tracing module.
+            from swisstopo_mcp.observability import get_tracer
+
+            tracer = get_tracer()
+            span_cm = (
+                tracer.start_as_current_span(f"mcp.tool/{tool_name}")
+                if tracer is not None
+                else contextlib.nullcontext()
             )
-            return result
+
+            with span_cm as span:
+                if span is not None:
+                    # Never the arguments: coordinates, addresses and search
+                    # terms are user input and do not belong in a tracing
+                    # backend. No mcp.user.id either — there is no identity.
+                    span.set_attribute("mcp.tool.name", tool_name)
+                try:
+                    result = await func(*args, **kwargs)
+                except Exception as exc:
+                    duration_ms = round((perf_counter() - start) * 1000, 1)
+                    log.error("tool_failed", duration_ms=duration_ms, exc_info=True)
+                    if span is not None:
+                        span.set_attribute("mcp.tool.result.is_error", True)
+                        span.record_exception(exc)
+                    raise
+
+                duration_ms = round((perf_counter() - start) * 1000, 1)
+                log.info(
+                    "tool_completed",
+                    duration_ms=duration_ms,
+                    result_chars=len(result) if isinstance(result, str) else None,
+                )
+                if span is not None:
+                    # A handled error still returns normally, so read the
+                    # envelope rather than assuming success.
+                    span.set_attribute(
+                        "mcp.tool.result.is_error", bool(getattr(result, "is_error", False))
+                    )
+                return result
 
         return wrapper
 

@@ -22,6 +22,15 @@ SWISSTOPO_LICENSE = "Swiss Open Government Data (opendata.swiss)"
 # separate host (geodesy.geo.admin.ch) — named separately so a caller can tell
 # an amtliche transformation apart from the local polynomial approximation.
 REFRAME_SOURCE = "swisstopo REFRAME (geodesy.geo.admin.ch)"
+ARE_SOURCE = "ch.are.bauzonen (ARE) / geo.admin.ch"
+SWISSBOUNDARIES_SOURCE = "swissBOUNDARIES3D (swisstopo) / geo.admin.ch"
+# The harmonised zoning layer is a federal synthesis for comparability across
+# cantons; it is NOT the legally binding plan. This caveat must travel with every
+# zoning result, not only in the prose summary.
+ARE_ZONING_CAVEAT = (
+    "Der harmonisierte Layer ch.are.bauzonen ist eine Synthese des ARE. "
+    "Rechtsverbindlich ist allein die kantonale/kommunale Nutzungsplanung."
+)
 OEREB_SOURCE = "ÖREB-Kataster (Kanton)"
 OEREB_LICENSE = "Kantonale ÖREB-Nutzungsbedingungen"
 GEODIENSTE_SOURCE = "geodienste.ch (Kantone)"

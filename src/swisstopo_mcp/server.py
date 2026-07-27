@@ -1,7 +1,7 @@
 """
 swisstopo-mcp — MCP-Server fuer schweizerische Bundesgeodaten.
 
-20 Tools aus 10 Quellen-Familien: REST, Geocoding, Hoehe, REFRAME
+23 Tools aus 10 Quellen-Familien: REST, Geocoding, Hoehe, REFRAME
 (Koordinatenumrechnung), STAC, WMTS, OEREB, die konsolidierte Geodaten-Fassade
 (Strassenverzeichnis, geodienste.ch, OEREB-Verfuegbarkeit), OpenStreetMap-POIs
 via Overpass, plus die administrative Adressebene via OpenPLZ
@@ -43,9 +43,13 @@ mcp = FastMCP(
     "swisstopo_mcp",
     lifespan=lifespan,
     instructions=(
-        "Swiss federal geodata server with 20 tools. "
-        "Use swisstopo_search_layers to discover layer IDs, then use "
-        "swisstopo_identify_features or swisstopo_find_features to query them. "
+        "Swiss federal geodata server with 23 tools. "
+        "Use swisstopo_search_layers to discover layer IDs, swisstopo_layer_info to see "
+        "a layer's queryable fields, then swisstopo_identify_features or "
+        "swisstopo_find_features to query them. "
+        "For the two most common point questions there are direct tools that need no "
+        "layer lookup: swisstopo_zoning_at (Bauzone) and swisstopo_municipality_at "
+        "(Gemeinde + amtliche BFS-Nummer). "
         "swisstopo_geocode converts addresses to coordinates. "
         "swisstopo_get_height returns elevation. "
         "Point-based tools (swisstopo_get_height, swisstopo_identify_features, "
@@ -123,11 +127,17 @@ from swisstopo_mcp.rest_api import (  # noqa: E402
     FindFeaturesInput,
     GetFeatureInput,
     IdentifyInput,
+    LayerInfoInput,
+    MunicipalityAtInput,
     SearchLayersInput,
+    ZoningAtInput,
     find_features,
     get_feature,
     identify_features,
+    layer_info,
+    municipality_at,
     search_layers,
+    zoning_at,
 )
 
 
@@ -333,6 +343,73 @@ async def swisstopo_elevation_profile(params: ElevationProfileInput, ctx: Contex
     Paare als 'easting,northing' übergeben.</important_notes>
     """
     return await elevation_profile(params, ctx=ctx)
+
+
+@mcp.tool(
+    name="swisstopo_zoning_at",
+    annotations={
+        "title": "Bauzone an Koordinate",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": True,
+    },
+)
+async def swisstopo_zoning_at(params: ZoningAtInput) -> ToolResponse:
+    """Gibt die harmonisierte Bauzone an einer Koordinate zurück (ch.are.bauzonen, ARE).
+
+    <use_case>«Welche Bauzone gilt hier?» in einem Aufruf — ohne vorher die
+    Layer-ID via swisstopo_search_layers suchen zu müssen.</use_case>
+    <important_notes>Der harmonisierte ARE-Layer ist eine Synthese für die
+    schweizweite Vergleichbarkeit und NICHT rechtsverbindlich — verbindlich ist
+    allein die kantonale/kommunale Nutzungsplanung. Der Hinweis steht in jedem
+    Resultat. Koordinaten als lat/lon (WGS84) oder easting/northing (LV95).</important_notes>
+    """
+    return await zoning_at(params)
+
+
+@mcp.tool(
+    name="swisstopo_municipality_at",
+    annotations={
+        "title": "Gemeinde an Koordinate",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": True,
+    },
+)
+async def swisstopo_municipality_at(params: MunicipalityAtInput) -> ToolResponse:
+    """Gibt Gemeinde, BFS-Nummer und Kanton an einer Koordinate zurück (swissBOUNDARIES3D).
+
+    <use_case>Koordinate → amtliche BFS-Gemeindenummer, der Join-Key zu
+    swiss-statistics-mcp und zurich-opendata-mcp.</use_case>
+    <important_notes>Der Layer führt eine Fläche pro historischem Jahrgang; es
+    wird der aktuelle Stand zurückgegeben. Auf einer Gemeindegrenze oder
+    ausserhalb der Schweiz bleibt das Resultat leer.</important_notes>
+    """
+    return await municipality_at(params)
+
+
+@mcp.tool(
+    name="swisstopo_layer_info",
+    annotations={
+        "title": "Layer-Felder und Legende",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": True,
+    },
+)
+async def swisstopo_layer_info(params: LayerInfoInput) -> ToolResponse:
+    """Listet die abfragbaren Felder und die Legende eines Layers auf.
+
+    <use_case>Bindeglied zwischen swisstopo_search_layers und
+    swisstopo_find_features: zeigt, welche Feldnamen als search_field zulässig
+    sind, statt sie raten zu müssen.</use_case>
+    <important_notes>Fehlt die Legende, werden die Felder trotzdem
+    zurückgegeben (legend = null).</important_notes>
+    """
+    return await layer_info(params)
 
 
 # --- Coordinate Tools ---

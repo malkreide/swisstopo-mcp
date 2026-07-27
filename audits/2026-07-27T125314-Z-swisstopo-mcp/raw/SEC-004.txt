@@ -1,0 +1,29 @@
+check_run:
+  id: SEC-004
+  status: partial
+  evidence_collected: 7
+  evidence_required: 3
+  findings:
+    - "Code-layer host allow-list is a frozenset of 10 hosts and is checked before every retried request: src/swisstopo_mcp/api_client.py:51-64 (ALLOWED_HOSTS), api_client.py:67-74 (assert_host_allowed), api_client.py:162-163 (called in request_with_retry before the first attempt)."
+    - "No tool accepts a user-supplied URL. Every upstream base is a module constant (src/swisstopo_mcp/api_client.py:16-22) or a fixed cantonal registry entry (src/swisstopo_mcp/oereb.py:25-28); the direct client calls that bypass request_with_retry still call assert_host_allowed first (src/swisstopo_mcp/oereb.py:98 and src/swisstopo_mcp/oereb.py:161)."
+    - "Redirect-based SSRF is closed: the shared httpx client sets follow_redirects=False (src/swisstopo_mcp/api_client.py:90-94)."
+    - "Network-layer blocklist for the container deployment covers RFC1918 plus link-local 169.254.0.0/16 (i.e. the cloud metadata IP) and permits only TCP/443 outbound: deploy/kubernetes.yaml:100-111."
+    - "GAP — no HTTPS scheme enforcement: assert_host_allowed inspects only urlparse(url).hostname (src/swisstopo_mcp/api_client.py:69). An http:// URL to an allow-listed host passes. This is reachable in practice: src/swisstopo_mcp/geodata.py:447 builds coll_url from `ogc_base`, a value read out of the upstream geodienste.ch catalogue response (src/swisstopo_mcp/geodata.py:96-104, 113), and src/swisstopo_mcp/geodata.py:464 does the same for items_url — the scheme of those URLs is attacker-influenced by the upstream, not fixed by this repo."
+    - "GAP — no resolved-IP blocklist anywhere in the code layer: grep for getaddrinfo|ipaddress|socket\\.|proxy over src/ returns zero hits. There is no DNS resolution + ip_network membership check and no egress proxy (Smokescreen or equivalent)."
+    - "GAP — IPv6 is not covered by the network-layer control: the NetworkPolicy `except` list in deploy/kubernetes.yaml:104-108 contains only IPv4 CIDRs; ::1/128 and fe80::/10 are not excluded, and there is no ipBlock rule for IPv6."
+  gaps:
+    - "HTTPS scheme is never validated before an outbound request (api_client.py:67-74)."
+    - "No resolved-IP blocklist / getaddrinfo range check at the code layer; the 169.254.169.254 defence exists only in the K8s NetworkPolicy, not for local-stdio or plain-Docker runs."
+    - "IPv6 loopback (::1) and link-local (fe80::/10) are not blocked at any layer."
+    - "No egress proxy as defence-in-depth."
+  evaluator_notes: |
+    The structural mitigation is strong — the tool surface exposes no URL
+    parameter, so an LLM cannot steer a request at an arbitrary target, and the
+    frozenset host check plus follow_redirects=False bound the reachable set to
+    10 fixed public geodata hosts (tests/test_egress_allowlist.py:27-38 asserts
+    169.254.169.254, localhost and a suffix-trick host are all rejected).
+    But three explicit Pass-Criteria are unmet: HTTPS is never enforced, no
+    resolved IP is range-checked before the request, and IPv6 private ranges are
+    unblocked. The scheme gap is not theoretical since geodata.py takes both the
+    scheme and the path of two request URLs from an upstream JSON payload.
+    Partial rather than pass.

@@ -17,7 +17,7 @@
 
 ## Overview
 
-`swisstopo-mcp` gives AI assistants access to Switzerland's official geodata infrastructure through 20 tools, all without authentication:
+`swisstopo-mcp` gives AI assistants access to Switzerland's official geodata infrastructure through 23 tools, all without authentication:
 
 | Source | Data | API |
 |--------|------|-----|
@@ -39,7 +39,7 @@
 
 ## Features
 
-- 🗺️ **20 tools** (REST, Geocoding, Height, STAC, WMTS, OEREB, geodienste.ch, OpenStreetMap/Overpass, OpenPLZ)
+- 🗺️ **23 tools** (REST, Geocoding, Height, STAC, WMTS, OEREB, geodienste.ch, OpenStreetMap/Overpass, OpenPLZ)
 - 🏛️ Resolve the administrative address level (PLZ → commune/**BFS number** → district → canton) via OpenPLZ
 - 🔍 Geocode Swiss addresses and reverse-geocode coordinates
 - 🏔️ Query elevation and compute elevation profiles
@@ -154,6 +154,9 @@ For use via **claude.ai in the browser** (e.g. on managed workstations without l
 | `swisstopo_identify_features` | Find map features at a specific coordinate (spatial query) |
 | `swisstopo_find_features` | Search features by attribute value within a layer (e.g. buildings by EGID) |
 | `swisstopo_get_feature` | Retrieve full attributes and geometry for a feature by ID |
+| `swisstopo_layer_info` | List a layer's queryable fields and its legend (which `search_field` values are valid) |
+| `swisstopo_zoning_at` | Harmonised building zone at a coordinate — one call, no layer lookup (not legally binding) |
+| `swisstopo_municipality_at` | Municipality, canton and official BFS number at a coordinate |
 
 ### Geocoding
 
@@ -168,6 +171,7 @@ For use via **claude.ai in the browser** (e.g. on managed workstations without l
 |------|-------------|
 | `swisstopo_get_height` | Get elevation above sea level (m a.s.l.) at a coordinate |
 | `swisstopo_elevation_profile` | Compute an elevation profile along a line |
+| `swisstopo_convert_coordinates` | Official WGS84 ↔ LV95 conversion via the swisstopo REFRAME service |
 
 ### STAC Catalog (Geodata Downloads)
 
@@ -191,7 +195,7 @@ For use via **claude.ai in the browser** (e.g. on managed workstations without l
 
 ### Consolidated Geodata Façade
 
-One façade over several map/layer sources, kept under the 18-tool budget (see
+One façade over several map/layer sources, kept under the 25-tool budget (see
 [`docs/geodaten-erweiterung-phase1.md`](docs/geodaten-erweiterung-phase1.md)):
 
 | Tool | Description |
@@ -240,7 +244,7 @@ BFS statistics (`swiss-statistics-mcp`) and `zurich-opendata-mcp`.
 │   Claude / AI   │────▶│  swisstopo-mcp               │────▶│  Swisstopo REST API      │
 │   (MCP Host)    │◀────│  (MCP Server)                │◀────│  api3.geo.admin.ch       │
 └─────────────────┘     │                              │     ├──────────────────────────┤
-                        │  20 Tools                    │────▶│  Geocoding               │
+                        │  23 Tools                    │────▶│  Geocoding               │
                         │  Stdio | Streamable HTTP     │◀────│  api3.geo.admin.ch       │
                         │                              │     ├──────────────────────────┤
                         │  No authentication required  │────▶│  STAC Catalog            │
@@ -308,7 +312,7 @@ The full security policy and posture is documented in [SECURITY.md](SECURITY.md)
 
 ### Phase
 
-This server is in **Phase 1 — Read-only wrapper**. All 20 tools are
+This server is in **Phase 1 — Read-only wrapper**. All 23 tools are
 `readOnlyHint: true` / `destructiveHint: false`; there are no write or send
 capabilities. See [docs/roadmap.md](docs/roadmap.md) for later phases.
 

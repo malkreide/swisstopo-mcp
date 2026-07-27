@@ -195,6 +195,18 @@ async def geo_admin_request(path: str, params: dict[str, Any] | None = None) -> 
     return response.json()
 
 
+async def geo_admin_request_text(path: str, params: dict[str, Any] | None = None) -> str:
+    """GET request on api3.geo.admin.ch returning the raw body as text.
+
+    The legend endpoints serve HTML rather than JSON, so they cannot go through
+    `geo_admin_request`.
+    """
+    url = f"{GEO_ADMIN_BASE}{path}"
+    _log.debug("upstream_request", host="api3.geo.admin.ch", path=path)
+    response = await request_with_retry("GET", url, params=params or {})
+    return response.text
+
+
 async def reframe_request(path: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
     """GET request on the swisstopo REFRAME service, returns parsed JSON.
 

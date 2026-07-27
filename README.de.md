@@ -17,7 +17,7 @@
 
 ## Uebersicht
 
-`swisstopo-mcp` gibt KI-Assistenten Zugriff auf die offizielle schweizerische Geodateninfrastruktur ueber 20 Tools, alle ohne Authentifizierung:
+`swisstopo-mcp` gibt KI-Assistenten Zugriff auf die offizielle schweizerische Geodateninfrastruktur ueber 23 Tools, alle ohne Authentifizierung:
 
 | Quelle | Daten | API |
 |--------|-------|-----|
@@ -39,7 +39,7 @@
 
 ## Funktionen
 
-- 🗺️ **20 Tools** (REST, Geocoding, Hoehe, STAC, WMTS, OEREB, geodienste.ch, OpenStreetMap/Overpass, OpenPLZ)
+- 🗺️ **23 Tools** (REST, Geocoding, Hoehe, STAC, WMTS, OEREB, geodienste.ch, OpenStreetMap/Overpass, OpenPLZ)
 - 🏛️ Administrative Adressebene aufloesen (PLZ → Gemeinde/**BFS-Nummer** → Bezirk → Kanton) via OpenPLZ
 - 🔍 Schweizerische Adressen geocodieren und Koordinaten rueckwaerts geocodieren
 - 🏔️ Hoehe ueber Meer abfragen und Hoehenprofile berechnen
@@ -154,6 +154,9 @@ Fuer den Einsatz via **claude.ai im Browser** (z.B. auf verwalteten Arbeitsplaet
 | `swisstopo_identify_features` | Kartenobjekte an einer bestimmten Koordinate finden (raeumliche Abfrage) |
 | `swisstopo_find_features` | Features anhand eines Attributwerts in einem Layer suchen (z.B. Gebaeude nach EGID) |
 | `swisstopo_get_feature` | Vollstaendige Attribute und Geometrie eines Features per ID abrufen |
+| `swisstopo_layer_info` | Abfragbare Felder und Legende eines Layers auflisten (zulaessige `search_field`-Werte) |
+| `swisstopo_zoning_at` | Harmonisierte Bauzone an einer Koordinate — ein Aufruf, ohne Layer-Suche (nicht rechtsverbindlich) |
+| `swisstopo_municipality_at` | Gemeinde, Kanton und amtliche BFS-Nummer an einer Koordinate |
 
 ### Geocoding
 
@@ -168,6 +171,7 @@ Fuer den Einsatz via **claude.ai im Browser** (z.B. auf verwalteten Arbeitsplaet
 |------|-------------|
 | `swisstopo_get_height` | Hoehe ueber Meer (m ue. M.) an einer Koordinate abfragen |
 | `swisstopo_elevation_profile` | Hoehenprofil entlang einer Linie berechnen |
+| `swisstopo_convert_coordinates` | Amtliche WGS84-/LV95-Umrechnung via swisstopo-REFRAME-Dienst |
 
 ### STAC-Katalog (Geodaten-Downloads)
 
@@ -191,7 +195,7 @@ Fuer den Einsatz via **claude.ai im Browser** (z.B. auf verwalteten Arbeitsplaet
 
 ### Konsolidierte Geodaten-Fassade
 
-Eine Fassade ueber mehrere Karten-/Layer-Quellen, bewusst unter dem 18-Tool-Budget
+Eine Fassade ueber mehrere Karten-/Layer-Quellen, bewusst unter dem 25-Tool-Budget
 (siehe [`docs/geodaten-erweiterung-phase1.md`](docs/geodaten-erweiterung-phase1.md)):
 
 | Tool | Beschreibung |
@@ -240,7 +244,7 @@ zu BFS-Statistikdaten (`swiss-statistics-mcp`) und zu `zurich-opendata-mcp`.
 │   Claude / KI   │────▶│  swisstopo-mcp               │────▶│  Swisstopo REST API      │
 │   (MCP Host)    │◀────│  (MCP Server)                │◀────│  api3.geo.admin.ch       │
 └─────────────────┘     │                              │     ├──────────────────────────┤
-                        │  20 Tools                    │────▶│  Geocoding               │
+                        │  23 Tools                    │────▶│  Geocoding               │
                         │  Stdio | Streamable HTTP     │◀────│  api3.geo.admin.ch       │
                         │                              │     ├──────────────────────────┤
                         │  Keine Authentifizierung     │────▶│  STAC-Katalog            │
@@ -306,7 +310,7 @@ Die vollständige Sicherheitsrichtlinie und Sicherheitslage ist in
 
 ### Phase
 
-Dieser Server ist in **Phase 1 — Read-only-Wrapper**. Alle 20 Tools sind
+Dieser Server ist in **Phase 1 — Read-only-Wrapper**. Alle 23 Tools sind
 `readOnlyHint: true` / `destructiveHint: false`; es gibt keine schreibenden
 oder versendenden Funktionen. Spätere Phasen siehe
 [docs/roadmap.md](docs/roadmap.md).

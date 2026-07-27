@@ -8,6 +8,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Three convenience tools ported from `swiss-geodata-mcp`** (20 → 23 tools),
+  completing PR 3 of `docs/merge-plan-swiss-geodata-mcp.md`:
+  - `swisstopo_zoning_at` — harmonised building zone at a point
+    (`ch.are.bauzonen`) in one call, without a preceding layer lookup. The ARE
+    layer is a federal synthesis and **not legally binding**; that caveat is
+    carried on every result record, not just in the prose summary, so a client
+    reading `results` cannot lose it.
+  - `swisstopo_municipality_at` — municipality, canton and official BFS commune
+    number at a point (swissBOUNDARIES3D). The layer carries one polygon per
+    historical year, so the current-year record is selected.
+  - `swisstopo_layer_info` — a layer's queryable fields plus its legend,
+    revealing which `search_field` values `swisstopo_find_features` accepts. A
+    missing legend is not fatal: the fields are still returned.
+- **Tool budget raised from 20 to 25** to accommodate the consolidation. The
+  README stated 18 while the CHANGELOG stated 20; both now say 25.
+  These three tools also address the open remediation on audit finding
+  ARCH-007, which asks for higher-level tools that resolve a common case in a
+  single call instead of a discovery chain.
+- `bfs_commune_number` is normalised to an integer across tools. The upstream
+  layers disagree — `ch.are.bauzonen` serves it as a string, swissBOUNDARIES3D
+  as an int — and it is the join key to `swiss-statistics-mcp` and
+  `zurich-opendata-mcp`, so it must not depend on which tool produced it.
 - **LV95 coordinate input on the point-based tools** (`swisstopo_get_height`,
   `swisstopo_identify_features`, `swisstopo_get_egrid`). Each now takes *either*
   `lat`/`lon` (WGS84) *or* `easting`/`northing` (LV95, EPSG:2056) via the shared

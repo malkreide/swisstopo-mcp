@@ -237,6 +237,12 @@ alle Ports sind additiv.
 
 ## 7. Risiken und offene Fragen
 
+> **Entscheide (2026-07-27).** Alle drei offenen Fragen sind beantwortet:
+> **§7.1 Tool-Budget → auf 25 angehoben.** **§7.2 Nutzerbasis → keine externen
+> Nutzer, daher Archivierung ohne Alias-Shim.** **§7.3 Portfolio-Doktrin →
+> Merge, mit `swisstopo-mcp` als Basis.** Die Absätze unten bleiben als
+> Begründung stehen.
+
 1. **Tool-Budget-Inflation.** 23 Tools in einem Server erhöhen die
    Auswahllast für das Modell. Falls die Tool-Beschreibungen nicht scharf
    getrennt sind, sinkt die Trefferquote — gerade weil dann *zwei* Wege zu

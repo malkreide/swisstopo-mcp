@@ -312,9 +312,53 @@ The full security policy and posture is documented in [SECURITY.md](SECURITY.md)
 
 ### Phase
 
-This server is in **Phase 1 — Read-only wrapper**. All 23 tools are
-`readOnlyHint: true` / `destructiveHint: false`; there are no write or send
-capabilities. See [docs/roadmap.md](docs/roadmap.md) for later phases.
+This server is in **Phase 2.5 — Consolidation of `swiss-geodata-mcp`**
+(see [docs/roadmap.md](docs/roadmap.md), the single authority for phase state).
+
+| Property | Status |
+|---|---|
+| Read tools | 23, all `readOnlyHint: true` / `destructiveHint: false` |
+| Write tools | none — Phase 3, not planned |
+| Transport | stdio (default) and Streamable-HTTP |
+| Last audit | `audits/2026-07-27T125314-Z-swisstopo-mcp/` |
+
+A phase advance requires: the phase's roadmap items checked off, a re-run audit
+with no open `critical` findings, and a CHANGELOG entry naming the new phase.
+Phase 3 (write tools) additionally requires re-running the Lethal-Trifecta
+assessment and a security review before any implementation starts.
+
+### Data sources and licences
+
+Every response carries `source` and `license`. ARE is a different federal
+office from swisstopo, so its licence is asserted rather than inherited.
+
+| Source | Served by | Licence |
+|---|---|---|
+| swisstopo / geo.admin.ch | most tools | Swiss OGD (opendata.swiss) |
+| swisstopo REFRAME (geodesy.geo.admin.ch) | `swisstopo_convert_coordinates` | Swiss OGD (opendata.swiss) |
+| swissBOUNDARIES3D (swisstopo) | `swisstopo_municipality_at` | Swiss OGD (opendata.swiss) |
+| `ch.are.bauzonen` (**ARE**) | `swisstopo_zoning_at` | Swiss OGD — Bundesamt für Raumentwicklung ARE |
+| Cantonal ÖREB cadastre | `swisstopo_get_egrid`, `swisstopo_get_oereb_extract` | Cantonal ÖREB terms |
+| geodienste.ch (cantons) | `swisstopo_query_geodata` | Free use — attribution required |
+| OpenStreetMap (Overpass) | `swisstopo_query_osm_features` | ODbL — © OpenStreetMap contributors |
+| OpenPLZ (BFS + swisstopo) | `swisstopo_lookup_postal_code`, `swisstopo_find_commune`, `swisstopo_search_address` | Free use — attribution required |
+
+`ch.are.bauzonen` is a federal synthesis for cross-cantonal comparability and
+is **not legally binding** — only the cantonal or communal Nutzungsplanung is.
+That caveat is carried on every `swisstopo_zoning_at` result record.
+
+### Project structure
+
+The tool modules sit flat under `src/swisstopo_mcp/` rather than in a `tools/`
+sub-package. Each module maps to exactly one upstream API family —
+`rest_api.py` → api3 MapServer, `stac.py` → STAC, `oereb.py` → cantonal ÖREB,
+`openplz.py` → OpenPLZ, `overpass.py` → OSM, `coords.py` → REFRAME — which is
+the axis along which this server's code actually varies. A `tools/` level would
+add a directory without adding a distinction.
+
+`server.py` contains tool registrations only; every tool body lives in its
+domain module. Splitting it further is a readability question, not a structural
+one.
 
 ### Lethal Trifecta assessment
 

@@ -31,11 +31,17 @@ allow-list (audit check **SEC-021**) and complements the SSRF hardening from
   `request_with_retry` wrapper checks the host once before the first attempt.
 - **Redirects:** the shared `httpx.AsyncClient` uses `follow_redirects=False`,
   so an upstream cannot redirect a request to an off-list host.
-- **Network layer (deployment):** the server runs locally over stdio today and
-  is not cloud-deployed, so no Kubernetes `NetworkPolicy` / security-group egress
-  rule is shipped. If/when the server is containerised, add a network-layer
-  egress allow-list mirroring the hosts above (and allow DNS/UDP 53), per the
-  SEC-021 pattern.
+- **Network layer (deployment):** a Kubernetes `NetworkPolicy` **is** shipped, in
+  [`deploy/kubernetes.yaml`](../deploy/kubernetes.yaml). Be precise about what it
+  does: it blocks egress to private CIDR ranges and permits DNS, ports 80/443.
+  It is a **CIDR and port restriction, not a per-host allow-list** — a
+  NetworkPolicy cannot match on hostname, so it cannot mirror the table above.
+
+  Closing that gap needs an egress proxy (Smokescreen or equivalent) configured
+  with the same host list, with the NetworkPolicy permitting egress only to the
+  proxy. That is deliberately not shipped: it is infrastructure this repository
+  does not own. Until it exists, the code-layer list is the only per-host
+  control, and it protects the process — not a compromised image.
 
 ## Update procedure
 
@@ -45,5 +51,5 @@ Adding a new allowed host (e.g. a new cantonal OEREB endpoint) requires:
    [`src/swisstopo_mcp/oereb.py`](../src/swisstopo_mcp/oereb.py) (for OEREB hosts).
 2. Add the hostname to `ALLOWED_HOSTS` in `api_client.py`.
 3. Add a row to the table above.
-4. Add/extend the network-layer egress rule (only relevant for cloud deployment).
+4. Add/extend the network-layer egress rule (applies to every deployment).
 5. Open a PR with a justification and a CHANGELOG entry.

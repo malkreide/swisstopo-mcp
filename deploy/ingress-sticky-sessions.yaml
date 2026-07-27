@@ -1,3 +1,6 @@
+# See deploy/haproxy.cfg for the deployable HAProxy configuration this
+# manifest pairs with (audit SCALE-003) — the routing block is no longer
+# only a comment.
 # Sticky-session example for scaling swisstopo-mcp beyond one replica
 # (audit finding SCALE-002).
 #

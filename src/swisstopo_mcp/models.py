@@ -76,6 +76,13 @@ class ToolResponse(BaseModel):
     license: str = Field(default=SWISSTOPO_LICENSE, description="Data licence.")
     provenance: Provenance = Field(default="live_api", description="How the data was obtained.")
     retrieved_at: str = Field(default_factory=_now_iso, description="ISO-8601 retrieval timestamp.")
+    note: str | None = Field(
+        default=None,
+        description=(
+            "Actionable hint when a search returns nothing — what to try next, "
+            "rather than a bare negative (audit ARCH-003)."
+        ),
+    )
     is_error: bool = Field(default=False, description="True if this represents a handled error.")
 
     @classmethod
@@ -88,6 +95,7 @@ class ToolResponse(BaseModel):
         source: str = SWISSTOPO_SOURCE,
         license: str = SWISSTOPO_LICENSE,
         provenance: Provenance = "live_api",
+        note: str | None = None,
     ) -> ToolResponse:
         records = results or []
         return cls(
@@ -98,6 +106,7 @@ class ToolResponse(BaseModel):
             source=source,
             license=license,
             provenance=provenance,
+            note=note,
         )
 
     @classmethod

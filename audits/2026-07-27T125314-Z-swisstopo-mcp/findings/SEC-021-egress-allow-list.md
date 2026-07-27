@@ -1,7 +1,7 @@
 ## Finding: SEC-021 — Egress-Allow-List: Code-Layer und Network-Layer
 
 **Severity:** high
-**Status:** open
+**Status:** in-remediation
 **Server:** swisstopo-mcp
 **Check-Reference:** SEC-021
 **PDF-Reference:** Anhang B5 + B12
@@ -56,3 +56,20 @@ The documentation contradiction is the more urgent of the two, because it is sel
 
 ### Effort Estimate
 M (1-3d)
+
+---
+
+### Remediation Status (2026-07-27, batch 2)
+
+**Partially closed.** The documentation contradiction is gone:
+`docs/network-egress.md` no longer claims no NetworkPolicy is shipped, and now
+states precisely what the shipped one does (CIDR and port restriction) and does
+not do (per-host matching — a NetworkPolicy cannot match on hostname).
+`SECURITY.md` references the doc as the single source instead of repeating a
+stale host list. A parametrised test now asserts every `ALLOWED_HOSTS` member
+appears in the documentation table, and that the table lists no host the code
+does not know — the drift is a CI failure now, not a review item.
+
+**Still open:** the network layer is not narrowed to the host list. That needs
+an egress proxy (Smokescreen or equivalent), which is infrastructure this
+repository does not own. The trade-off is now written down rather than implied.

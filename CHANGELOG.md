@@ -8,6 +8,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Audit remediation batch 2 — six findings closed, two partially** (ARCH-003,
+  ARCH-011, OPS-001, OPS-003, SCALE-003, CH-004; SEC-005 and SEC-021 partially).
+  - **ARCH-003:** `ToolResponse` gained a `note` field, and searches that find
+    nothing now return an actionable next step instead of a bare negative.
+    Additive — no client breaks, tool hashes unaffected.
+  - **OPS-001:** `.github/workflows/live-test.yml` runs the `live` suite nightly
+    and opens a deduplicated issue on failure. Keeping it out of PR CI stays
+    right; never running it at all meant an upstream contract change would have
+    surfaced as a user-facing bug.
+  - **SCALE-003:** `deploy/haproxy.cfg` is a real, mountable config with the
+    stick-table keyed on `Mcp-Session-Id`. It was previously a comment inside
+    the Ingress manifest, which is not deployable.
+  - **OPS-003:** both READMEs stated Phase 1 while `docs/roadmap.md` said 2.5.
+    The roadmap is now named as the single authority, and the README carries a
+    status table plus the phase-advance criteria.
+  - **CH-004:** both READMEs now carry a source-and-licence table covering all
+    eight sources, including the three that were missing.
+  - **ARCH-011:** the flat module layout is now argued in both READMEs rather
+    than restructured — each module maps to one upstream API family, which is
+    the axis this code varies along.
+
+### Fixed
+- **Two security documents overstated the posture.**
+  - `SECURITY.md` credited `follow_redirects=False` to SEC-005 (DNS rebinding),
+    which it does not address. It belongs to SEC-004 and is listed there now.
+    An honest row states that **DNS pinning is not implemented**, names the
+    residual rebinding window, and notes the network-layer compensation applies
+    to the Kubernetes deployment only.
+  - `docs/network-egress.md` claimed no NetworkPolicy was shipped while
+    `deploy/kubernetes.yaml` contains one. It now states precisely what that
+    policy does (CIDR and port restriction) and does not do (per-host matching —
+    a NetworkPolicy cannot match on hostname).
+  - A parametrised test asserts every `ALLOWED_HOSTS` member appears in the
+    documentation table and that the table lists no host the code does not know,
+    so this particular drift is a CI failure rather than a review item.
+
+### Added
 - **OpenTelemetry tracing (OBS-006).** `structlog` already reported a
   `duration_ms` per tool call; tracing adds the causal view, so a slow tool call
   can be attributed to the upstream request inside it.

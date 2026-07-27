@@ -1,7 +1,7 @@
 ## Finding: CH-004 — OGD-CH Lizenz-Compliance: CC BY 4.0 Attribution
 
 **Severity:** medium
-**Status:** in-remediation
+**Status:** closed
 **Server:** swisstopo-mcp
 **Check-Reference:** CH-004
 **PDF-Reference:** Custom (OGD-CH-Richtlinien)
@@ -92,3 +92,13 @@ tests cover this.
 
 **Still open:** neither README documents per-source licences, and the overview
 source table still omits ARE, swissBOUNDARIES3D and REFRAME.
+
+---
+
+### Remediation Status (2026-07-27, batch 2)
+
+**Now fully closed.** The licence constants and the `ToolResponse.error()`
+parameter landed earlier. This adds the documentation half the finding also
+asked for: both READMEs carry a source-and-licence table covering all eight
+sources, including the three that were missing (ARE, swissBOUNDARIES3D,
+REFRAME), and restate the ARE non-binding caveat.

@@ -1,0 +1,59 @@
+name: Live API tests
+
+# Audit OPS-001. The `live` suite is excluded from CI on purpose — an upstream
+# outage must not fail an unrelated PR. But excluded-and-never-run means an
+# upstream contract change (a renamed attribute, a dropped field) surfaces as a
+# user-facing bug rather than as a build failure. This runs it nightly instead.
+on:
+  schedule:
+    - cron: "0 4 * * *"
+  workflow_dispatch:
+
+jobs:
+  live-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        run: pip install -e ".[dev]"
+
+      - name: Run live tests
+        run: pytest tests/ -m live -v
+
+      - name: Report failure
+        if: failure()
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const title = 'Nightly live API tests failed';
+            const body = [
+              'The nightly `live` suite failed against the real upstream APIs.',
+              '',
+              'This usually means one of:',
+              '- an upstream contract change (renamed attribute, dropped field),',
+              '- a transient upstream outage,',
+              '- the polynomial-vs-REFRAME deviation exceeding one metre.',
+              '',
+              `Run: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+            ].join('\n');
+            const existing = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'live-test-failure',
+            });
+            if (existing.data.length === 0) {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title,
+                body,
+                labels: ['live-test-failure'],
+              });
+            }

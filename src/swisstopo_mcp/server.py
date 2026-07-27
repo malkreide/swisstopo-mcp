@@ -1,10 +1,11 @@
 """
 swisstopo-mcp — MCP-Server fuer schweizerische Bundesgeodaten.
 
-19 Tools aus 9 Quellen-Familien: REST, Geocoding, Hoehe, STAC, WMTS, OEREB,
-die konsolidierte Geodaten-Fassade (Strassenverzeichnis, geodienste.ch,
-OEREB-Verfuegbarkeit), OpenStreetMap-POIs via Overpass, plus die administrative
-Adressebene via OpenPLZ (PLZ -> Gemeinde/BFS-Nr -> Bezirk -> Kanton).
+20 Tools aus 10 Quellen-Familien: REST, Geocoding, Hoehe, REFRAME
+(Koordinatenumrechnung), STAC, WMTS, OEREB, die konsolidierte Geodaten-Fassade
+(Strassenverzeichnis, geodienste.ch, OEREB-Verfuegbarkeit), OpenStreetMap-POIs
+via Overpass, plus die administrative Adressebene via OpenPLZ
+(PLZ -> Gemeinde/BFS-Nr -> Bezirk -> Kanton).
 Alle Endpunkte sind offen (kein API-Schluessel erforderlich, ausser OEREB-Kanton).
 """
 
@@ -42,11 +43,14 @@ mcp = FastMCP(
     "swisstopo_mcp",
     lifespan=lifespan,
     instructions=(
-        "Swiss federal geodata server with 19 tools. "
+        "Swiss federal geodata server with 20 tools. "
         "Use swisstopo_search_layers to discover layer IDs, then use "
         "swisstopo_identify_features or swisstopo_find_features to query them. "
         "swisstopo_geocode converts addresses to coordinates. "
         "swisstopo_get_height returns elevation. "
+        "All tools take WGS84 lat/lon; if the caller has LV95 (EPSG:2056) "
+        "coordinates, convert them first with swisstopo_convert_coordinates "
+        "(official REFRAME service — note its axis order: easting=lon, northing=lat). "
         "swisstopo_search_geodata finds downloadable datasets (orthophotos, 3D models, etc.). "
         "swisstopo_map_url generates shareable map links. "
         "ÖREB tools (swisstopo_get_egrid, swisstopo_get_oereb_extract) require a canton parameter. "
@@ -321,6 +325,37 @@ async def swisstopo_elevation_profile(params: ElevationProfileInput, ctx: Contex
     <important_notes>Benötigt ≥2 Koordinatenpaare im Format 'lat1,lon1;lat2,lon2;…'.</important_notes>
     """
     return await elevation_profile(params, ctx=ctx)
+
+
+# --- Coordinate Tools ---
+from swisstopo_mcp.coords import (  # noqa: E402
+    ConvertCoordinatesInput,
+    convert_coordinates,
+)
+
+
+@mcp.tool(
+    name="swisstopo_convert_coordinates",
+    annotations={
+        "title": "Koordinaten umrechnen (REFRAME)",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": True,
+    },
+)
+async def swisstopo_convert_coordinates(params: ConvertCoordinatesInput) -> ToolResponse:
+    """Rechnet Koordinaten amtlich zwischen WGS84 und LV95 um (swisstopo REFRAME).
+
+    <use_case>Wenn Koordinaten in LV95 (EPSG:2056) vorliegen und für die übrigen
+    Tools nach WGS84 gebracht werden müssen — oder umgekehrt für den
+    Katasterbezug, wo Zentimeter zählen.</use_case>
+    <important_notes>Achsenreihenfolge beachten: REFRAME benennt beide Eingaben
+    easting/northing. Bei wgs84_to_lv95 ist easting der LÄNGENgrad und northing
+    der BREITENgrad — umgekehrt zur lat/lon-Reihenfolge der übrigen Tools.
+    Vertauschte Achsen werden abgewiesen, nicht stillschweigend umgerechnet.</important_notes>
+    """
+    return await convert_coordinates(params)
 
 
 # --- ÖREB Tools ---

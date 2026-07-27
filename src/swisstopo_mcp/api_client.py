@@ -14,6 +14,7 @@ _log = get_logger("swisstopo_mcp.api_client")
 # --- Constants ---
 
 GEO_ADMIN_BASE = "https://api3.geo.admin.ch"
+REFRAME_BASE = "https://geodesy.geo.admin.ch/reframe"
 STAC_BASE = "https://data.geo.admin.ch/api/stac/v0.9"
 WMTS_BASE = "https://wmts.geo.admin.ch/1.0.0"
 GEODIENSTE_BASE = "https://geodienste.ch"
@@ -50,6 +51,7 @@ CANTON_PATTERN = r"^[A-Za-z]{2}$"  # ZH, BE, ...
 ALLOWED_HOSTS: frozenset[str] = frozenset(
     {
         "api3.geo.admin.ch",  # REST / SearchServer / MapServer + Geocoding + Height
+        "geodesy.geo.admin.ch",  # REFRAME — official coordinate transformation
         "data.geo.admin.ch",  # STAC catalog
         "wmts.geo.admin.ch",  # WMTS tiles
         "map.geo.admin.ch",  # shareable map viewer URLs
@@ -189,6 +191,21 @@ async def geo_admin_request(path: str, params: dict[str, Any] | None = None) -> 
     """GET request on api3.geo.admin.ch, returns parsed JSON."""
     url = f"{GEO_ADMIN_BASE}{path}"
     _log.debug("upstream_request", host="api3.geo.admin.ch", path=path)
+    response = await request_with_retry("GET", url, params=params or {})
+    return response.json()
+
+
+async def reframe_request(path: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
+    """GET request on the swisstopo REFRAME service, returns parsed JSON.
+
+    REFRAME is the *official* LV95<->WGS84 transformation. The local polynomial
+    helpers (`wgs84_to_lv95` / `lv95_to_wgs84`) stay the internal fast path for
+    every height/profile/identify call — their deviation from REFRAME measures
+    0.05-0.20 m, well below those tools' own tolerance — so this endpoint is
+    reached only by the explicit conversion tool, where precision is the point.
+    """
+    url = f"{REFRAME_BASE}{path}"
+    _log.debug("upstream_request", host="geodesy.geo.admin.ch", path=path)
     response = await request_with_retry("GET", url, params=params or {})
     return response.json()
 

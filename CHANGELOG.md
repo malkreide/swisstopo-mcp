@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **`swisstopo_convert_coordinates` — official LV95<->WGS84 transformation via
+  the swisstopo REFRAME service** (19 → 20 tools, exactly at the 20-tool
+  budget). This is the first step of the `swiss-geodata-mcp` consolidation
+  described in `docs/merge-plan-swiss-geodata-mcp.md`, and the one capability
+  that server had which this one lacked.
+  - New egress host `geodesy.geo.admin.ch` (SEC-021 allow-list + docs).
+  - The input validator rejects swapped axes and out-of-system magnitudes
+    instead of silently returning a point in the wrong place — REFRAME labels
+    both inputs `easting`/`northing`, so for `wgs84_to_lv95` the easting
+    carries the *longitude*, reversing the `lat`/`lon` order used elsewhere.
+  - `lv95_to_wgs84` results additionally carry `lat`/`lon` so they can be passed
+    straight to the other tools.
+
+### Changed
+- The local polynomial helpers (`wgs84_to_lv95` / `lv95_to_wgs84`) remain the
+  internal fast path for every height/profile/identify call and were **not**
+  replaced by REFRAME. Measured against the official service at four points
+  across Switzerland they deviate by 0.05–0.20 m — well below the tolerance
+  those tools operate at — so routing them through the network would have added
+  a roundtrip per call for irrelevant precision. A `live`-marked test guards the
+  assumption by failing if the deviation ever exceeds one metre.
+
+### Fixed
+- `server.json` declared version `0.1.3` while the package was at `0.2.0`, which
+  would have published a wrong version to the MCP Registry.
+
 ## [0.2.0] - 2026-07-20
 
 ### Added

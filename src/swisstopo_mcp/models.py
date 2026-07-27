@@ -18,6 +18,10 @@ MatchType = Literal["exact", "fuzzy", "none"]
 # --- Attribution (CH-004) ---
 SWISSTOPO_SOURCE = "swisstopo / geo.admin.ch"
 SWISSTOPO_LICENSE = "Swiss Open Government Data (opendata.swiss)"
+# REFRAME is the official swisstopo transformation service, served from a
+# separate host (geodesy.geo.admin.ch) — named separately so a caller can tell
+# an amtliche transformation apart from the local polynomial approximation.
+REFRAME_SOURCE = "swisstopo REFRAME (geodesy.geo.admin.ch)"
 OEREB_SOURCE = "ÖREB-Kataster (Kanton)"
 OEREB_LICENSE = "Kantonale ÖREB-Nutzungsbedingungen"
 GEODIENSTE_SOURCE = "geodienste.ch (Kantone)"

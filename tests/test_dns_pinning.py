@@ -124,3 +124,66 @@ class TestRewriting:
         monkeypatch.setattr(api_client, "_resolve", lambda h: ("185.19.28.1",))
         seen = await _capture(monkeypatch, _request())
         assert seen.url.host == "api3.geo.admin.ch", "must not pin behind a proxy"
+
+
+# ---------------------------------------------------------------------------
+# Live verification (skipped in CI)
+#
+# The unit tests above prove the transport rewrites the request correctly. They
+# cannot prove the resulting TLS handshake succeeds — that needs a real
+# endpoint. These close that gap and are the reason SEC-005 could be closed.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.live
+class TestPinnedTlsHandshake:
+    """Connecting to an IP while presenting the hostname as SNI must validate."""
+
+    @pytest.mark.parametrize(
+        "host", ["api3.geo.admin.ch", "geodesy.geo.admin.ch"]
+    )
+    def test_handshake_succeeds_with_hostname_sni(self, host):
+        import socket
+        import ssl
+
+        ip = socket.getaddrinfo(host, 443, proto=socket.IPPROTO_TCP)[0][4][0]
+        context = ssl.create_default_context()
+        with socket.create_connection((ip, 443), timeout=10) as sock:
+            with context.wrap_socket(sock, server_hostname=host) as tls:
+                cert = tls.getpeercert()
+        sans = [v for k, v in cert.get("subjectAltName", ()) if k == "DNS"]
+        assert host in sans or any(s.startswith("*.") for s in sans)
+
+    def test_handshake_fails_without_hostname_sni(self):
+        """The failure mode the SNI preservation exists to avoid: presenting the
+        IP as the server name makes the certificate mismatch."""
+        import socket
+        import ssl
+
+        host = "api3.geo.admin.ch"
+        ip = socket.getaddrinfo(host, 443, proto=socket.IPPROTO_TCP)[0][4][0]
+        context = ssl.create_default_context()
+        with pytest.raises(ssl.SSLCertVerificationError):
+            with socket.create_connection((ip, 443), timeout=10) as sock:
+                context.wrap_socket(sock, server_hostname=ip)
+
+
+@pytest.mark.live
+class TestExtensionPassthrough:
+    """The transport sets request.extensions['sni_hostname']; the chain that
+    consumes it must stay intact across httpx/httpcore upgrades."""
+
+    def test_httpx_forwards_extensions_to_httpcore(self):
+        import inspect
+
+        from httpx._transports import default as httpx_default
+
+        src = inspect.getsource(httpx_default.AsyncHTTPTransport.handle_async_request)
+        assert "extensions=request.extensions" in src
+
+    def test_httpcore_reads_sni_hostname(self):
+        import inspect
+
+        from httpcore._async import connection
+
+        assert "sni_hostname" in inspect.getsource(connection)

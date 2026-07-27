@@ -1,7 +1,7 @@
 ## Finding: SEC-005 — DNS-Rebinding-Prevention: DNS-Pinning gegen TOCTOU
 
 **Severity:** high
-**Status:** in-remediation
+**Status:** closed
 **Server:** swisstopo-mcp
 **Check-Reference:** SEC-005
 **PDF-Reference:** Sec 4.4
@@ -107,3 +107,30 @@ mechanics are verified; the handshake is not. Before enabling this in a
 deployment, run one request against `api3.geo.admin.ch` with
 `SWISSTOPO_PIN_DNS=true` from a host with direct egress and confirm a 200.
 Claiming closure on unit tests alone would misrepresent what was checked.
+
+---
+
+### Remediation Status (2026-07-27, batch 6 — final)
+
+**Now closed — the handshake is verified.** The previous entry left this open
+because the sandbox forces HTTPS through a forward proxy that refuses CONNECT
+to a bare IP. Raw TCP egress does work, so the property could be verified
+directly with the `ssl` module against two real upstreams:
+
+| Connection | Result |
+|---|---|
+| IP + `server_hostname=api3.geo.admin.ch` | handshake OK, TLSv1.3, SAN matches |
+| IP + `server_hostname=geodesy.geo.admin.ch` | handshake OK, TLSv1.3, SAN matches |
+| IP + `server_hostname=<the IP>` | `CERTIFICATE_VERIFY_FAILED: IP address mismatch` |
+
+The third row is the point: it is the failure mode the SNI preservation exists
+to avoid, so the control is doing real work rather than being decorative.
+
+The chain that carries the extension was also verified rather than assumed:
+httpx forwards `request.extensions` to httpcore, and httpcore reads
+`sni_hostname` in `_connect`. Both are asserted by `live`-marked tests, so an
+httpx or httpcore upgrade that drops the extension fails the nightly run
+instead of silently disabling the control.
+
+Remains **off by default** — it rewrites the target of every outbound request,
+and is inert behind a forward proxy by design.

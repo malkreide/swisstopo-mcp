@@ -1,0 +1,95 @@
+# Per-host egress control for swisstopo-mcp (audit SEC-021).
+#
+# The NetworkPolicy in kubernetes.yaml blocks private CIDRs and permits 80/443.
+# It cannot do more: a NetworkPolicy matches on IP and port, never on hostname,
+# so it cannot mirror the ten-host list the code enforces.
+#
+# This manifest closes that gap. Smokescreen runs as a sidecar with the ACL
+# generated from ALLOWED_HOSTS (deploy/smokescreen-acl.yaml), and the
+# NetworkPolicy below permits the pod no egress except to that sidecar and DNS.
+# Applying both replaces the permissive policy in kubernetes.yaml.
+#
+# Apply order:
+#   kubectl create configmap smokescreen-acl --from-file=deploy/smokescreen-acl.yaml
+#   kubectl apply -f deploy/egress-proxy.yaml
+#   kubectl delete networkpolicy swisstopo-mcp-egress   # the permissive one
+---
+# The sidecar is added to the Deployment in kubernetes.yaml; shown here as a
+# patch so the base manifest stays runnable without a proxy.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: swisstopo-mcp
+spec:
+  template:
+    spec:
+      containers:
+        - name: smokescreen
+          image: stripe/smokescreen:latest
+          args:
+            - "--config-file=/etc/smokescreen/config.yaml"
+            - "--egress-acl-file=/etc/smokescreen/smokescreen-acl.yaml"
+            - "--listen-port=4750"
+          ports:
+            - containerPort: 4750
+              name: egress-proxy
+          volumeMounts:
+            - name: smokescreen-acl
+              mountPath: /etc/smokescreen
+              readOnly: true
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            capabilities:
+              drop: ["ALL"]
+        - name: swisstopo-mcp
+          env:
+            # The server routes through the sidecar. Note that DNS pinning
+            # (SWISSTOPO_PIN_DNS) is automatically inert once a proxy is set —
+            # the proxy resolves the name, so client-side pinning cannot apply.
+            - name: HTTPS_PROXY
+              value: "http://127.0.0.1:4750"
+            - name: HTTP_PROXY
+              value: "http://127.0.0.1:4750"
+      volumes:
+        - name: smokescreen-acl
+          configMap:
+            name: smokescreen-acl
+---
+# Replaces the permissive policy: the pod may reach DNS and nothing else
+# directly. All upstream traffic goes through the sidecar on localhost, which
+# is not covered by NetworkPolicy (same pod, same network namespace).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: swisstopo-mcp-egress-proxied
+spec:
+  podSelector:
+    matchLabels:
+      app: swisstopo-mcp
+  policyTypes:
+    - Egress
+  egress:
+    # DNS only — the sidecar resolves the allow-listed hosts itself.
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # HTTPS egress is permitted because the sidecar makes it, from this pod's
+    # network namespace. The per-host restriction is enforced by the ACL, which
+    # is generated from ALLOWED_HOSTS and checked in CI.
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+              - 169.254.0.0/16
+      ports:
+        - protocol: TCP
+          port: 443

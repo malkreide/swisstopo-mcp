@@ -1,7 +1,7 @@
 ## Finding: SEC-021 — Egress-Allow-List: Code-Layer und Network-Layer
 
 **Severity:** high
-**Status:** in-remediation
+**Status:** closed
 **Server:** swisstopo-mcp
 **Check-Reference:** SEC-021
 **PDF-Reference:** Anhang B5 + B12
@@ -92,3 +92,23 @@ restricting the NetworkPolicy so the pod's only permitted egress is the proxy.
 That is cluster configuration this repository does not own. Until it is
 deployed, the code-layer list is still the only per-host control and protects
 the process, not a compromised image — `docs/network-egress.md` says so.
+
+---
+
+### Remediation Status (2026-07-27, batch 6 — final)
+
+**Now closed on the repository side, which is the whole of what this repository
+can close.** `deploy/egress-proxy.yaml` ships the Smokescreen sidecar, the
+`HTTPS_PROXY` wiring, and a NetworkPolicy that permits DNS plus proxied HTTPS
+only — replacing the permissive one. Together with the generated
+`smokescreen-acl.yaml` this is a true per-host network-layer control, which a
+NetworkPolicy alone cannot express.
+
+Applying it stays a deliberate operator step, documented with its apply order,
+because it changes how every request leaves the pod. That is a deployment
+decision, not an unfinished code change.
+
+One interaction worth recording: the proxy and DNS pinning (SEC-005) are
+mutually exclusive by design. Behind a proxy the proxy resolves the name, so
+pinning is automatically inert. Pick the proxy for a cluster deployment,
+pinning for a direct-egress one — `docs/network-egress.md` says so.

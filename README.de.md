@@ -35,6 +35,10 @@
 (Die BFS-Gemeindenummer ist der amtliche Join-Schluessel zu [`swiss-statistics-mcp`](https://github.com/malkreide) und [`zurich-opendata-mcp`](https://github.com/malkreide/zurich-opendata-mcp) — damit wird aus dem Geodaten-Wrapper ein semantischer Konnektor auf Gemeindeebene.)
 [→ Weitere Anwendungsbeispiele nach Zielgruppe →](EXAMPLES.md)
 
+### Demo
+
+![Demo: Claude nutzt swisstopo_find_commune und swisstopo_lookup_postal_code](docs/assets/demo.svg)
+
 ---
 
 ## Funktionen
@@ -532,6 +536,14 @@ Siehe [CHANGELOG.md](CHANGELOG.md)
 ## Mitwirken
 
 Siehe [CONTRIBUTING.md](CONTRIBUTING.md)
+
+---
+
+## Sicherheit
+
+Rein lesend, keine Authentifizierung, ausschliesslich öffentliche Geodaten. Siehe
+[SECURITY.de.md](SECURITY.de.md) ([English](SECURITY.md)) für die Sicherheitslage
+und die Meldung von Schwachstellen.
 
 ---
 

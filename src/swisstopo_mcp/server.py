@@ -1,7 +1,7 @@
 """
 swisstopo-mcp — MCP-Server fuer schweizerische Bundesgeodaten.
 
-23 Tools aus 10 Quellen-Familien: REST, Geocoding, Hoehe, REFRAME
+24 Tools aus 10 Quellen-Familien: REST, Geocoding, Hoehe, REFRAME
 (Koordinatenumrechnung), STAC, WMTS, OEREB, die konsolidierte Geodaten-Fassade
 (Strassenverzeichnis, geodienste.ch, OEREB-Verfuegbarkeit), OpenStreetMap-POIs
 via Overpass, plus die administrative Adressebene via OpenPLZ
@@ -61,13 +61,18 @@ mcp = FastMCP(
         allowed_origins=settings.transport_origins_list,
     ),
     instructions=(
-        "Swiss federal geodata server with 23 tools. "
+        "Swiss federal geodata server with 24 tools. "
         "Use swisstopo_search_layers to discover layer IDs, swisstopo_layer_info to see "
         "a layer's queryable fields, then swisstopo_identify_features or "
         "swisstopo_find_features to query them. "
-        "For the two most common point questions there are direct tools that need no "
-        "layer lookup: swisstopo_zoning_at (Bauzone) and swisstopo_municipality_at "
-        "(Gemeinde + amtliche BFS-Nummer). "
+        "PRECEDENCE for point questions — prefer the direct tool over the generic one: "
+        "Bauzone → swisstopo_zoning_at (use swisstopo_identify_features on "
+        "ch.are.bauzonen only when raw layer attributes are needed; "
+        "swisstopo_query_geodata with geodienste:nutzungsplanung:<kanton> only for "
+        "cantonal Nutzungsplanung beyond the harmonised ARE layer). "
+        "Gemeinde/BFS-Nummer → swisstopo_municipality_at. "
+        "ÖREB-Beschränkungen → swisstopo_oereb_at (swisstopo_get_egrid only when the "
+        "parcel ID itself is wanted). "
         "swisstopo_geocode converts addresses to coordinates. "
         "swisstopo_get_height returns elevation. "
         "Point-based tools (swisstopo_get_height, swisstopo_identify_features, "
@@ -192,8 +197,11 @@ async def swisstopo_search_layers(params: SearchLayersInput) -> ToolResponse:
 async def swisstopo_identify_features(params: IdentifyInput) -> ToolResponse:
     """Findet Features an einer bestimmten Koordinate (räumliche Punktabfrage über Layer).
 
-    <use_case>«Was liegt an diesem Punkt?» — z.B. Bauzone, Gemeinde oder Gebäude an
-    einer Adresse. Layer-IDs vorher via swisstopo_search_layers ermitteln.</use_case>
+    <use_case>«Was liegt an diesem Punkt?» — generische Punktabfrage über beliebige
+    Layer. Layer-IDs vorher via swisstopo_search_layers ermitteln.</use_case>
+    <important_notes>Für Bauzone bzw. Gemeinde gibt es direkte Tools
+    (swisstopo_zoning_at, swisstopo_municipality_at) — dieses Tool nur nutzen, wenn
+    zusätzliche Rohattribute gebraucht werden oder ein anderer Layer gefragt ist.</important_notes>
     <important_notes>Im Gegensatz zu swisstopo_find_features (Attributsuche) erfolgt
     die Abfrage rein geografisch.</important_notes>
     """
@@ -465,8 +473,10 @@ async def swisstopo_convert_coordinates(params: ConvertCoordinatesInput) -> Tool
 from swisstopo_mcp.oereb import (  # noqa: E402
     GetEgridInput,
     GetOerebExtractInput,
+    OerebAtInput,
     get_egrid,
     get_oereb_extract,
+    oereb_at,
 )
 
 
@@ -507,6 +517,29 @@ async def swisstopo_get_oereb_extract(params: GetOerebExtractInput, ctx: Context
     <important_notes>Erfordert einen unterstützten Kanton.</important_notes>
     """
     return await get_oereb_extract(params, ctx=ctx)
+
+
+@mcp.tool(
+    name="swisstopo_oereb_at",
+    annotations=ToolAnnotations(
+        title="ÖREB-Auszug an Koordinate",
+        readOnlyHint=True,
+        destructiveHint=False,
+        idempotentHint=True,
+        openWorldHint=True,
+    ),
+)
+async def swisstopo_oereb_at(params: OerebAtInput, ctx: Context) -> ToolResponse:
+    """Gibt die ÖREB-Eigentumsbeschränkungen an einer Koordinate zurück (ein Aufruf).
+
+    <use_case>«Welche Beschränkungen gelten auf diesem Grundstück?» — löst den
+    EGRID intern auf. Das ist der normale Weg; swisstopo_get_egrid braucht es
+    nur, wer die Parzellen-ID selbst benötigt.</use_case>
+    <important_notes>Nur für Kantone mit angebundenem ÖREB-Dienst (siehe
+    SWISSTOPO_OEREB_CANTONS). Koordinaten als lat/lon (WGS84) oder
+    easting/northing (LV95).</important_notes>
+    """
+    return await oereb_at(params, ctx=ctx)
 
 
 # --- Consolidated Geodata Façade (Phase-2 Geodaten-Erweiterung) ---

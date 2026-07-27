@@ -81,6 +81,32 @@ class GetOerebExtractInput(BaseModel):
 # ---------------------------------------------------------------------------
 
 
+async def _fetch_egrid_features(base: str, easting: float, northing: float) -> list[dict]:
+    """Resolve an LV95 point to its parcel feature(s) at a cantonal ÖREB endpoint.
+
+    Shared by `swisstopo_get_egrid` and `swisstopo_oereb_at` so the one-call
+    aggregate does not re-enter the tool layer to reach it (ARCH-007).
+    """
+    url = f"{base}/getegrid/json/?EN={easting},{northing}"
+    assert_host_allowed(url)
+    async with await _get_client() as client:
+        response = await client.get(url)
+        response.raise_for_status()
+        data = response.json()
+    features = data.get("features", [])
+    return features if isinstance(features, list) else []
+
+
+def _first_egrid(features: list[dict]) -> str | None:
+    """Pull the EGRID out of the first feature, tolerating key-case variation."""
+    for feature in features:
+        props = feature.get("properties", {})
+        egrid = props.get("egrid") or props.get("EGRID")
+        if egrid:
+            return str(egrid)
+    return None
+
+
 @log_tool_call("swisstopo_get_egrid")
 async def get_egrid(params: GetEgridInput) -> ToolResponse:
     """Return the EGRID (parcel identifier) for a WGS84 coordinate in a given canton."""
@@ -96,17 +122,8 @@ async def get_egrid(params: GetEgridInput) -> ToolResponse:
         )
 
     try:
-        e, n = params.as_lv95
         lat, lon = params.as_wgs84
-        url = f"{base}/getegrid/json/?EN={e},{n}"
-        assert_host_allowed(url)
-        async with await _get_client() as client:
-            response = await client.get(url)
-            response.raise_for_status()
-            data = response.json()
-
-        # Parse EGRID(s) from response
-        features = data.get("features", [])
+        features = await _fetch_egrid_features(base, *params.as_lv95)
         if not features:
             return ToolResponse.ok(
                 f"Kein EGRID gefunden für Koordinaten "
@@ -261,3 +278,74 @@ async def get_oereb_extract(
 
     except Exception as e:
         return ToolResponse.error(handle_api_error(e, f"ÖREB-Auszug Kanton {canton}"), source=OEREB_SOURCE)
+
+
+class OerebAtInput(SwissPointInput):
+    """Input for `swisstopo_oereb_at` — a point plus the canton."""
+
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid", strict=True)
+
+    canton: str = Field(
+        ...,
+        min_length=2,
+        max_length=2,
+        pattern=CANTON_PATTERN,
+        description="Kantonskürzel (z.B. 'ZH', 'BE')",
+    )
+    topics: str | None = Field(
+        default=None,
+        max_length=200,
+        pattern=r"^[\w,\-]+$",
+        description="Themenfilter (kommagetrennt)",
+    )
+    lang: str = Field(default="de", pattern=LANG_PATTERN, description="Sprache")
+
+
+@log_tool_call("swisstopo_oereb_at")
+async def oereb_at(params: OerebAtInput, ctx: Context | None = None) -> ToolResponse:
+    """Return ÖREB restrictions at a coordinate, resolving the EGRID internally.
+
+    The two-step chain (coordinate → EGRID → extract) was the shape the audit
+    flags: the intermediate EGRID is an upstream identifier, not something the
+    caller asked for (ARCH-007).
+    """
+    canton = params.canton.upper()
+    base = get_oereb_endpoint(canton)
+    if base is None:
+        available = list(get_active_cantons().keys())
+        return ToolResponse.error(
+            f"⚠️ Kanton {canton} wird nicht unterstützt. "
+            f"Verfügbar: {available}. "
+            f"Manueller Auszug: https://oereb.cadastre.ch",
+            source=OEREB_SOURCE,
+        )
+
+    try:
+        lat, lon = params.as_wgs84
+        features = await _fetch_egrid_features(base, *params.as_lv95)
+        egrid = _first_egrid(features)
+    except Exception as e:
+        return ToolResponse.error(
+            handle_api_error(e, f"ÖREB-Abfrage Kanton {canton}"), source=OEREB_SOURCE
+        )
+
+    if egrid is None:
+        return ToolResponse.ok(
+            f"Kein Grundstück an ({lat}, {lon}) in Kanton {canton} gefunden.",
+            [],
+            match_type="none",
+            source=OEREB_SOURCE,
+            license=OEREB_LICENSE,
+            note=(
+                "Die Koordinate liegt womöglich ausserhalb des Kantons oder auf "
+                "einer Parzellengrenze. Kanton via swisstopo_municipality_at "
+                "prüfen, oder den Punkt leicht verschieben."
+            ),
+        )
+
+    return await get_oereb_extract(
+        GetOerebExtractInput(
+            egrid=egrid, canton=canton, topics=params.topics, lang=params.lang
+        ),
+        ctx=ctx,
+    )

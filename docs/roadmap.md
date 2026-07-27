@@ -29,7 +29,7 @@ README ("Security & Compliance" section).
       httpx auto-instrumentation so upstream calls nest under the tool span
       (OBS-006)
 
-## Phase 2.5 — Consolidation of `swiss-geodata-mcp` (🔄 in progress)
+## Phase 2.5 — Consolidation of `swiss-geodata-mcp` (✅ done)
 
 Merging the sibling server into this one, per
 [`merge-plan-swiss-geodata-mcp.md`](merge-plan-swiss-geodata-mcp.md). Decision
@@ -47,8 +47,12 @@ server as the base.
       degrees upstream labelled as metres.
 - [x] Ported `swisstopo_zoning_at`, `swisstopo_municipality_at` and
       `swisstopo_layer_info`; tool budget raised 20 → 25.
-- [ ] Deprecate and archive `swiss-geodata-mcp` (no external users, so no
-      alias-shim period is needed — plan §7.2).
+- [x] `swisstopo_oereb_at` collapses the coordinate → EGRID → extract chain into
+      one call (ARCH-007). The aggregation rationale per tool cluster lives in
+      the README; the open candidate is merging the five api3 tools, which is a
+      breaking change for a future major release (ARCH-006).
+- [x] Deprecated and **archived** `swiss-geodata-mcp` (2026-07-27). No external
+      users, so no alias-shim period was needed — plan §7.2.
 - [x] Re-run the audit against the changed surface — run
       `2026-07-27T125314-Z`, 22 pass / 20 partial / 2 fail. Not
       production-ready; see that run's `audit-report.md`.

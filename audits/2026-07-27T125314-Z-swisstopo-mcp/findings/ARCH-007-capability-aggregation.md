@@ -1,7 +1,7 @@
 ## Finding: ARCH-007 — Capability-Aggregation: Composability intern, Atomarität extern
 
 **Severity:** medium
-**Status:** open
+**Status:** closed
 **Server:** swisstopo-mcp
 **Check-Reference:** ARCH-007
 **PDF-Reference:** Sec 2.3
@@ -71,3 +71,23 @@ Handle the legend failing independently — a missing legend should degrade the 
 
 ### Effort Estimate
 M (1-3d)
+
+---
+
+### Remediation Status (2026-07-27, batch 4)
+
+**Closed.** `swisstopo_oereb_at` collapses the coordinate → EGRID → extract
+chain into one call. The EGRID is an upstream identifier, not something the
+caller asked for, which is exactly the pattern the check names. EGRID
+resolution was extracted into `_fetch_egrid_features()` so the aggregate does
+not re-enter the tool layer to reach it; `swisstopo_get_egrid` stays for
+callers who want the parcel ID, and its description no longer bills it as a
+precursor.
+
+The precedence rule the finding asked for is now an explicit rule in
+`instructions` — Bauzone, Gemeinde and ÖREB each name the direct tool and say
+when the generic one applies — and it is cross-referenced from the competing
+tool descriptions, since `instructions` alone is not reliably consulted per
+selection decision.
+
+Costs one budget slot: 24 of 25.

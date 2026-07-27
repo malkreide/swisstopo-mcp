@@ -770,3 +770,82 @@ class TestGetOerebExtractHandler:
             GetOerebExtractInput(egrid="CH767982496078", canton="ZH")
         )
         assert "CH767982496078" in result.summary
+
+
+# ---------------------------------------------------------------------------
+# One-call aggregate (audit ARCH-007)
+# ---------------------------------------------------------------------------
+
+import httpx  # noqa: E402
+import respx  # noqa: E402
+
+from swisstopo_mcp.oereb import OerebAtInput, _first_egrid, oereb_at  # noqa: E402
+
+_ZH = "https://oereb.geo.zh.ch"
+_EGRID_PAYLOAD = {"features": [{"properties": {"egrid": "CH807306036483"}}]}
+
+
+class TestFirstEgrid:
+    def test_lowercase_key(self):
+        assert _first_egrid([{"properties": {"egrid": "CH1"}}]) == "CH1"
+
+    def test_uppercase_key(self):
+        """Cantonal endpoints disagree on the casing."""
+        assert _first_egrid([{"properties": {"EGRID": "CH2"}}]) == "CH2"
+
+    def test_skips_features_without_an_egrid(self):
+        assert _first_egrid([{"properties": {}}, {"properties": {"egrid": "CH3"}}]) == "CH3"
+
+    def test_empty_gives_none(self):
+        assert _first_egrid([]) is None
+
+
+class TestOerebAt:
+    @respx.mock
+    async def test_resolves_egrid_and_returns_the_extract(self, monkeypatch):
+        """The EGRID is an upstream identifier, not something the caller asked
+        for — it must not require a second tool call (ARCH-007)."""
+        monkeypatch.setattr(settings, "oereb_cantons", "ZH")
+        egrid_route = respx.get(url__startswith=f"{_ZH}/getegrid/json/").mock(
+            return_value=httpx.Response(200, json=_EGRID_PAYLOAD)
+        )
+        extract_route = respx.get(url__startswith=f"{_ZH}/extract/json/").mock(
+            return_value=httpx.Response(200, json={"extract": {}})
+        )
+        out = await oereb_at(OerebAtInput(lat=47.3769, lon=8.5417, canton="ZH"))
+        assert out.is_error is False
+        assert egrid_route.called and extract_route.called
+        # The resolved EGRID must reach the extract call.
+        assert "CH807306036483" in str(extract_route.calls[0].request.url)
+
+    @respx.mock
+    async def test_no_parcel_is_a_soft_miss_with_a_hint(self, monkeypatch):
+        monkeypatch.setattr(settings, "oereb_cantons", "ZH")
+        respx.get(url__startswith=f"{_ZH}/getegrid/json/").mock(
+            return_value=httpx.Response(200, json={"features": []})
+        )
+        out = await oereb_at(OerebAtInput(lat=47.3769, lon=8.5417, canton="ZH"))
+        assert out.is_error is False
+        assert out.match_type == "none"
+        assert out.note and "municipality_at" in out.note
+
+    async def test_unsupported_canton_is_reported(self, monkeypatch):
+        monkeypatch.setattr(settings, "oereb_cantons", "ZH")
+        out = await oereb_at(OerebAtInput(lat=47.3769, lon=8.5417, canton="GR"))
+        assert out.is_error is True
+        assert "GR" in out.summary
+
+    @respx.mock
+    async def test_upstream_failure_is_handled(self, monkeypatch):
+        monkeypatch.setattr(settings, "oereb_cantons", "ZH")
+        respx.get(url__startswith=f"{_ZH}/getegrid/json/").mock(
+            return_value=httpx.Response(500, text="boom")
+        )
+        out = await oereb_at(OerebAtInput(lat=47.3769, lon=8.5417, canton="ZH"))
+        assert out.is_error is True
+        assert "boom" not in out.summary
+
+    async def test_accepts_lv95_input(self, monkeypatch):
+        monkeypatch.setattr(settings, "oereb_cantons", "ZH")
+        m = OerebAtInput(easting=2683531.0, northing=1247914.0, canton="ZH")
+        assert m.as_lv95 == (2683531.0, 1247914.0)

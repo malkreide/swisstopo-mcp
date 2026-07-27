@@ -340,10 +340,22 @@ Capabilities, Egress-NetworkPolicy) — siehe
 
 ### MCP-Protokollversion
 
-Die MCP-Protokollversion wird vom `mcp`-SDK ausgehandelt; dieses ist in
-`pyproject.toml` auf den `1.x`-Major gepinnt, damit ein Update die ausgehandelte
-Version nicht stillschweigend ändert. SDK-Bumps werden monatlich via Dependabot
-vorgeschlagen und in [CHANGELOG.md](CHANGELOG.md) dokumentiert.
+Die MCP-Protokollversion wird beim `initialize` ausgehandelt; das Python-SDK
+bietet keinen vom Autor setzbaren Pin. Mit `mcp` 1.28.1 ist die ausgehandelte
+Version **2025-11-25** (`mcp.types.LATEST_PROTOCOL_VERSION`). Das SDK ist in
+`pyproject.toml` auf den `1.x`-Major gepinnt, damit ein Update sie nicht still
+verschiebt, und `tests/test_protocol_version.py` schlaegt fehl, falls doch —
+ein Dependabot-Bump kann die Protokollversion nicht unbemerkt aendern.
+
+**Update-Policy**
+
+- SDK-Updates werden vor dem Merge auf einem Feature-Branch getestet.
+- Eine Aenderung der ausgehandelten Protokollversion wird in
+  [CHANGELOG.md](CHANGELOG.md) unter `### Changed` mit alter und neuer Version
+  festgehalten.
+- Eine Protokolländerung, die bestehende Clients bricht, loest ein
+  Major-Release aus.
+
 
 ### Sessions & Authentifizierung
 

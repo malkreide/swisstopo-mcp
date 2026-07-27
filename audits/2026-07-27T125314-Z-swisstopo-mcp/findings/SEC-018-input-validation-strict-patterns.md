@@ -1,7 +1,7 @@
 ## Finding: SEC-018 — Input-Validation an Tool-Boundaries (Pydantic strict / Zod)
 
 **Severity:** high
-**Status:** in-remediation
+**Status:** closed
 **Server:** swisstopo-mcp
 **Check-Reference:** SEC-018
 **PDF-Reference:** Sec 3 / Sec 4 (Defense-in-Depth)
@@ -92,3 +92,14 @@ declares no config of its own.
 **Still open:** `sr` remains an unbounded `int` on three models, and
 `validate_sr()` in `api_client.py` remains dead code. Those predate this
 change and are left for a dedicated remediation pass.
+
+---
+
+### Remediation Status (2026-07-27, follow-up PR)
+
+**Now fully closed.** The base-model gap was fixed earlier; this pass closes the
+remainder. `validate_sr()` is no longer dead code — it is wired into the three
+`sr` fields via `field_validator`, so an arbitrary int is rejected instead of
+being forwarded upstream. `max_length` bounds were added to `layers` (512),
+`layer`, `search_field` and `feature_id` (128). 11 tests added, including the
+base-model config assertions that would have caught the original gap.

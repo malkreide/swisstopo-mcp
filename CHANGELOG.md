@@ -8,6 +8,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Security
+- **Audit remediation batch 1 — five findings closed** (SEC-004, SEC-018,
+  SDK-002, ARCH-004, ARCH-012). No breaking changes for clients.
+  - **SEC-004 (critical):** `assert_host_allowed` only ever checked the
+    hostname, so an allow-listed host over cleartext `http://` passed. It now
+    validates the scheme first and adds a resolved-IP guard that blocks any
+    allow-listed name answering with a private or link-local address. The guard
+    hangs off the same function, so it also covers the two direct-client call
+    sites in `oereb.py`. Resolution is cached per host; a resolution *failure*
+    is deliberately non-fatal so httpx surfaces the real connection error.
+  - **SEC-018:** `validate_sr()` existed but was never called — an arbitrary
+    `sr` int was forwarded straight upstream. It is now wired into the three
+    `sr` fields, and length bounds were added to the identifier fields.
+  - **ARCH-004:** `transport` and `oereb_cantons` became `Settings` fields.
+    `--http` still wins on the command line, but `SWISSTOPO_TRANSPORT` is the
+    deployment path, and `oereb.py` no longer reads `os.environ` directly —
+    which had contradicted `config.py`'s own docstring.
+  - **ARCH-012:** both READMEs now name the concrete negotiated protocol
+    version (2025-11-25) and an update policy, and
+    `tests/test_protocol_version.py` fails if an SDK bump moves it.
+
+### Changed
+- **The OEREB canton list is read once at startup instead of on every call.**
+  This is what ARCH-004 asks for, but it means changing
+  `SWISSTOPO_OEREB_CANTONS` now requires a restart.
+- All 23 tool annotations use the typed `ToolAnnotations` instead of plain
+  dicts, and a `mypy src/` gate runs in CI (SDK-002). Four handlers in
+  `rest_api.py` were annotated `-> str` while returning `ToolResponse`;
+  nothing caught it, hence the gate.
 - **Fixed the broken HTTP transport (SDK-004 / SCALE-001).**
   `TransportSecuritySettings` is now passed to `FastMCP()`, so the SDK's
   DNS-rebinding protection is told the deployment's real hosts and origins

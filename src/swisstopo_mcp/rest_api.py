@@ -6,7 +6,7 @@ import html
 import re
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from swisstopo_mcp.api_client import (
     ID_PATTERN,
@@ -15,6 +15,7 @@ from swisstopo_mcp.api_client import (
     geo_admin_request,
     geo_admin_request_text,
     handle_api_error,
+    validate_sr,
 )
 from swisstopo_mcp.coords import SwissPointInput, check_deprecated_sr
 from swisstopo_mcp.logging_config import log_tool_call
@@ -58,6 +59,7 @@ class IdentifyInput(SwissPointInput):
     layers: str = Field(
         ...,
         min_length=2,
+        max_length=512,
         pattern=ID_PATTERN,
         description="Layer-IDs, kommagetrennt, z.B. 'ch.bfs.gebaeude_wohnungs_register'",
     )
@@ -76,18 +78,31 @@ class IdentifyInput(SwissPointInput):
 class FindFeaturesInput(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid", strict=True)
 
-    layer: str = Field(..., min_length=2, pattern=ID_PATTERN, description="Layer-ID")
+    layer: str = Field(
+        ..., min_length=2, max_length=128, pattern=ID_PATTERN, description="Layer-ID"
+    )
     search_text: str = Field(..., min_length=1, max_length=200, pattern=TEXT_PATTERN, description="Suchwert")
-    search_field: str = Field(..., min_length=1, pattern=ID_PATTERN, description="Attributfeld")
+    search_field: str = Field(
+        ..., min_length=1, max_length=128, pattern=ID_PATTERN, description="Attributfeld"
+    )
     contains: bool = Field(default=True, description="Teilstring-Suche (True) oder exakt (False)")
 
 
 class GetFeatureInput(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid", strict=True)
 
-    layer: str = Field(..., min_length=2, pattern=ID_PATTERN, description="Layer-ID")
-    feature_id: str = Field(..., min_length=1, pattern=ID_PATTERN, description="Feature-ID")
-    sr: int = Field(default=4326, description="Koordinatensystem")
+    layer: str = Field(
+        ..., min_length=2, max_length=128, pattern=ID_PATTERN, description="Layer-ID"
+    )
+    feature_id: str = Field(
+        ..., min_length=1, max_length=128, pattern=ID_PATTERN, description="Feature-ID"
+    )
+    sr: int = Field(default=4326, description="Koordinatensystem der Ausgabegeometrie")
+
+    @field_validator("sr")
+    @classmethod
+    def _validate_sr(cls, v: int) -> int:
+        return validate_sr(v)
 
 
 class ZoningAtInput(SwissPointInput):
@@ -101,7 +116,9 @@ class MunicipalityAtInput(SwissPointInput):
 class LayerInfoInput(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid", strict=True)
 
-    layer: str = Field(..., min_length=2, pattern=ID_PATTERN, description="Layer-ID")
+    layer: str = Field(
+        ..., min_length=2, max_length=128, pattern=ID_PATTERN, description="Layer-ID"
+    )
     lang: str = Field(default="de", pattern=LANG_PATTERN, description="Sprache: de, fr, it, en")
 
 
@@ -288,7 +305,7 @@ def format_feature_detail(data: dict[str, Any]) -> str:
 
 
 @log_tool_call("swisstopo_search_layers")
-async def search_layers(params: SearchLayersInput) -> str:
+async def search_layers(params: SearchLayersInput) -> ToolResponse:
     """Search the swisstopo layer catalogue."""
     try:
         data = await geo_admin_request(
@@ -311,7 +328,7 @@ async def search_layers(params: SearchLayersInput) -> str:
 
 
 @log_tool_call("swisstopo_identify_features")
-async def identify_features(params: IdentifyInput) -> str:
+async def identify_features(params: IdentifyInput) -> ToolResponse:
     """Identify features at a coordinate."""
     try:
         lat, lon = params.as_wgs84
@@ -339,7 +356,7 @@ async def identify_features(params: IdentifyInput) -> str:
 
 
 @log_tool_call("swisstopo_find_features")
-async def find_features(params: FindFeaturesInput) -> str:
+async def find_features(params: FindFeaturesInput) -> ToolResponse:
     """Find features by attribute value."""
     try:
         data = await geo_admin_request(
@@ -362,7 +379,7 @@ async def find_features(params: FindFeaturesInput) -> str:
 
 
 @log_tool_call("swisstopo_get_feature")
-async def get_feature(params: GetFeatureInput) -> str:
+async def get_feature(params: GetFeatureInput) -> ToolResponse:
     """Get full details for a single feature."""
     try:
         data = await geo_admin_request(

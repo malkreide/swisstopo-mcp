@@ -42,6 +42,7 @@ dev = [
     "pytest-cov>=5.0.0",
     "respx>=0.21.0",
     "ruff>=0.4.0",
+    "mypy>=1.10.0",
 ]
 
 [project.scripts]
@@ -62,6 +63,17 @@ addopts      = "-v --tb=short"
 markers      = [
     "live: live API tests (skipped in CI by default)",
 ]
+
+[tool.mypy]
+# Static gate for SDK-002: four handlers were annotated `-> str` while returning
+# ToolResponse, and nothing caught it. Deliberately permissive to start — the
+# point is to freeze the return-type contract, not to boil the ocean.
+files                = ["src"]
+python_version       = "3.11"
+check_untyped_defs   = true
+warn_return_any      = true
+warn_redundant_casts = true
+ignore_missing_imports = true
 
 [tool.ruff]
 line-length = 100

@@ -2,8 +2,6 @@
 """ÖREB Cadastre tools for cantonal ÖREB services."""
 from __future__ import annotations
 
-import os
-
 from mcp.server.fastmcp import Context
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -14,6 +12,7 @@ from swisstopo_mcp.api_client import (
     assert_host_allowed,
     handle_api_error,
 )
+from swisstopo_mcp.config import settings
 from swisstopo_mcp.coords import SwissPointInput
 from swisstopo_mcp.logging_config import log_tool_call
 from swisstopo_mcp.models import OEREB_LICENSE, OEREB_SOURCE, ToolResponse
@@ -29,9 +28,13 @@ OEREB_ENDPOINTS: dict[str, str] = {
 
 
 def get_active_cantons() -> dict[str, str]:
-    """Return ÖREB endpoints filtered by SWISSTOPO_OEREB_CANTONS env var."""
-    cantons_env = os.environ.get("SWISSTOPO_OEREB_CANTONS", "ZH")
-    active = [c.strip().upper() for c in cantons_env.split(",")]
+    """Return ÖREB endpoints filtered by the configured cantons.
+
+    Reads the shared Settings object rather than os.environ directly, so the
+    value is validated once at startup and config.py stays the single source
+    for every setting, as its own docstring claims (ARCH-004).
+    """
+    active = settings.oereb_cantons_list
     return {k: v for k, v in OEREB_ENDPOINTS.items() if k in active}
 
 
@@ -208,7 +211,7 @@ async def get_oereb_extract(
                 if isinstance(information, list) and information:
                     first_info = information[0]
                     if isinstance(first_info, dict):
-                        description = first_info.get("Text", first_info.get("text", ""))
+                        description = str(first_info.get("Text") or first_info.get("text") or "")
                 elif isinstance(information, str):
                     description = information
 
@@ -219,7 +222,7 @@ async def get_oereb_extract(
                     if isinstance(authority_names, list) and authority_names:
                         first_name = authority_names[0]
                         if isinstance(first_name, dict):
-                            authority = first_name.get("Text", first_name.get("text", ""))
+                            authority = str(first_name.get("Text") or first_name.get("text") or "")
                         else:
                             authority = str(first_name)
                     elif isinstance(authority_names, str):
@@ -234,7 +237,7 @@ async def get_oereb_extract(
                         if isinstance(lp_titles, list) and lp_titles:
                             first_title = lp_titles[0]
                             if isinstance(first_title, dict):
-                                legal_text = first_title.get("Text", first_title.get("text", ""))
+                                legal_text = str(first_title.get("Text") or first_title.get("text") or "")
                             else:
                                 legal_text = str(first_title)
                         elif isinstance(lp_titles, str):

@@ -1,7 +1,7 @@
 ## Finding: SDK-002 — Pydantic v2 / TypedDict / Dataclass als Tool-Returns
 
 **Severity:** medium
-**Status:** open
+**Status:** closed
 **Server:** swisstopo-mcp
 **Check-Reference:** SDK-002
 **PDF-Reference:** Sec 3.1
@@ -70,3 +70,14 @@ The client-facing schema is unaffected today, because FastMCP derives the `outpu
 ### Effort Estimate
 
 S (<1d) — four one-line edits; the mypy gate adds a few hours, mostly for the first clean run.
+
+---
+
+### Remediation Status (2026-07-27, follow-up PR)
+
+**Closed.** The four `-> str` annotations in `rest_api.py` now say
+`-> ToolResponse`. A mypy gate was added (`[tool.mypy]` in `pyproject.toml`,
+`mypy src/` step in CI) so the drift cannot recur silently. Fixing the
+resulting 34 errors also converted all 23 tool `annotations={...}` dicts to the
+typed `ToolAnnotations`, and cleaned up three genuine `Any`-leaks in
+`geodata.py` and `oereb.py`. mypy is clean on `src/`.

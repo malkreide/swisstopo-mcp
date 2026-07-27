@@ -339,10 +339,20 @@ NetworkPolicy) are provided — see [docs/deployment.md](docs/deployment.md).
 
 ### MCP Protocol Version
 
-The MCP protocol version is negotiated by the `mcp` SDK, which is pinned to the
-`1.x` major in `pyproject.toml` so an update cannot silently change the
-negotiated version. SDK bumps are proposed monthly via Dependabot and tracked
-in [CHANGELOG.md](CHANGELOG.md).
+The MCP protocol version is negotiated during `initialize`; the Python SDK does
+not expose an author-settable pin. As of `mcp` 1.28.1 the negotiated version is
+**2025-11-25** (`mcp.types.LATEST_PROTOCOL_VERSION`). The SDK is pinned to the
+`1.x` major in `pyproject.toml` so an update cannot silently move it, and
+`tests/test_protocol_version.py` fails if it does — a Dependabot bump cannot
+change the protocol version unnoticed.
+
+**Update policy**
+
+- SDK updates are tested on a feature branch before merge.
+- A change to the negotiated protocol version is recorded in
+  [CHANGELOG.md](CHANGELOG.md) under `### Changed`, naming the old and the new
+  version.
+- A protocol change that breaks existing clients triggers a major release.
 
 ### Sessions & Authentication
 

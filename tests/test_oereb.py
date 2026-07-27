@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
+from swisstopo_mcp.config import settings
 from swisstopo_mcp.oereb import (
     OEREB_ENDPOINTS,
     GetEgridInput,
@@ -39,76 +40,76 @@ class TestOerebEndpoints:
 
 class TestGetActiveCantons:
     def test_default_returns_zh_only(self, monkeypatch):
-        monkeypatch.delenv("SWISSTOPO_OEREB_CANTONS", raising=False)
+        monkeypatch.setattr(settings, "oereb_cantons", "ZH")
         result = get_active_cantons()
         assert "ZH" in result
         assert "BE" not in result
 
     def test_env_var_zh_only(self, monkeypatch):
-        monkeypatch.setenv("SWISSTOPO_OEREB_CANTONS", "ZH")
+        monkeypatch.setattr(settings, "oereb_cantons", "ZH")
         result = get_active_cantons()
         assert "ZH" in result
         assert "BE" not in result
 
     def test_env_var_be_only(self, monkeypatch):
-        monkeypatch.setenv("SWISSTOPO_OEREB_CANTONS", "BE")
+        monkeypatch.setattr(settings, "oereb_cantons", "BE")
         result = get_active_cantons()
         assert "BE" in result
         assert "ZH" not in result
 
     def test_env_var_both(self, monkeypatch):
-        monkeypatch.setenv("SWISSTOPO_OEREB_CANTONS", "ZH,BE")
+        monkeypatch.setattr(settings, "oereb_cantons", "ZH,BE")
         result = get_active_cantons()
         assert "ZH" in result
         assert "BE" in result
 
     def test_env_var_with_spaces(self, monkeypatch):
-        monkeypatch.setenv("SWISSTOPO_OEREB_CANTONS", "ZH, BE")
+        monkeypatch.setattr(settings, "oereb_cantons", "ZH, BE")
         result = get_active_cantons()
         assert "ZH" in result
         assert "BE" in result
 
     def test_env_var_lowercase_normalized(self, monkeypatch):
-        monkeypatch.setenv("SWISSTOPO_OEREB_CANTONS", "zh,be")
+        monkeypatch.setattr(settings, "oereb_cantons", "zh,be")
         result = get_active_cantons()
         assert "ZH" in result
         assert "BE" in result
 
     def test_unknown_canton_filtered_out(self, monkeypatch):
-        monkeypatch.setenv("SWISSTOPO_OEREB_CANTONS", "XX")
+        monkeypatch.setattr(settings, "oereb_cantons", "XX")
         result = get_active_cantons()
         assert len(result) == 0
 
     def test_returns_dict(self, monkeypatch):
-        monkeypatch.delenv("SWISSTOPO_OEREB_CANTONS", raising=False)
+        monkeypatch.setattr(settings, "oereb_cantons", "ZH")
         result = get_active_cantons()
         assert isinstance(result, dict)
 
 
 class TestGetOerebEndpoint:
     def test_zh_returns_url(self, monkeypatch):
-        monkeypatch.setenv("SWISSTOPO_OEREB_CANTONS", "ZH,BE")
+        monkeypatch.setattr(settings, "oereb_cantons", "ZH,BE")
         result = get_oereb_endpoint("ZH")
         assert result is not None
         assert result.startswith("https://")
 
     def test_be_returns_url(self, monkeypatch):
-        monkeypatch.setenv("SWISSTOPO_OEREB_CANTONS", "ZH,BE")
+        monkeypatch.setattr(settings, "oereb_cantons", "ZH,BE")
         result = get_oereb_endpoint("BE")
         assert result is not None
 
     def test_unknown_returns_none(self, monkeypatch):
-        monkeypatch.delenv("SWISSTOPO_OEREB_CANTONS", raising=False)
+        monkeypatch.setattr(settings, "oereb_cantons", "ZH")
         result = get_oereb_endpoint("XX")
         assert result is None
 
     def test_inactive_canton_returns_none(self, monkeypatch):
-        monkeypatch.setenv("SWISSTOPO_OEREB_CANTONS", "ZH")
+        monkeypatch.setattr(settings, "oereb_cantons", "ZH")
         result = get_oereb_endpoint("BE")
         assert result is None
 
     def test_lowercase_input_normalized(self, monkeypatch):
-        monkeypatch.setenv("SWISSTOPO_OEREB_CANTONS", "ZH,BE")
+        monkeypatch.setattr(settings, "oereb_cantons", "ZH,BE")
         result = get_oereb_endpoint("zh")
         assert result is not None
 
@@ -228,27 +229,27 @@ class TestGetOerebExtractInput:
 
 class TestUnsupportedCanton:
     async def test_get_egrid_unsupported_canton(self, monkeypatch):
-        monkeypatch.setenv("SWISSTOPO_OEREB_CANTONS", "ZH")
+        monkeypatch.setattr(settings, "oereb_cantons", "ZH")
         result = await get_egrid(GetEgridInput(lat=47.0, lon=8.5, canton="BE"))
         assert "BE" in result.summary
         assert "nicht unterstützt" in result.summary or "nicht" in result.summary
         assert "oereb.cadastre.ch" in result.summary
 
     async def test_get_egrid_unknown_canton(self, monkeypatch):
-        monkeypatch.setenv("SWISSTOPO_OEREB_CANTONS", "ZH")
+        monkeypatch.setattr(settings, "oereb_cantons", "ZH")
         result = await get_egrid(GetEgridInput(lat=47.0, lon=8.5, canton="XX"))
         assert "XX" in result.summary
         assert "oereb.cadastre.ch" in result.summary
 
     async def test_get_egrid_message_contains_available(self, monkeypatch):
-        monkeypatch.setenv("SWISSTOPO_OEREB_CANTONS", "ZH,BE")
+        monkeypatch.setattr(settings, "oereb_cantons", "ZH,BE")
         # Use a canton not in registry at all
         result = await get_egrid(GetEgridInput(lat=47.0, lon=8.5, canton="XX"))
         # Should mention available cantons
         assert "ZH" in result.summary or "BE" in result.summary
 
     async def test_get_oereb_extract_unsupported_canton(self, monkeypatch):
-        monkeypatch.setenv("SWISSTOPO_OEREB_CANTONS", "ZH")
+        monkeypatch.setattr(settings, "oereb_cantons", "ZH")
         result = await get_oereb_extract(
             GetOerebExtractInput(egrid="CH767982496078", canton="BE")
         )
@@ -257,7 +258,7 @@ class TestUnsupportedCanton:
         assert "oereb.cadastre.ch" in result.summary
 
     async def test_get_oereb_extract_unknown_canton(self, monkeypatch):
-        monkeypatch.setenv("SWISSTOPO_OEREB_CANTONS", "ZH")
+        monkeypatch.setattr(settings, "oereb_cantons", "ZH")
         result = await get_oereb_extract(
             GetOerebExtractInput(egrid="CH767982496078", canton="XX")
         )
@@ -272,7 +273,7 @@ class TestUnsupportedCanton:
 
 class TestGetEgridHandler:
     async def test_returns_egrid_string(self, monkeypatch):
-        monkeypatch.setenv("SWISSTOPO_OEREB_CANTONS", "ZH,BE")
+        monkeypatch.setattr(settings, "oereb_cantons", "ZH,BE")
 
         async def mock_get_client():
             class MockResponse:
@@ -311,7 +312,7 @@ class TestGetEgridHandler:
         assert "Zürich" in result.summary
 
     async def test_no_features_returns_not_found(self, monkeypatch):
-        monkeypatch.setenv("SWISSTOPO_OEREB_CANTONS", "ZH,BE")
+        monkeypatch.setattr(settings, "oereb_cantons", "ZH,BE")
 
         async def mock_get_client():
             class MockResponse:
@@ -340,7 +341,7 @@ class TestGetEgridHandler:
         assert "gefunden" in result.summary.lower() or "kein" in result.summary.lower()
 
     async def test_uses_lv95_coordinates_in_url(self, monkeypatch):
-        monkeypatch.setenv("SWISSTOPO_OEREB_CANTONS", "ZH,BE")
+        monkeypatch.setattr(settings, "oereb_cantons", "ZH,BE")
         captured_url = {}
 
         async def mock_get_client():
@@ -375,7 +376,7 @@ class TestGetEgridHandler:
     async def test_http_error_returns_error_message(self, monkeypatch):
         import httpx
 
-        monkeypatch.setenv("SWISSTOPO_OEREB_CANTONS", "ZH,BE")
+        monkeypatch.setattr(settings, "oereb_cantons", "ZH,BE")
 
         async def mock_get_client():
             class MockClient:
@@ -398,7 +399,7 @@ class TestGetEgridHandler:
     async def test_timeout_returns_error_message(self, monkeypatch):
         import httpx
 
-        monkeypatch.setenv("SWISSTOPO_OEREB_CANTONS", "ZH,BE")
+        monkeypatch.setattr(settings, "oereb_cantons", "ZH,BE")
 
         async def mock_get_client():
             class MockClient:
@@ -418,7 +419,7 @@ class TestGetEgridHandler:
         assert "Fehler" in result.summary or "Zeitüberschreitung" in result.summary
 
     async def test_multiple_features_returned(self, monkeypatch):
-        monkeypatch.setenv("SWISSTOPO_OEREB_CANTONS", "ZH,BE")
+        monkeypatch.setattr(settings, "oereb_cantons", "ZH,BE")
 
         async def mock_get_client():
             class MockResponse:
@@ -476,7 +477,7 @@ class TestGetOerebExtractHandler:
         }
 
     async def test_returns_markdown_extract(self, monkeypatch):
-        monkeypatch.setenv("SWISSTOPO_OEREB_CANTONS", "ZH,BE")
+        monkeypatch.setattr(settings, "oereb_cantons", "ZH,BE")
         restriction = self._make_restriction()
         response_data = self._make_extract_response([restriction])
 
@@ -512,7 +513,7 @@ class TestGetOerebExtractHandler:
         assert "Gemeinde Zürich" in result.summary
 
     async def test_no_restrictions_returns_empty_message(self, monkeypatch):
-        monkeypatch.setenv("SWISSTOPO_OEREB_CANTONS", "ZH,BE")
+        monkeypatch.setattr(settings, "oereb_cantons", "ZH,BE")
         response_data = self._make_extract_response([])
 
         async def mock_get_client():
@@ -546,7 +547,7 @@ class TestGetOerebExtractHandler:
     async def test_404_egrid_not_found(self, monkeypatch):
         import httpx
 
-        monkeypatch.setenv("SWISSTOPO_OEREB_CANTONS", "ZH,BE")
+        monkeypatch.setattr(settings, "oereb_cantons", "ZH,BE")
 
         async def mock_get_client():
             class MockClient:
@@ -571,7 +572,7 @@ class TestGetOerebExtractHandler:
         assert "nicht gefunden" in result.summary or "CH000000000000" in result.summary
 
     async def test_topics_filter_added_to_url(self, monkeypatch):
-        monkeypatch.setenv("SWISSTOPO_OEREB_CANTONS", "ZH,BE")
+        monkeypatch.setattr(settings, "oereb_cantons", "ZH,BE")
         captured_url = {}
         response_data = self._make_extract_response([])
 
@@ -607,7 +608,7 @@ class TestGetOerebExtractHandler:
         assert "TOPICS=Nutzungsplanung" in captured_url["url"]
 
     async def test_no_topics_filter_absent_from_url(self, monkeypatch):
-        monkeypatch.setenv("SWISSTOPO_OEREB_CANTONS", "ZH,BE")
+        monkeypatch.setattr(settings, "oereb_cantons", "ZH,BE")
         captured_url = {}
         response_data = self._make_extract_response([])
 
@@ -641,7 +642,7 @@ class TestGetOerebExtractHandler:
         assert "TOPICS" not in captured_url["url"]
 
     async def test_lang_passed_in_url(self, monkeypatch):
-        monkeypatch.setenv("SWISSTOPO_OEREB_CANTONS", "ZH,BE")
+        monkeypatch.setattr(settings, "oereb_cantons", "ZH,BE")
         captured_url = {}
         response_data = self._make_extract_response([])
 
@@ -677,7 +678,7 @@ class TestGetOerebExtractHandler:
     async def test_http_error_returns_error_message(self, monkeypatch):
         import httpx
 
-        monkeypatch.setenv("SWISSTOPO_OEREB_CANTONS", "ZH,BE")
+        monkeypatch.setattr(settings, "oereb_cantons", "ZH,BE")
 
         async def mock_get_client():
             class MockClient:
@@ -700,7 +701,7 @@ class TestGetOerebExtractHandler:
         assert "Fehler" in result.summary
 
     async def test_grouped_by_topic(self, monkeypatch):
-        monkeypatch.setenv("SWISSTOPO_OEREB_CANTONS", "ZH,BE")
+        monkeypatch.setattr(settings, "oereb_cantons", "ZH,BE")
         restrictions = [
             self._make_restriction(topic="Nutzungsplanung", description="Wohnzone"),
             self._make_restriction(topic="Waldabstand", description="Waldabstandslinie"),
@@ -739,7 +740,7 @@ class TestGetOerebExtractHandler:
         assert "Waldabstandslinie" in result.summary
 
     async def test_egrid_in_heading(self, monkeypatch):
-        monkeypatch.setenv("SWISSTOPO_OEREB_CANTONS", "ZH,BE")
+        monkeypatch.setattr(settings, "oereb_cantons", "ZH,BE")
         response_data = self._make_extract_response([self._make_restriction()])
 
         async def mock_get_client():

@@ -15,6 +15,7 @@ from contextlib import asynccontextmanager
 
 from mcp.server.fastmcp import Context, FastMCP
 from mcp.server.transport_security import TransportSecuritySettings
+from mcp.types import ToolAnnotations
 
 from swisstopo_mcp.api_client import create_shared_client, set_shared_client
 from swisstopo_mcp.config import settings
@@ -98,13 +99,13 @@ from swisstopo_mcp.geocoding import (  # noqa: E402
 
 @mcp.tool(
     name="swisstopo_geocode",
-    annotations={
-        "title": "Adresse geocodieren",
-        "readOnlyHint": True,
-        "destructiveHint": False,
-        "idempotentHint": True,
-        "openWorldHint": True,
-    },
+    annotations=ToolAnnotations(
+        title="Adresse geocodieren",
+        readOnlyHint=True,
+        destructiveHint=False,
+        idempotentHint=True,
+        openWorldHint=True,
+    ),
 )
 async def swisstopo_geocode(params: GeocodeInput) -> ToolResponse:
     """Wandelt eine Adresse, einen Ortsnamen oder eine PLZ in Koordinaten um (Geocoding).
@@ -118,13 +119,13 @@ async def swisstopo_geocode(params: GeocodeInput) -> ToolResponse:
 
 @mcp.tool(
     name="swisstopo_reverse_geocode",
-    annotations={
-        "title": "Koordinaten zu Adresse",
-        "readOnlyHint": True,
-        "destructiveHint": False,
-        "idempotentHint": True,
-        "openWorldHint": True,
-    },
+    annotations=ToolAnnotations(
+        title="Koordinaten zu Adresse",
+        readOnlyHint=True,
+        destructiveHint=False,
+        idempotentHint=True,
+        openWorldHint=True,
+    ),
 )
 async def swisstopo_reverse_geocode(params: ReverseGeocodeInput) -> ToolResponse:
     """Findet die nächstgelegene Adresse zu gegebenen WGS84-Koordinaten (Reverse Geocoding).
@@ -155,13 +156,13 @@ from swisstopo_mcp.rest_api import (  # noqa: E402
 
 @mcp.tool(
     name="swisstopo_search_layers",
-    annotations={
-        "title": "Swisstopo Layer suchen",
-        "readOnlyHint": True,
-        "destructiveHint": False,
-        "idempotentHint": True,
-        "openWorldHint": True,
-    },
+    annotations=ToolAnnotations(
+        title="Swisstopo Layer suchen",
+        readOnlyHint=True,
+        destructiveHint=False,
+        idempotentHint=True,
+        openWorldHint=True,
+    ),
 )
 async def swisstopo_search_layers(params: SearchLayersInput) -> ToolResponse:
     """Durchsucht den Swisstopo-Layerkatalog (500+ Layer) nach Geodatensätzen.
@@ -175,13 +176,13 @@ async def swisstopo_search_layers(params: SearchLayersInput) -> ToolResponse:
 
 @mcp.tool(
     name="swisstopo_identify_features",
-    annotations={
-        "title": "Features an Koordinate identifizieren",
-        "readOnlyHint": True,
-        "destructiveHint": False,
-        "idempotentHint": True,
-        "openWorldHint": True,
-    },
+    annotations=ToolAnnotations(
+        title="Features an Koordinate identifizieren",
+        readOnlyHint=True,
+        destructiveHint=False,
+        idempotentHint=True,
+        openWorldHint=True,
+    ),
 )
 async def swisstopo_identify_features(params: IdentifyInput) -> ToolResponse:
     """Findet Features an einer bestimmten Koordinate (räumliche Punktabfrage über Layer).
@@ -196,13 +197,13 @@ async def swisstopo_identify_features(params: IdentifyInput) -> ToolResponse:
 
 @mcp.tool(
     name="swisstopo_find_features",
-    annotations={
-        "title": "Features nach Attribut suchen",
-        "readOnlyHint": True,
-        "destructiveHint": False,
-        "idempotentHint": True,
-        "openWorldHint": True,
-    },
+    annotations=ToolAnnotations(
+        title="Features nach Attribut suchen",
+        readOnlyHint=True,
+        destructiveHint=False,
+        idempotentHint=True,
+        openWorldHint=True,
+    ),
 )
 async def swisstopo_find_features(params: FindFeaturesInput) -> ToolResponse:
     """Sucht Features anhand eines Attributwerts in einem Layer (Attributsuche, z.B. Gebäude nach EGID).
@@ -217,13 +218,13 @@ async def swisstopo_find_features(params: FindFeaturesInput) -> ToolResponse:
 
 @mcp.tool(
     name="swisstopo_get_feature",
-    annotations={
-        "title": "Feature-Details abrufen",
-        "readOnlyHint": True,
-        "destructiveHint": False,
-        "idempotentHint": True,
-        "openWorldHint": True,
-    },
+    annotations=ToolAnnotations(
+        title="Feature-Details abrufen",
+        readOnlyHint=True,
+        destructiveHint=False,
+        idempotentHint=True,
+        openWorldHint=True,
+    ),
 )
 async def swisstopo_get_feature(params: GetFeatureInput) -> ToolResponse:
     """Ruft die vollständigen Attribute und die Geometrie eines Features per Layer- und Feature-ID ab.
@@ -245,13 +246,13 @@ from swisstopo_mcp.stac import (  # noqa: E402
 
 @mcp.tool(
     name="swisstopo_search_geodata",
-    annotations={
-        "title": "Geodaten suchen",
-        "readOnlyHint": True,
-        "destructiveHint": False,
-        "idempotentHint": True,
-        "openWorldHint": True,
-    },
+    annotations=ToolAnnotations(
+        title="Geodaten suchen",
+        readOnlyHint=True,
+        destructiveHint=False,
+        idempotentHint=True,
+        openWorldHint=True,
+    ),
 )
 async def swisstopo_search_geodata(params: SearchGeodataInput) -> ToolResponse:
     """Durchsucht den STAC-Katalog nach herunterladbaren Geodaten.
@@ -266,13 +267,13 @@ async def swisstopo_search_geodata(params: SearchGeodataInput) -> ToolResponse:
 
 @mcp.tool(
     name="swisstopo_get_collection",
-    annotations={
-        "title": "Geodaten-Details abrufen",
-        "readOnlyHint": True,
-        "destructiveHint": False,
-        "idempotentHint": True,
-        "openWorldHint": True,
-    },
+    annotations=ToolAnnotations(
+        title="Geodaten-Details abrufen",
+        readOnlyHint=True,
+        destructiveHint=False,
+        idempotentHint=True,
+        openWorldHint=True,
+    ),
 )
 async def swisstopo_get_collection(params: GetCollectionInput) -> ToolResponse:
     """Ruft Detailinformationen und Download-Links einer STAC-Collection ab.
@@ -289,13 +290,13 @@ from swisstopo_mcp.wmts import MapUrlInput, build_map_url  # noqa: E402
 
 @mcp.tool(
     name="swisstopo_map_url",
-    annotations={
-        "title": "Karten-URL generieren",
-        "readOnlyHint": True,
-        "destructiveHint": False,
-        "idempotentHint": True,
-        "openWorldHint": True,
-    },
+    annotations=ToolAnnotations(
+        title="Karten-URL generieren",
+        readOnlyHint=True,
+        destructiveHint=False,
+        idempotentHint=True,
+        openWorldHint=True,
+    ),
 )
 async def swisstopo_map_url(params: MapUrlInput) -> ToolResponse:
     """Generiert eine teilbare map.geo.admin.ch-URL zum Öffnen im Browser.
@@ -317,13 +318,13 @@ from swisstopo_mcp.height import (  # noqa: E402
 
 @mcp.tool(
     name="swisstopo_get_height",
-    annotations={
-        "title": "Höhe abfragen",
-        "readOnlyHint": True,
-        "destructiveHint": False,
-        "idempotentHint": True,
-        "openWorldHint": True,
-    },
+    annotations=ToolAnnotations(
+        title="Höhe abfragen",
+        readOnlyHint=True,
+        destructiveHint=False,
+        idempotentHint=True,
+        openWorldHint=True,
+    ),
 )
 async def swisstopo_get_height(params: HeightInput) -> ToolResponse:
     """Gibt die Höhe über Meer (m ü. M.) an einer Koordinate zurück.
@@ -338,13 +339,13 @@ async def swisstopo_get_height(params: HeightInput) -> ToolResponse:
 
 @mcp.tool(
     name="swisstopo_elevation_profile",
-    annotations={
-        "title": "Höhenprofil berechnen",
-        "readOnlyHint": True,
-        "destructiveHint": False,
-        "idempotentHint": True,
-        "openWorldHint": True,
-    },
+    annotations=ToolAnnotations(
+        title="Höhenprofil berechnen",
+        readOnlyHint=True,
+        destructiveHint=False,
+        idempotentHint=True,
+        openWorldHint=True,
+    ),
 )
 async def swisstopo_elevation_profile(params: ElevationProfileInput, ctx: Context) -> ToolResponse:
     """Berechnet ein Höhenprofil entlang einer Linie aus mehreren Koordinatenpaaren.
@@ -359,13 +360,13 @@ async def swisstopo_elevation_profile(params: ElevationProfileInput, ctx: Contex
 
 @mcp.tool(
     name="swisstopo_zoning_at",
-    annotations={
-        "title": "Bauzone an Koordinate",
-        "readOnlyHint": True,
-        "destructiveHint": False,
-        "idempotentHint": True,
-        "openWorldHint": True,
-    },
+    annotations=ToolAnnotations(
+        title="Bauzone an Koordinate",
+        readOnlyHint=True,
+        destructiveHint=False,
+        idempotentHint=True,
+        openWorldHint=True,
+    ),
 )
 async def swisstopo_zoning_at(params: ZoningAtInput) -> ToolResponse:
     """Gibt die harmonisierte Bauzone an einer Koordinate zurück (ch.are.bauzonen, ARE).
@@ -382,13 +383,13 @@ async def swisstopo_zoning_at(params: ZoningAtInput) -> ToolResponse:
 
 @mcp.tool(
     name="swisstopo_municipality_at",
-    annotations={
-        "title": "Gemeinde an Koordinate",
-        "readOnlyHint": True,
-        "destructiveHint": False,
-        "idempotentHint": True,
-        "openWorldHint": True,
-    },
+    annotations=ToolAnnotations(
+        title="Gemeinde an Koordinate",
+        readOnlyHint=True,
+        destructiveHint=False,
+        idempotentHint=True,
+        openWorldHint=True,
+    ),
 )
 async def swisstopo_municipality_at(params: MunicipalityAtInput) -> ToolResponse:
     """Gibt Gemeinde, BFS-Nummer und Kanton an einer Koordinate zurück (swissBOUNDARIES3D).
@@ -404,13 +405,13 @@ async def swisstopo_municipality_at(params: MunicipalityAtInput) -> ToolResponse
 
 @mcp.tool(
     name="swisstopo_layer_info",
-    annotations={
-        "title": "Layer-Felder und Legende",
-        "readOnlyHint": True,
-        "destructiveHint": False,
-        "idempotentHint": True,
-        "openWorldHint": True,
-    },
+    annotations=ToolAnnotations(
+        title="Layer-Felder und Legende",
+        readOnlyHint=True,
+        destructiveHint=False,
+        idempotentHint=True,
+        openWorldHint=True,
+    ),
 )
 async def swisstopo_layer_info(params: LayerInfoInput) -> ToolResponse:
     """Listet die abfragbaren Felder und die Legende eines Layers auf.
@@ -433,13 +434,13 @@ from swisstopo_mcp.coords import (  # noqa: E402
 
 @mcp.tool(
     name="swisstopo_convert_coordinates",
-    annotations={
-        "title": "Koordinaten umrechnen (REFRAME)",
-        "readOnlyHint": True,
-        "destructiveHint": False,
-        "idempotentHint": True,
-        "openWorldHint": True,
-    },
+    annotations=ToolAnnotations(
+        title="Koordinaten umrechnen (REFRAME)",
+        readOnlyHint=True,
+        destructiveHint=False,
+        idempotentHint=True,
+        openWorldHint=True,
+    ),
 )
 async def swisstopo_convert_coordinates(params: ConvertCoordinatesInput) -> ToolResponse:
     """Rechnet Koordinaten amtlich zwischen WGS84 und LV95 um (swisstopo REFRAME).
@@ -466,13 +467,13 @@ from swisstopo_mcp.oereb import (  # noqa: E402
 
 @mcp.tool(
     name="swisstopo_get_egrid",
-    annotations={
-        "title": "Grundstück-ID (EGRID) ermitteln",
-        "readOnlyHint": True,
-        "destructiveHint": False,
-        "idempotentHint": True,
-        "openWorldHint": True,
-    },
+    annotations=ToolAnnotations(
+        title="Grundstück-ID (EGRID) ermitteln",
+        readOnlyHint=True,
+        destructiveHint=False,
+        idempotentHint=True,
+        openWorldHint=True,
+    ),
 )
 async def swisstopo_get_egrid(params: GetEgridInput) -> ToolResponse:
     """Ermittelt die EGRID (Grundstück-ID) aus Koordinaten für einen bestimmten Kanton.
@@ -485,13 +486,13 @@ async def swisstopo_get_egrid(params: GetEgridInput) -> ToolResponse:
 
 @mcp.tool(
     name="swisstopo_get_oereb_extract",
-    annotations={
-        "title": "ÖREB-Auszug abrufen",
-        "readOnlyHint": True,
-        "destructiveHint": False,
-        "idempotentHint": True,
-        "openWorldHint": True,
-    },
+    annotations=ToolAnnotations(
+        title="ÖREB-Auszug abrufen",
+        readOnlyHint=True,
+        destructiveHint=False,
+        idempotentHint=True,
+        openWorldHint=True,
+    ),
 )
 async def swisstopo_get_oereb_extract(params: GetOerebExtractInput, ctx: Context) -> ToolResponse:
     """Ruft öffentlich-rechtliche Eigentumsbeschränkungen (ÖREB) für ein Grundstück (EGRID) ab.
@@ -514,13 +515,13 @@ from swisstopo_mcp.geodata import (  # noqa: E402
 
 @mcp.tool(
     name="list_available_layers",
-    annotations={
-        "title": "Verfügbare Geodaten-Layer auflisten",
-        "readOnlyHint": True,
-        "destructiveHint": False,
-        "idempotentHint": True,
-        "openWorldHint": True,
-    },
+    annotations=ToolAnnotations(
+        title="Verfügbare Geodaten-Layer auflisten",
+        readOnlyHint=True,
+        destructiveHint=False,
+        idempotentHint=True,
+        openWorldHint=True,
+    ),
 )
 async def list_available_layers_tool(params: ListLayersInput) -> ToolResponse:
     """Discovery-Tool: listet die Layer-Kennungen, die query_geodata akzeptiert.
@@ -535,13 +536,13 @@ async def list_available_layers_tool(params: ListLayersInput) -> ToolResponse:
 
 @mcp.tool(
     name="query_geodata",
-    annotations={
-        "title": "Geodaten abfragen (Fassade)",
-        "readOnlyHint": True,
-        "destructiveHint": False,
-        "idempotentHint": True,
-        "openWorldHint": True,
-    },
+    annotations=ToolAnnotations(
+        title="Geodaten abfragen (Fassade)",
+        readOnlyHint=True,
+        destructiveHint=False,
+        idempotentHint=True,
+        openWorldHint=True,
+    ),
 )
 async def query_geodata_tool(params: QueryGeodataInput) -> ToolResponse:
     """Einheitliche Fassade über mehrere Geodaten-Quellen anhand einer Layer-Kennung.
@@ -562,13 +563,13 @@ from swisstopo_mcp.overpass import QueryOsmFeaturesInput, query_osm_features  # 
 
 @mcp.tool(
     name="query_osm_features",
-    annotations={
-        "title": "OpenStreetMap-POIs abfragen (Overpass)",
-        "readOnlyHint": True,
-        "destructiveHint": False,
-        "idempotentHint": True,
-        "openWorldHint": True,
-    },
+    annotations=ToolAnnotations(
+        title="OpenStreetMap-POIs abfragen (Overpass)",
+        readOnlyHint=True,
+        destructiveHint=False,
+        idempotentHint=True,
+        openWorldHint=True,
+    ),
 )
 async def query_osm_features_tool(params: QueryOsmFeaturesInput) -> ToolResponse:
     """Findet OpenStreetMap-POIs (Schulen, Spielplätze, Apotheken …) im Umkreis.
@@ -596,13 +597,13 @@ from swisstopo_mcp.openplz import (  # noqa: E402
 
 @mcp.tool(
     name="lookup_postal_code",
-    annotations={
-        "title": "PLZ zu Gemeinde/BFS-Nummer auflösen",
-        "readOnlyHint": True,
-        "destructiveHint": False,
-        "idempotentHint": True,
-        "openWorldHint": True,
-    },
+    annotations=ToolAnnotations(
+        title="PLZ zu Gemeinde/BFS-Nummer auflösen",
+        readOnlyHint=True,
+        destructiveHint=False,
+        idempotentHint=True,
+        openWorldHint=True,
+    ),
 )
 async def lookup_postal_code_tool(params: LookupPostalCodeInput) -> ToolResponse:
     """Löst eine Schweizer PLZ in Ort, Gemeinde, Bezirk und Kanton auf (OpenPLZ, amtlich).
@@ -619,13 +620,13 @@ async def lookup_postal_code_tool(params: LookupPostalCodeInput) -> ToolResponse
 
 @mcp.tool(
     name="find_commune",
-    annotations={
-        "title": "Gemeinde auflösen (Name ↔ BFS-Nummer, Kanton/Bezirk)",
-        "readOnlyHint": True,
-        "destructiveHint": False,
-        "idempotentHint": True,
-        "openWorldHint": True,
-    },
+    annotations=ToolAnnotations(
+        title="Gemeinde auflösen (Name ↔ BFS-Nummer, Kanton/Bezirk)",
+        readOnlyHint=True,
+        destructiveHint=False,
+        idempotentHint=True,
+        openWorldHint=True,
+    ),
 )
 async def find_commune_tool(params: FindCommuneInput) -> ToolResponse:
     """Löst Gemeinden auf: Name→BFS-Nummer, BFS-Nummer→Name, oder alle Gemeinden eines Kantons/Bezirks.
@@ -646,13 +647,13 @@ async def find_commune_tool(params: FindCommuneInput) -> ToolResponse:
 
 @mcp.tool(
     name="search_address",
-    annotations={
-        "title": "Adressen/Orte per Volltext suchen",
-        "readOnlyHint": True,
-        "destructiveHint": False,
-        "idempotentHint": True,
-        "openWorldHint": True,
-    },
+    annotations=ToolAnnotations(
+        title="Adressen/Orte per Volltext suchen",
+        readOnlyHint=True,
+        destructiveHint=False,
+        idempotentHint=True,
+        openWorldHint=True,
+    ),
 )
 async def search_address_tool(params: SearchAddressInput) -> ToolResponse:
     """Volltextsuche über Schweizer Strassen und Ortschaften (OpenPLZ FullTextSearch).
@@ -698,7 +699,10 @@ def build_http_app(allowed_origins: list[str] | None = None):
 if __name__ == "__main__":
     import sys
 
-    if "--http" in sys.argv:
+    # The CLI flag still wins so existing invocations keep working; the
+    # setting is the deployment path (ARCH-004).
+    use_http = "--http" in sys.argv or settings.transport == "streamable-http"
+    if use_http:
         import uvicorn
 
         # An explicit --port overrides the configured default.

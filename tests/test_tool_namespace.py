@@ -9,6 +9,8 @@ instructions advertise joins to sibling MCP servers, so generic names like
 """
 from __future__ import annotations
 
+import importlib.util
+import inspect
 import json
 import pathlib
 import subprocess
@@ -84,3 +86,36 @@ class TestToolHashSnapshot:
         for name, digest in hashes.items():
             assert len(digest) == 64, name
             int(digest, 16)  # raises if not hex
+
+
+class TestSnapshotIsInterpreterIndependent:
+    """Regression: the first version of this snapshot hashed the raw docstring.
+
+    Python 3.13 strips a docstring's common leading whitespace at compile time
+    while 3.11 and 3.12 do not, so the same source hashed differently per
+    interpreter — the snapshot passed on 3.11 and 3.12 and failed the 3.13 leg
+    of the same CI run.
+    """
+
+    @staticmethod
+    def _module():
+        spec = importlib.util.spec_from_file_location(
+            "snap", REPO_ROOT / "scripts" / "snapshot_tool_hashes.py"
+        )
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+    def test_description_normalisation_is_idempotent(self):
+        """cleandoc on the already-dedented 3.13 form must be a no-op, which is
+        what makes the three interpreters converge."""
+        snap = self._module()
+        raw = "Summary.\n\n    Indented continuation.\n"
+        once = snap._normalise_description(raw)
+        assert snap._normalise_description(once) == once
+
+    def test_indented_and_dedented_descriptions_hash_alike(self):
+        snap = self._module()
+        indented = "Summary.\n\n    <use_case>Something.</use_case>"
+        dedented = inspect.cleandoc(indented)
+        assert snap._normalise_description(indented) == snap._normalise_description(dedented)

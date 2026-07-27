@@ -16,6 +16,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import hashlib
+import inspect
 import json
 import pathlib
 import sys
@@ -25,6 +26,18 @@ from swisstopo_mcp.server import mcp
 OUTPUT = pathlib.Path(__file__).resolve().parent.parent / "tool-hashes.json"
 
 
+def _normalise_description(description: str | None) -> str:
+    """Dedent a tool description before hashing.
+
+    Descriptions come from function docstrings, and Python 3.13 strips their
+    common leading whitespace at compile time while 3.11 and 3.12 do not. Left
+    raw, the same source would hash differently per interpreter and the CI
+    matrix would disagree with itself. `cleandoc` is idempotent on the already
+    dedented 3.13 form, so all three converge.
+    """
+    return inspect.cleandoc(description or "")
+
+
 async def collect() -> dict[str, str]:
     tools = await mcp.list_tools()
     return {
@@ -32,7 +45,7 @@ async def collect() -> dict[str, str]:
             json.dumps(
                 {
                     "name": tool.name,
-                    "description": tool.description,
+                    "description": _normalise_description(tool.description),
                     "schema": tool.inputSchema,
                 },
                 sort_keys=True,

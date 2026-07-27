@@ -101,3 +101,10 @@ retroactively given its re-approval note.
 The misnomer objection the finding anticipated is accepted rather than dodged:
 the façade and OpenPLZ tools serve non-swisstopo data, but a mixed surface is
 worse than a consistent, imprecise one. Recorded in the CHANGELOG.
+
+**Implementation note (CI caught this, not review):** the first version hashed
+the raw `tool.description`. Python 3.13 strips a docstring's common leading
+whitespace at compile time while 3.11 and 3.12 do not, so the snapshot passed
+on two legs of the CI matrix and failed the third. Descriptions are now
+normalised with `inspect.cleandoc()` before hashing — idempotent on the 3.13
+form, so all three interpreters converge. Two tests guard it.

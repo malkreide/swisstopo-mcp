@@ -13,8 +13,8 @@ from swisstopo_mcp.api_client import (
     _get_client,
     assert_host_allowed,
     handle_api_error,
-    wgs84_to_lv95,
 )
+from swisstopo_mcp.coords import SwissPointInput
 from swisstopo_mcp.logging_config import log_tool_call
 from swisstopo_mcp.models import OEREB_LICENSE, OEREB_SOURCE, ToolResponse
 
@@ -45,11 +45,9 @@ def get_oereb_endpoint(canton: str) -> str | None:
 # ---------------------------------------------------------------------------
 
 
-class GetEgridInput(BaseModel):
+class GetEgridInput(SwissPointInput):
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid", strict=True)
 
-    lat: float = Field(..., ge=45.8, le=47.9, description="Breitengrad (WGS84)")
-    lon: float = Field(..., ge=5.9, le=10.5, description="Längengrad (WGS84)")
     canton: str = Field(
         ...,
         min_length=2,
@@ -95,7 +93,8 @@ async def get_egrid(params: GetEgridInput) -> ToolResponse:
         )
 
     try:
-        e, n = wgs84_to_lv95(params.lat, params.lon)
+        e, n = params.as_lv95
+        lat, lon = params.as_wgs84
         url = f"{base}/getegrid/json/?EN={e},{n}"
         assert_host_allowed(url)
         async with await _get_client() as client:
@@ -108,7 +107,7 @@ async def get_egrid(params: GetEgridInput) -> ToolResponse:
         if not features:
             return ToolResponse.ok(
                 f"Kein EGRID gefunden für Koordinaten "
-                f"({params.lat}, {params.lon}) in Kanton {canton}.",
+                f"({lat}, {lon}) in Kanton {canton}.",
                 [],
                 match_type="none",
                 source=OEREB_SOURCE,

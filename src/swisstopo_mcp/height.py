@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import json
-from typing import Any
+from typing import Any, Literal
 
 from mcp.server.fastmcp import Context
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from swisstopo_mcp.api_client import (
     COORDS_PATTERN,
@@ -15,6 +15,7 @@ from swisstopo_mcp.api_client import (
     parse_coordinate_string,
     wgs84_to_lv95,
 )
+from swisstopo_mcp.coords import SwissPointInput, check_deprecated_sr
 from swisstopo_mcp.logging_config import log_tool_call
 from swisstopo_mcp.models import ToolResponse
 
@@ -23,12 +24,18 @@ from swisstopo_mcp.models import ToolResponse
 # ---------------------------------------------------------------------------
 
 
-class HeightInput(BaseModel):
+class HeightInput(SwissPointInput):
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid", strict=True)
 
-    lat: float = Field(..., ge=45.8, le=47.9, description="Breitengrad (WGS84)")
-    lon: float = Field(..., ge=5.9, le=10.5, description="Längengrad (WGS84)")
-    sr: int = Field(default=4326, description="Koordinatensystem (EPSG-Code)")
+    sr: int = Field(
+        default=4326,
+        description="Veraltet — nur noch 4326. Für LV95 easting/northing verwenden.",
+    )
+
+    @model_validator(mode="after")
+    def _check_sr(self) -> HeightInput:
+        check_deprecated_sr(self.sr)
+        return self
 
 
 class ElevationProfileInput(BaseModel):
@@ -39,7 +46,14 @@ class ElevationProfileInput(BaseModel):
         min_length=5,
         max_length=2000,
         pattern=COORDS_PATTERN,
-        description="Koordinaten im Format 'lat1,lon1;lat2,lon2;...'",
+        description=(
+            "Stützpunkte als 'x1,y1;x2,y2;…'. Bei coordinate_system='wgs84' "
+            "(Standard) ist das 'lat,lon'; bei 'lv95' ist es 'easting,northing'."
+        ),
+    )
+    coordinate_system: Literal["wgs84", "lv95"] = Field(
+        default="wgs84",
+        description="Koordinatensystem der Stützpunkte: wgs84 (lat,lon) oder lv95 (E,N).",
     )
     nb_points: int = Field(
         default=200,
@@ -47,7 +61,15 @@ class ElevationProfileInput(BaseModel):
         le=1000,
         description="Anzahl Profilpunkte",
     )
-    sr: int = Field(default=4326, description="Koordinatensystem (EPSG-Code)")
+    sr: int = Field(
+        default=4326,
+        description="Veraltet — nur noch 4326. Für LV95 coordinate_system='lv95' setzen.",
+    )
+
+    @model_validator(mode="after")
+    def _check_sr(self) -> ElevationProfileInput:
+        check_deprecated_sr(self.sr, alternative="coordinate_system='lv95'")
+        return self
 
 
 # ---------------------------------------------------------------------------
@@ -118,25 +140,29 @@ def format_elevation_profile(points: list[dict[str, Any]]) -> str:
 async def get_height(params: HeightInput) -> ToolResponse:
     """Return the elevation above sea level for a WGS84 coordinate."""
     try:
-        # Height API only supports LV95 (2056) and LV03 (21781), not WGS84
-        if params.sr == 4326:
-            easting, northing = wgs84_to_lv95(params.lat, params.lon)
-            sr = 2056
-        else:
-            easting, northing = params.lon, params.lat
-            sr = params.sr
+        # The height API speaks LV95 only, so both input flavours resolve to it.
+        easting, northing = params.as_lv95
+        lat, lon = params.as_wgs84
         data = await geo_admin_request(
             "/rest/services/height",
             {
                 "easting": easting,
                 "northing": northing,
-                "sr": sr,
+                "sr": 2056,
             },
         )
         height = data.get("height", "?")
         return ToolResponse.ok(
-            format_height_result(params.lat, params.lon, height),
-            [{"lat": params.lat, "lon": params.lon, "height": height}],
+            format_height_result(lat, lon, height),
+            [
+                {
+                    "lat": lat,
+                    "lon": lon,
+                    "easting": easting,
+                    "northing": northing,
+                    "height": height,
+                }
+            ],
         )
     except Exception as e:
         return ToolResponse.error(handle_api_error(e, "Höhenabfrage"))
@@ -152,21 +178,16 @@ async def elevation_profile(
         if ctx is not None:
             await ctx.info(f"Berechne Höhenprofil über {len(coord_pairs)} Stützpunkte …")
 
-        # Profile API only supports LV95 (2056) and LV03 (21781)
-        # GeoJSON coordinates must also be in the target SR
-        if params.sr == 4326:
-            lv95_coords = [wgs84_to_lv95(lat, lon) for lat, lon in coord_pairs]
-            geojson = {
-                "type": "LineString",
-                "coordinates": [[e, n] for e, n in lv95_coords],
-            }
-            sr = 2056
+        # The profile API speaks LV95 only, so WGS84 input is converted first.
+        # LV95 input arrives as (easting, northing) pairs and passes through.
+        if params.coordinate_system == "lv95":
+            lv95_coords = list(coord_pairs)
         else:
-            geojson = {
-                "type": "LineString",
-                "coordinates": [[lon, lat] for lat, lon in coord_pairs],
-            }
-            sr = params.sr
+            lv95_coords = [wgs84_to_lv95(lat, lon) for lat, lon in coord_pairs]
+        geojson = {
+            "type": "LineString",
+            "coordinates": [[e, n] for e, n in lv95_coords],
+        }
         geojson_str = json.dumps(geojson, separators=(",", ":"))
 
         data = await geo_admin_request(
@@ -174,7 +195,7 @@ async def elevation_profile(
             {
                 "geom": geojson_str,
                 "nb_points": params.nb_points,
-                "sr": sr,
+                "sr": 2056,
             },
         )
         # data is a list of profile points

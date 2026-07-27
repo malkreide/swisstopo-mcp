@@ -17,7 +17,7 @@
 
 ## Uebersicht
 
-`swisstopo-mcp` gibt KI-Assistenten Zugriff auf die offizielle schweizerische Geodateninfrastruktur ueber 23 Tools, alle ohne Authentifizierung:
+`swisstopo-mcp` gibt KI-Assistenten Zugriff auf die offizielle schweizerische Geodateninfrastruktur ueber 24 Tools, alle ohne Authentifizierung:
 
 | Quelle | Daten | API |
 |--------|-------|-----|
@@ -39,7 +39,7 @@
 
 ## Funktionen
 
-- 🗺️ **23 Tools** (REST, Geocoding, Hoehe, STAC, WMTS, OEREB, geodienste.ch, OpenStreetMap/Overpass, OpenPLZ)
+- 🗺️ **24 Tools** (REST, Geocoding, Hoehe, STAC, WMTS, OEREB, geodienste.ch, OpenStreetMap/Overpass, OpenPLZ)
 - 🏛️ Administrative Adressebene aufloesen (PLZ → Gemeinde/**BFS-Nummer** → Bezirk → Kanton) via OpenPLZ
 - 🔍 Schweizerische Adressen geocodieren und Koordinaten rueckwaerts geocodieren
 - 🏔️ Hoehe ueber Meer abfragen und Hoehenprofile berechnen
@@ -244,7 +244,7 @@ zu BFS-Statistikdaten (`swiss-statistics-mcp`) und zu `zurich-opendata-mcp`.
 │   Claude / KI   │────▶│  swisstopo-mcp               │────▶│  Swisstopo REST API      │
 │   (MCP Host)    │◀────│  (MCP Server)                │◀────│  api3.geo.admin.ch       │
 └─────────────────┘     │                              │     ├──────────────────────────┤
-                        │  23 Tools                    │────▶│  Geocoding               │
+                        │  24 Tools                    │────▶│  Geocoding               │
                         │  Stdio | Streamable HTTP     │◀────│  api3.geo.admin.ch       │
                         │                              │     ├──────────────────────────┤
                         │  Keine Authentifizierung     │────▶│  STAC-Katalog            │
@@ -312,10 +312,41 @@ Die vollständige Sicherheitsrichtlinie und Sicherheitslage ist in
 
 Dieser Server ist in **Phase 2.5 — Konsolidierung von `swiss-geodata-mcp`**
 (siehe [docs/roadmap.md](docs/roadmap.md), die alleinige Autorität für den
-Phasenstand). Alle 23 Tools sind
+Phasenstand). Alle 24 Tools sind
 `readOnlyHint: true` / `destructiveHint: false`; es gibt keine schreibenden
 oder versendenden Funktionen. Spätere Phasen siehe
 [docs/roadmap.md](docs/roadmap.md).
+
+### Tool-Budget und Aggregation
+
+24 Tools bei einem selbstgesetzten Budget von 25. Das Ideal des Checks liegt bei
+≤12, die Zahl braucht also eine Begruendung, nicht nur eine Nennung. Pro Cluster:
+
+**Die fuenf api3-Tools** (`search_layers`, `layer_info`, `identify_features`,
+`find_features`, `get_feature`) bleiben getrennt, weil ihre Argumentformen
+tatsaechlich disjunkt sind: eine Geometrie, ein Attributname plus Wert, eine
+opake Feature-ID. Ein Zusammenlegen hinter eine diskriminierte Union wuerde die
+Tool-Wahl in eine Varianten-Wahl verwandeln — dieselbe Entscheidung, nur
+verschoben, plus ein Schema, durch das sich der Aufrufer navigieren muss. Das
+reale Risiko benennt das Audit zurecht: eine Fehlwahl liefert leer statt eines
+Fehlers. Dem begegnen stattdessen die `note`-Hinweise aus ARCH-003. Ein
+Zusammenlegen bleibt Kandidat fuer ein kuenftiges Major-Release.
+
+**Search-→-Detail-Paare.** `search_geodata` → `get_collection` ist ein echtes
+Paar: STAC-Collection-Metadaten sind umfangreich, und meist wird eines von
+vielen Suchergebnissen gebraucht. `get_egrid` → `get_oereb_extract` hatte
+dieselbe Form und ist aufgeloest: `swisstopo_oereb_at` beantwortet die
+eigentliche Frage in einem Aufruf und ermittelt den EGRID intern — der EGRID ist
+eine Upstream-Kennung, nicht das, wonach gefragt wurde. `get_egrid` bleibt fuer
+Aufrufer, die die Parzellen-ID selbst brauchen.
+
+**Bereits vorhandene echte Aggregation.** `query_geodata` buendelt drei Quellen
+hinter einem Tool; `zoning_at` und `municipality_at` loesen je eine
+Discovery-Kette auf, die vorher zwei Aufrufe brauchte.
+
+**Bei der naechsten Datenquelle** steht die Wahl zwischen Anheben und
+Konsolidieren. Der Konsolidierungskandidat sind die api3-Fuenf; das ist ein
+Breaking Change und gehoert in ein Major-Release.
 
 ### Datenquellen und Lizenzen
 

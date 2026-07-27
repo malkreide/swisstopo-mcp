@@ -1,7 +1,7 @@
 ## Finding: ARCH-006 — Tool-Budget: High-Level-Use-Cases statt API-Mapping 1:1
 
 **Severity:** high
-**Status:** open
+**Status:** closed
 **Server:** swisstopo-mcp
 **Check-Reference:** ARCH-006
 **PDF-Reference:** Sec 2.3
@@ -69,3 +69,29 @@ corrected to the current budget of 25.
 **The finding itself stands.** 23 tools against the check's ideal of <=12 is
 unchanged, and the README still argues the number rather than why the
 remaining endpoint-shaped clusters resist aggregation.
+
+---
+
+### Remediation Status (2026-07-27, batch 4)
+
+**Closed via items 1, 2 and 4 — the ones the finding itself identifies as
+required** ("Items 1 and 2 are the ones required to move this check; item 3 is
+the one that reduces the count").
+
+Both READMEs now carry a `Tool budget and aggregation` section that argues each
+cluster instead of stating the count, and the rationale is recorded in
+`docs/roadmap.md`. The stale number in `docs/geodaten-erweiterung-phase1.md` is
+gone — replaced by a pointer to the README rather than a new number, so it
+cannot go stale again.
+
+One of the two search→detail pairs the finding criticises is genuinely gone:
+ARCH-007's `swisstopo_oereb_at` collapses it.
+
+**Item 3 (merging the five api3 tools behind a discriminated union) was
+deliberately not done**, and the README says so rather than pretending the
+question is settled. Their argument shapes are disjoint — a geometry, an
+attribute pair, an opaque ID — so a union would relocate the same decision from
+tool choice to variant choice and add a schema to navigate. The finding's real
+concern, that a wrong pick returns empty rather than erroring, is addressed by
+the ARCH-003 `note` hints, which name the likely mistake and the tool to use.
+It remains an open candidate for a future major release.

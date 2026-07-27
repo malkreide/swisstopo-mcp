@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **`swisstopo_oereb_at` — ÖREB restrictions at a coordinate in one call**
+  (23 → 24 tools, ARCH-007). It resolves the EGRID internally: that identifier
+  is an upstream artefact, not something a caller asked for, so requiring a
+  second tool call for it was the chain the audit flagged.
+  `swisstopo_get_egrid` stays for callers who want the parcel ID itself.
+- **An explicit precedence rule in the server instructions** (ARCH-007). Bauzone,
+  Gemeinde and ÖREB each name the direct tool and state when the generic one
+  applies, cross-referenced from the competing tool descriptions — the
+  instructions string alone is not reliably consulted per selection decision.
+- **A `Tool budget and aggregation` section in both READMEs** (ARCH-006) that
+  argues each tool cluster rather than stating the count. The five api3 tools
+  are **not** merged: their argument shapes are disjoint, so a discriminated
+  union would relocate the same decision rather than remove it. That remains an
+  open candidate for a future major release, and the README says so.
+
+### Fixed
+- The last stale tool-budget number (`docs/geodaten-erweiterung-phase1.md`) now
+  points at the README instead of carrying a figure of its own, so it cannot go
+  stale again.
+
 ### Security
 - **SEC-014 and SEC-015 closed as enforced deferrals.** Both concern controls
   that belong to an MCP gateway aggregating the portfolio — no single server can

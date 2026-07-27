@@ -17,7 +17,7 @@
 
 ## Overview
 
-`swisstopo-mcp` gives AI assistants access to Switzerland's official geodata infrastructure through 23 tools, all without authentication:
+`swisstopo-mcp` gives AI assistants access to Switzerland's official geodata infrastructure through 24 tools, all without authentication:
 
 | Source | Data | API |
 |--------|------|-----|
@@ -39,7 +39,7 @@
 
 ## Features
 
-- 🗺️ **23 tools** (REST, Geocoding, Height, STAC, WMTS, OEREB, geodienste.ch, OpenStreetMap/Overpass, OpenPLZ)
+- 🗺️ **24 tools** (REST, Geocoding, Height, STAC, WMTS, OEREB, geodienste.ch, OpenStreetMap/Overpass, OpenPLZ)
 - 🏛️ Resolve the administrative address level (PLZ → commune/**BFS number** → district → canton) via OpenPLZ
 - 🔍 Geocode Swiss addresses and reverse-geocode coordinates
 - 🏔️ Query elevation and compute elevation profiles
@@ -244,7 +244,7 @@ BFS statistics (`swiss-statistics-mcp`) and `zurich-opendata-mcp`.
 │   Claude / AI   │────▶│  swisstopo-mcp               │────▶│  Swisstopo REST API      │
 │   (MCP Host)    │◀────│  (MCP Server)                │◀────│  api3.geo.admin.ch       │
 └─────────────────┘     │                              │     ├──────────────────────────┤
-                        │  23 Tools                    │────▶│  Geocoding               │
+                        │  24 Tools                    │────▶│  Geocoding               │
                         │  Stdio | Streamable HTTP     │◀────│  api3.geo.admin.ch       │
                         │                              │     ├──────────────────────────┤
                         │  No authentication required  │────▶│  STAC Catalog            │
@@ -326,6 +326,38 @@ A phase advance requires: the phase's roadmap items checked off, a re-run audit
 with no open `critical` findings, and a CHANGELOG entry naming the new phase.
 Phase 3 (write tools) additionally requires re-running the Lethal-Trifecta
 assessment and a security review before any implementation starts.
+
+### Tool budget and aggregation
+
+24 tools against a self-imposed budget of 25. The check's ideal is ≤12, so the
+count needs an argument, not just a number. Per cluster:
+
+**The five api3 tools** (`search_layers`, `layer_info`, `identify_features`,
+`find_features`, `get_feature`) are kept separate because their argument shapes
+are genuinely disjoint: a geometry, an attribute name plus value, and an opaque
+feature ID. Merging them behind one tool with a discriminated union would turn a
+tool choice into a variant choice — the same decision, relocated, plus a schema
+the caller must navigate. The audit notes the real risk here: a wrong pick
+returns empty rather than erroring. That is mitigated instead by the `note`
+hints added for ARCH-003, which name the likely mistake and the tool to use.
+This remains a merge candidate for a future major release, not a settled
+question.
+
+**Search → detail pairs.** `search_geodata` → `get_collection` is a genuine
+pair: STAC collection metadata is large and callers usually want one of many
+search hits. `get_egrid` → `get_oereb_extract` was the same shape and has been
+collapsed: `swisstopo_oereb_at` answers the actual question in one call and
+resolves the EGRID internally, because the EGRID is an upstream identifier
+rather than something a caller asked for. `get_egrid` remains for callers who
+want the parcel ID itself.
+
+**Genuine aggregation already in place.** `query_geodata` fronts three sources
+behind one tool; `zoning_at` and `municipality_at` each collapse a discovery
+chain that previously took two calls.
+
+**When the next source is added**, the choice is a raise or a consolidation. The
+consolidation on the table is the api3 five; it is a breaking change and should
+ride a major release together with any other renames.
 
 ### Data sources and licences
 

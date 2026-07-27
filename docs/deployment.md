@@ -16,12 +16,36 @@ docker run --rm \
   --cap-drop ALL \
   --security-opt no-new-privileges \
   -e SWISSTOPO_ALLOWED_ORIGINS="https://your-client.example.com" \
+  -e SWISSTOPO_ALLOWED_HOSTS="swisstopo-mcp.example.com" \
   -p 8000:8000 \
   swisstopo-mcp
 ```
 
 Health check: `GET http://localhost:8000/healthz` → `{"status":"ok"}`. The MCP
 endpoint is served at `/mcp`.
+
+## Host and origin allow-lists (SDK-004 / SCALE-001)
+
+Two separate layers guard the HTTP transport, and they are configured
+separately because they run at different points in the request:
+
+| Setting | Layer | Effect when a value is missing |
+|---|---|---|
+| `SWISSTOPO_ALLOWED_ORIGINS` | CORS + SDK transport security | browser client is refused |
+| `SWISSTOPO_ALLOWED_HOSTS` | SDK transport security only | **every** MCP request returns 421 |
+
+The MCP SDK enables DNS-rebinding protection by default and ships a
+loopback-only allow-list. Behind an ingress the forwarded `Host` is therefore
+unknown to it, and the server answers `421 Invalid Host header` on `/mcp` —
+while `/healthz` keeps returning 200, so a Kubernetes readiness probe stays
+green and the deployment looks healthy while nothing works.
+
+Set `SWISSTOPO_ALLOWED_HOSTS` to the hostname your clients actually use. Both
+lists always include loopback with any port, so the local `--http` workflow
+needs no configuration.
+
+Do **not** work around a 421 by disabling DNS-rebinding protection — SEC-005
+depends on it. The fix is to name the right hosts.
 
 ## Hardening applied (SEC-007)
 
@@ -41,7 +65,7 @@ No filesystem tools are exposed, so no host paths are mounted.
 
 `deploy/kubernetes.yaml` contains a hardened `Deployment`, a `Service`, and an
 egress `NetworkPolicy`. Replace the image reference and set
-`SWISSTOPO_ALLOWED_ORIGINS` before applying:
+`SWISSTOPO_ALLOWED_ORIGINS` **and `SWISSTOPO_ALLOWED_HOSTS`** before applying:
 
 ```bash
 kubectl apply -f deploy/kubernetes.yaml

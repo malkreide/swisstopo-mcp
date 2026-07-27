@@ -41,6 +41,12 @@ spec:
               value: "0.0.0.0"
             - name: SWISSTOPO_ALLOWED_ORIGINS
               value: "" # <-- set explicit origins for browser clients
+            # REQUIRED behind an ingress. The SDK's DNS-rebinding protection
+            # rejects any Host it was not told about: without this every MCP
+            # request returns 421 while /healthz keeps returning 200, so the
+            # readiness probe stays green and hides it (audit SCALE-001).
+            - name: SWISSTOPO_ALLOWED_HOSTS
+              value: "" # <-- set to the ingress hostname, e.g. swisstopo-mcp.example.com
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true

@@ -1,7 +1,7 @@
 ## Finding: SDK-004 — CORS Mcp-Session-Id Exposure bei HTTP/SSE
 
 **Severity:** high
-**Status:** open
+**Status:** closed
 **Server:** swisstopo-mcp
 **Check-Reference:** SDK-004
 **PDF-Reference:** Sec 3.1
@@ -83,3 +83,32 @@ Pass an explicit `TransportSecuritySettings` into `FastMCP` so the deployment's 
 ### Effort Estimate
 
 S (<1d) — one constructor argument, one settings field, one deployment env var, plus the end-to-end regression test that would have caught it.
+
+---
+
+### Remediation Status (2026-07-27, follow-up PR)
+
+**Closed.** `TransportSecuritySettings` is now passed to `FastMCP()` in
+`src/swisstopo_mcp/server.py`, fed from two new `Settings` properties
+(`allowed_hosts_list`, `transport_origins_list`) plus the new
+`SWISSTOPO_ALLOWED_HOSTS` variable. DNS-rebinding protection stays enabled.
+
+The loopback entries use the SDK's `:*` wildcard-port syntax. That detail
+mattered: a first attempt pinned them to the configured `http_port`, which
+`--port` overrides at runtime — every local request then failed with 421.
+
+Re-measured against a running instance, same requests as the original evidence:
+
+| Request | Before | After |
+|---|---|---|
+| `POST /mcp`, configured `Origin` | 403 | **200** |
+| `POST /mcp`, ingress `Host` | 421 | **200** |
+| `POST /mcp`, loopback, no headers | 200 | **200** |
+| `POST /mcp`, unconfigured `Origin` | 403 | **403** (still rejected) |
+| `POST /mcp`, unconfigured `Host` | 421 | **421** (still rejected) |
+
+Covered by end-to-end tests in `tests/test_http_app.py` that drive the ASGI app
+rather than inspecting middleware kwargs — the previous tests passed throughout
+the outage precisely because they only checked configuration.
+`SWISSTOPO_ALLOWED_HOSTS` is documented in `.env.example`,
+`docs/deployment.md` and `deploy/kubernetes.yaml`.

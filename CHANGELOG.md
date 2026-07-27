@@ -8,6 +8,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Security
+- **Fixed the broken HTTP transport (SDK-004 / SCALE-001).**
+  `TransportSecuritySettings` is now passed to `FastMCP()`, so the SDK's
+  DNS-rebinding protection is told the deployment's real hosts and origins
+  instead of falling back to its loopback-only default. Before this, a
+  deployment behind an ingress answered **403** to a configured origin and
+  **421** to the forwarded `Host` on every `/mcp` request, while `/healthz`
+  returned 200 — so the Kubernetes readiness probe stayed green and the
+  failure was invisible.
+  - New `SWISSTOPO_ALLOWED_HOSTS` setting, documented in `.env.example`,
+    `docs/deployment.md` and `deploy/kubernetes.yaml`.
+  - Loopback entries use the SDK's `:*` wildcard-port form, because `--port`
+    overrides the configured port at runtime.
+  - DNS-rebinding protection stays **enabled** — SEC-005 depends on it. The fix
+    is to name the right hosts, never to switch the check off. Unconfigured
+    origins and hosts are still rejected.
+  - `tests/test_http_app.py` now drives the ASGI app end to end. Its previous
+    tests inspected middleware kwargs and passed throughout the outage.
 - **Re-audit run `2026-07-27T125314-Z` against the 68-check catalogue**
   (`audits/`). 44 checks applicable, 22 pass / 20 partial / 2 fail;
   `production_ready: false`, blocked on SEC-022. This is **not** comparable to

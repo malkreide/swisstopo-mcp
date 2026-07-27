@@ -14,6 +14,7 @@ from __future__ import annotations
 from contextlib import asynccontextmanager
 
 from mcp.server.fastmcp import Context, FastMCP
+from mcp.server.transport_security import TransportSecuritySettings
 
 from swisstopo_mcp.api_client import create_shared_client, set_shared_client
 from swisstopo_mcp.config import settings
@@ -42,6 +43,17 @@ async def lifespan(server: FastMCP):
 mcp = FastMCP(
     "swisstopo_mcp",
     lifespan=lifespan,
+    # Without this the SDK keeps its localhost-only default list and rejects
+    # every MCP request behind an ingress: 403 on a configured Origin, 421 on
+    # the forwarded Host, while /healthz stays 200 so the readiness probe hides
+    # it (audit SDK-004 / SCALE-001). DNS-rebinding protection stays ON — the
+    # fix is to feed it the deployment's real hosts and origins, never to
+    # disable it (SEC-005 depends on it).
+    transport_security=TransportSecuritySettings(
+        enable_dns_rebinding_protection=True,
+        allowed_hosts=settings.allowed_hosts_list,
+        allowed_origins=settings.transport_origins_list,
+    ),
     instructions=(
         "Swiss federal geodata server with 23 tools. "
         "Use swisstopo_search_layers to discover layer IDs, swisstopo_layer_info to see "

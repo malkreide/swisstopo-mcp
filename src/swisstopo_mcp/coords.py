@@ -18,7 +18,16 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from swisstopo_mcp.api_client import handle_api_error, reframe_request
+from swisstopo_mcp.api_client import (
+    CH_LAT_MAX,
+    CH_LAT_MIN,
+    CH_LON_MAX,
+    CH_LON_MIN,
+    handle_api_error,
+    lv95_to_wgs84,
+    reframe_request,
+    wgs84_to_lv95,
+)
 from swisstopo_mcp.logging_config import log_tool_call
 from swisstopo_mcp.models import REFRAME_SOURCE, ToolResponse
 
@@ -38,6 +47,120 @@ _ENDPOINTS: dict[str, str] = {
 # enforced elsewhere in the server (CH_LAT/LON bounds in api_client).
 LV95_E_MIN, LV95_E_MAX = 2_480_000.0, 2_840_000.0
 LV95_N_MIN, LV95_N_MAX = 1_070_000.0, 1_300_000.0
+
+
+# ---------------------------------------------------------------------------
+# Shared point input (WGS84 or LV95)
+# ---------------------------------------------------------------------------
+
+
+def check_deprecated_sr(sr: int, alternative: str = "easting/northing") -> None:
+    """Reject the legacy `sr` input-coordinate switch.
+
+    `sr` used to select the input coordinate system, but the WGS84 field bounds
+    made the LV95 path unusable: passing LV95 magnitudes was rejected, while
+    passing WGS84 degrees with `sr=2056` sent degrees upstream labelled as
+    metres — a silently wrong answer. LV95 input now goes through explicit
+    fields, so anything other than 4326 is an error rather than a wrong result.
+
+    `alternative` names the replacement for the calling tool, since the
+    point-based tools and the profile tool take LV95 differently.
+    """
+    if sr != 4326:
+        raise ValueError(
+            f"sr={sr} wird für Eingabekoordinaten nicht mehr unterstützt. "
+            f"Für LV95 (EPSG:2056) bitte {alternative} verwenden; "
+            "sr ist veraltet und akzeptiert nur noch 4326."
+        )
+
+
+class SwissPointInput(BaseModel):
+    """A point given either as WGS84 `lat`/`lon` **or** as LV95 `easting`/`northing`.
+
+    Exactly one complete pair must be supplied. Both tool families in this
+    server can consume either: WGS84 remains the default because the geocoding
+    tools emit it, while LV95 is what Swiss cadastral and planning data arrive
+    in.
+    """
+
+    lat: float | None = Field(
+        default=None,
+        ge=CH_LAT_MIN,
+        le=CH_LAT_MAX,
+        description="Breitengrad (WGS84). Zusammen mit lon angeben.",
+    )
+    lon: float | None = Field(
+        default=None,
+        ge=CH_LON_MIN,
+        le=CH_LON_MAX,
+        description="Längengrad (WGS84). Zusammen mit lat angeben.",
+    )
+    # No field-level bounds here on purpose: the model validator below checks the
+    # range so it can tell "outside Switzerland" apart from "these are degrees,
+    # you wanted lat/lon" and say so.
+    easting: float | None = Field(
+        default=None,
+        description="LV95-Ostwert in Metern (EPSG:2056, z.B. 2683531). Zusammen mit northing.",
+    )
+    northing: float | None = Field(
+        default=None,
+        description="LV95-Nordwert in Metern (EPSG:2056, z.B. 1247914). Zusammen mit easting.",
+    )
+
+    @model_validator(mode="after")
+    def _validate_point(self) -> SwissPointInput:
+        has_wgs84 = self.lat is not None and self.lon is not None
+        has_lv95 = self.easting is not None and self.northing is not None
+        any_wgs84 = self.lat is not None or self.lon is not None
+        any_lv95 = self.easting is not None or self.northing is not None
+
+        if has_wgs84 and any_lv95:
+            raise ValueError(
+                "Koordinaten bitte entweder als lat/lon (WGS84) oder als "
+                "easting/northing (LV95) angeben, nicht beides."
+            )
+        if not has_wgs84 and not has_lv95:
+            if any_wgs84:
+                raise ValueError("Unvollständig: lat und lon müssen beide angegeben werden.")
+            if any_lv95:
+                raise ValueError(
+                    "Unvollständig: easting und northing müssen beide angegeben werden."
+                )
+            raise ValueError(
+                "Koordinaten fehlen: entweder lat/lon (WGS84) oder "
+                "easting/northing (LV95) angeben."
+            )
+
+        if has_lv95:
+            e, n = self.easting, self.northing
+            # Degrees in the LV95 fields is the likely mistake, so name it.
+            if abs(e) <= 180 and abs(n) <= 180:
+                raise ValueError(
+                    f"easting={e}, northing={n} sehen nach WGS84-Grad aus, nicht nach "
+                    "LV95-Metern. Für WGS84 bitte lat/lon verwenden."
+                )
+            if not (LV95_E_MIN <= e <= LV95_E_MAX) or not (LV95_N_MIN <= n <= LV95_N_MAX):
+                raise ValueError(
+                    f"LV95-Koordinaten ausserhalb der Schweiz: easting muss in "
+                    f"{LV95_E_MIN:.0f}–{LV95_E_MAX:.0f}, northing in "
+                    f"{LV95_N_MIN:.0f}–{LV95_N_MAX:.0f} liegen. "
+                    f"Erhalten: easting={e}, northing={n}."
+                )
+        return self
+
+    @property
+    def as_lv95(self) -> tuple[float, float]:
+        """Return the point as (easting, northing) in LV95."""
+        if self.easting is not None and self.northing is not None:
+            return self.easting, self.northing
+        return wgs84_to_lv95(self.lat, self.lon)  # type: ignore[arg-type]
+
+    @property
+    def as_wgs84(self) -> tuple[float, float]:
+        """Return the point as (lat, lon) in WGS84."""
+        if self.lat is not None and self.lon is not None:
+            return self.lat, self.lon
+        return lv95_to_wgs84(self.easting, self.northing)  # type: ignore[arg-type]
 
 
 # ---------------------------------------------------------------------------

@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from swisstopo_mcp.api_client import (
     ID_PATTERN,
@@ -14,6 +14,7 @@ from swisstopo_mcp.api_client import (
     geo_admin_request,
     handle_api_error,
 )
+from swisstopo_mcp.coords import SwissPointInput, check_deprecated_sr
 from swisstopo_mcp.logging_config import log_tool_call
 from swisstopo_mcp.models import ToolResponse
 
@@ -36,7 +37,7 @@ class SearchLayersInput(BaseModel):
     limit: int = Field(default=10, ge=1, le=30)
 
 
-class IdentifyInput(BaseModel):
+class IdentifyInput(SwissPointInput):
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid", strict=True)
 
     layers: str = Field(
@@ -45,10 +46,16 @@ class IdentifyInput(BaseModel):
         pattern=ID_PATTERN,
         description="Layer-IDs, kommagetrennt, z.B. 'ch.bfs.gebaeude_wohnungs_register'",
     )
-    lat: float = Field(..., ge=45.8, le=47.9, description="Breitengrad (WGS84)")
-    lon: float = Field(..., ge=5.9, le=10.5, description="Längengrad (WGS84)")
     tolerance: int = Field(default=0, ge=0, le=200, description="Suchradius in Pixeln")
-    sr: int = Field(default=4326, description="Koordinatensystem")
+    sr: int = Field(
+        default=4326,
+        description="Veraltet — nur noch 4326. Für LV95 easting/northing verwenden.",
+    )
+
+    @model_validator(mode="after")
+    def _check_sr(self) -> IdentifyInput:
+        check_deprecated_sr(self.sr)
+        return self
 
 
 class FindFeaturesInput(BaseModel):
@@ -202,7 +209,7 @@ async def search_layers(params: SearchLayersInput) -> str:
 async def identify_features(params: IdentifyInput) -> str:
     """Identify features at a coordinate."""
     try:
-        lon, lat = params.lon, params.lat
+        lat, lon = params.as_wgs84
         data = await geo_admin_request(
             "/rest/services/ech/MapServer/identify",
             {
@@ -210,7 +217,7 @@ async def identify_features(params: IdentifyInput) -> str:
                 "geometryType": "esriGeometryPoint",
                 "layers": f"all:{params.layers}",
                 "tolerance": params.tolerance,
-                "sr": params.sr,
+                "sr": 4326,
                 "returnGeometry": "false",
                 "mapExtent": f"{lon - 0.01},{lat - 0.01},{lon + 0.01},{lat + 0.01}",
                 "imageDisplay": "100,100,96",

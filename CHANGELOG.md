@@ -8,6 +8,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **LV95 coordinate input on the point-based tools** (`swisstopo_get_height`,
+  `swisstopo_identify_features`, `swisstopo_get_egrid`). Each now takes *either*
+  `lat`/`lon` (WGS84) *or* `easting`/`northing` (LV95, EPSG:2056) via the shared
+  `SwissPointInput` contract; supplying both, neither, or half a pair is a
+  validation error. `swisstopo_elevation_profile` gains
+  `coordinate_system="lv95"` for LV95 support points.
+  This is PR 2 of `docs/merge-plan-swiss-geodata-mcp.md` and the prerequisite
+  for migrating LV95-native clients off `swiss-geodata-mcp`.
+  - Passing WGS84 degrees in the LV95 fields is rejected with a message naming
+    the mistake, rather than being converted into a point in the wrong place.
+  - Height results now carry both `lat`/`lon` and `easting`/`northing`.
+  - Existing `lat`/`lon` callers are unaffected.
 - **`swisstopo_convert_coordinates` — official LV95<->WGS84 transformation via
   the swisstopo REFRAME service** (19 → 20 tools, exactly at the 20-tool
   budget). This is the first step of the `swiss-geodata-mcp` consolidation
@@ -31,6 +43,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   assumption by failing if the deviation ever exceeds one metre.
 
 ### Fixed
+- **`sr=2056` produced silently wrong height, profile and identify results.**
+  The parameter was meant to select the input coordinate system, but the WGS84
+  field bounds rejected LV95 magnitudes, so the only way to reach the branch was
+  to pass WGS84 degrees *with* `sr=2056` — which sent those degrees upstream
+  labelled as LV95 metres. `sr` now accepts `4326` only and points at the new
+  `easting`/`northing` fields, turning a wrong answer into an explicit error.
 - `server.json` declared version `0.1.3` while the package was at `0.2.0`, which
   would have published a wrong version to the MCP Registry.
 

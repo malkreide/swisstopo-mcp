@@ -79,12 +79,18 @@ else:
     easting, northing = params.lon, params.lat   # erwartet LV95 in lat/lon
 ```
 
-Der `else`-Zweig ist **unerreichbar**: um ihn zu treffen, müsste der Aufrufer
-`sr=2056` *und* LV95-Werte in `lat`/`lon` übergeben — die Pydantic-Bounds
-(45.8–47.9 / 5.9–10.5) weisen LV95-Grössenordnungen aber vorher ab. Der
-`sr`-Parameter ist für alles ausser 4326 faktisch wirkungslos. Gleiches Muster in
-`ElevationProfileInput`. Das ist genau die Lücke, die PR 2 schliesst — und ein
-Grund, LV95-Support sauber zu modellieren statt den bestehenden `sr` zu flicken.
+**Korrektur (PR 2, verifiziert):** Die ursprüngliche Beschreibung „unerreichbar"
+war zu milde. Zwar ist der *beabsichtigte* Weg unerreichbar — LV95-Werte in
+`lat`/`lon` werden von den Bounds (45.8–47.9 / 5.9–10.5) abgewiesen. Aber
+`HeightInput(lat=46.9481, lon=7.4474, sr=2056)` **passiert die Validierung** und
+schickt dann `easting=7.4474, northing=46.9481, sr=2056` upstream: Grad, als
+Meter etikettiert. Das ist kein toter Code, sondern ein **still falsches
+Resultat**.
+
+Gleiches Muster in `ElevationProfileInput` und `IdentifyInput`. PR 2 schliesst
+das, indem LV95 über explizite `easting`/`northing`-Felder läuft und `sr` für
+Eingabekoordinaten nur noch `4326` akzeptiert — aus einer stillen Falschantwort
+wird ein lauter Fehler.
 
 ---
 

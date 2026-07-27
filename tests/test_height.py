@@ -24,9 +24,12 @@ class TestHeightInput:
         m = HeightInput(lat=46.9481, lon=7.4474)
         assert m.sr == 4326
 
-    def test_custom_sr(self):
-        m = HeightInput(lat=46.9481, lon=7.4474, sr=2056)
-        assert m.sr == 2056
+    def test_legacy_sr_2056_is_rejected(self):
+        """`sr=2056` used to be accepted and then sent degrees upstream labelled
+        as LV95 metres — a silently wrong answer. LV95 now goes through
+        easting/northing, so the legacy switch must fail loudly instead."""
+        with pytest.raises(ValidationError, match="easting/northing"):
+            HeightInput(lat=46.9481, lon=7.4474, sr=2056)
 
     def test_lat_too_low(self):
         with pytest.raises(ValidationError):
@@ -75,9 +78,23 @@ class TestElevationProfileInput:
         assert m.sr == 4326
 
     def test_custom_values(self):
-        m = ElevationProfileInput(coordinates="46.9,7.4;47.0,7.5", nb_points=50, sr=2056)
+        m = ElevationProfileInput(coordinates="46.9,7.4;47.0,7.5", nb_points=50)
         assert m.nb_points == 50
-        assert m.sr == 2056
+        assert m.sr == 4326
+
+    def test_defaults_to_wgs84_coordinate_system(self):
+        m = ElevationProfileInput(coordinates="46.9,7.4;47.0,7.5")
+        assert m.coordinate_system == "wgs84"
+
+    def test_accepts_lv95_coordinate_system(self):
+        m = ElevationProfileInput(
+            coordinates="2600000,1200000;2601000,1201000", coordinate_system="lv95"
+        )
+        assert m.coordinate_system == "lv95"
+
+    def test_legacy_sr_2056_is_rejected(self):
+        with pytest.raises(ValidationError, match="coordinate_system"):
+            ElevationProfileInput(coordinates="46.9,7.4;47.0,7.5", sr=2056)
 
     def test_coordinates_too_short(self):
         with pytest.raises(ValidationError):

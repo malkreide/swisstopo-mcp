@@ -48,9 +48,13 @@ mcp = FastMCP(
         "swisstopo_identify_features or swisstopo_find_features to query them. "
         "swisstopo_geocode converts addresses to coordinates. "
         "swisstopo_get_height returns elevation. "
-        "All tools take WGS84 lat/lon; if the caller has LV95 (EPSG:2056) "
-        "coordinates, convert them first with swisstopo_convert_coordinates "
-        "(official REFRAME service — note its axis order: easting=lon, northing=lat). "
+        "Point-based tools (swisstopo_get_height, swisstopo_identify_features, "
+        "swisstopo_get_egrid) take EITHER lat/lon (WGS84) OR easting/northing "
+        "(LV95, EPSG:2056) — pass one pair, not both. swisstopo_elevation_profile "
+        "takes coordinate_system='lv95' for LV95 support points. "
+        "swisstopo_convert_coordinates converts explicitly via the official "
+        "REFRAME service when a caller needs the numbers themselves "
+        "(note its axis order: easting=lon, northing=lat). "
         "swisstopo_search_geodata finds downloadable datasets (orthophotos, 3D models, etc.). "
         "swisstopo_map_url generates shareable map links. "
         "ÖREB tools (swisstopo_get_egrid, swisstopo_get_oereb_extract) require a canton parameter. "
@@ -300,10 +304,12 @@ from swisstopo_mcp.height import (  # noqa: E402
     },
 )
 async def swisstopo_get_height(params: HeightInput) -> ToolResponse:
-    """Gibt die Höhe über Meer (m ü. M.) an einer WGS84-Koordinate zurück.
+    """Gibt die Höhe über Meer (m ü. M.) an einer Koordinate zurück.
 
     <use_case>Punkthöhe für eine Adresse/Koordinate; für Linien siehe
     swisstopo_elevation_profile.</use_case>
+    <important_notes>Koordinaten entweder als lat/lon (WGS84) ODER als
+    easting/northing (LV95) angeben — nicht beides.</important_notes>
     """
     return await get_height(params)
 
@@ -322,7 +328,9 @@ async def swisstopo_elevation_profile(params: ElevationProfileInput, ctx: Contex
     """Berechnet ein Höhenprofil entlang einer Linie aus mehreren Koordinatenpaaren.
 
     <use_case>Höhenverlauf z.B. für Wander-/Schulweg-Analysen.</use_case>
-    <important_notes>Benötigt ≥2 Koordinatenpaare im Format 'lat1,lon1;lat2,lon2;…'.</important_notes>
+    <important_notes>Benötigt ≥2 Koordinatenpaare. Standard ist WGS84
+    ('lat1,lon1;lat2,lon2;…'); für LV95 coordinate_system='lv95' setzen und die
+    Paare als 'easting,northing' übergeben.</important_notes>
     """
     return await elevation_profile(params, ctx=ctx)
 

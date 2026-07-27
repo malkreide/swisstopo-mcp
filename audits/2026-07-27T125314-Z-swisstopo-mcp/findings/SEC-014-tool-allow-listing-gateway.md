@@ -1,7 +1,7 @@
 ## Finding: SEC-014 — Tool-Allow-Listing via MCP-Gateway-Pattern
 
 **Severity:** medium
-**Status:** open
+**Status:** closed
 **Server:** swisstopo-mcp
 **Check-Reference:** SEC-014
 **PDF-Reference:** Sec 5.3
@@ -56,3 +56,17 @@ No code change in this repository is required or appropriate. Concretely:
 
 ### Effort Estimate
 S (<1d) for the repository-side items (1, 2 partly overlaps SEC-022, 4). The portfolio gateway itself is out of scope for this server and is not estimated here.
+
+---
+
+### Remediation Status (2026-07-27, batch 3)
+
+**Closed as a documented deferral, now enforced rather than asserted.** The
+gateway itself remains out of scope — no single server can allow-list across a
+set it cannot see. What changed is that the deferral's premises are checked:
+`tests/test_tool_hygiene.py` fails if any tool stops being read-only or becomes
+destructive, so the risk-bounding argument cannot quietly go stale.
+
+`SECURITY.md` now points at the two facts the deferral rests on and adds a
+re-evaluation trigger for a non-read-only tool. The SEC-022 prefixing landed
+earlier, so a future gateway allow-list can name all 23 tools unambiguously.

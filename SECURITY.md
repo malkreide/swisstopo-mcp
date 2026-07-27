@@ -57,19 +57,42 @@ They are portfolio-wide and best enforced at an MCP gateway / host layer; the
 residual risk here is low because the server is read-only and only reaches a
 fixed set of trusted public-data providers.
 
-- **Tool allow-listing** belongs to the MCP host/gateway that aggregates
-  multiple servers, not to an individual server exposing a fixed, read-only
-  tool set. Until a central gateway exists, the risk is bounded by the egress
-  allow-list and the read-only tool surface.
-- **Cross-server tool-poisoning detection** is a host/gateway responsibility.
-  This server's tool definitions are version-controlled and shipped from this
-  repository; there is no dynamic or remote tool registration.
+- **Tool allow-listing** (SEC-014) belongs to the MCP host/gateway that
+  aggregates multiple servers, not to an individual server exposing a fixed,
+  read-only tool set. Until a central gateway exists, the risk is bounded by two
+  facts, both enforced in CI rather than merely asserted here:
+  - every tool is read-only — `tests/test_tool_hygiene.py` fails if one is not,
+    so this premise cannot quietly become false;
+  - egress is a code-level frozenset in
+    [`src/swisstopo_mcp/api_client.py`](src/swisstopo_mcp/api_client.py), kept in
+    sync with [docs/network-egress.md](docs/network-egress.md) by a test.
+
+  All 23 tools carry the `swisstopo_` prefix (SEC-022), so a future gateway
+  allow-list can name them unambiguously.
+
+- **Cross-server tool-poisoning detection** (SEC-015) is a host/gateway
+  responsibility — no single server can see across the set. What *is* covered
+  here today: tool definitions are version-controlled and shipped from this
+  repository, there is no dynamic or remote registration, and
+  `tests/test_tool_hygiene.py` scans this server's own descriptions for
+  invisible characters and override phrasing (German, French and English), while
+  `tool-hashes.json` pins name, description and input schema per tool so a
+  change cannot ship unreviewed.
+
+  This is a self-scan, not cross-server detection. It cannot see what another
+  server declares.
 
 ## Re-evaluation triggers
 
 These decisions should be revisited if the server ever:
 
-- gains **write/send** capability or starts processing **PII**, or
+- gains **write/send** capability or starts processing **PII** — this voids
+  SEC-014's risk-bounding argument outright, which is why the read-only premise
+  is asserted by a test, or
+- gains any tool whose description is **config-driven or remotely sourced**
+  rather than written in this repository — the self-scan only covers what is
+  committed here, or
 - registers tools **dynamically** / from remote sources, or
 - is aggregated behind a shared MCP gateway (then implement tool
-  allow-listing and poisoning detection there).
+  allow-listing and poisoning detection there, with this server's findings
+  SEC-014 and SEC-015 as the input to that work).

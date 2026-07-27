@@ -1,7 +1,7 @@
 ## Finding: SEC-015 — Pre-Flight Tool-Poisoning Detection
 
 **Severity:** medium
-**Status:** open
+**Status:** closed
 **Server:** swisstopo-mcp
 **Check-Reference:** SEC-015
 **PDF-Reference:** Sec 5.3
@@ -67,3 +67,23 @@ def test_description_is_clean(tool):
 
 ### Effort Estimate
 S (<1d) for the repository-side items. The gateway-side detection layer is out of scope for this server and is not estimated here.
+
+---
+
+### Remediation Status (2026-07-27, batch 3)
+
+**Closed as a documented deferral with a repository-side self-scan.**
+Cross-server detection stays a gateway responsibility. What is now covered
+here: `tests/test_tool_hygiene.py` scans this server's own tool descriptions
+for invisible characters (zero-width, bidi-override, word-joiner) and for
+override phrasing in **German, French and English** — the descriptions in this
+portfolio are German, and an English-only pattern list would miss them.
+`tool-hashes.json` pins name, description and input schema per tool.
+
+One note worth recording: the first version of the scan contained the invisible
+characters *literally* in its own pattern — exactly the failure mode it exists
+to catch, and invisible to review. They are now written as `\uXXXX` escapes and
+a check confirms none remain in the file.
+
+`SECURITY.md` no longer implies nothing applies until a gateway exists, and
+gains a trigger for config-driven or remotely-sourced descriptions.

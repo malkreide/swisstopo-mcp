@@ -8,6 +8,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **DNS-pinning transport, opt-in (SEC-005).** `SWISSTOPO_PIN_DNS=true` makes
+  the client connect to the address the SSRF guard already vetted, closing the
+  rebinding window between check and connect. SNI and the `Host` header stay on
+  the hostname, so certificate validation is unaffected.
+  - **Off by default**, because it rewrites the target of every outbound
+    request. It is also automatically inert behind a forward proxy, where the
+    proxy resolves the name and pinning would only break CONNECT.
+  - The TLS handshake against a real endpoint with a pinned IP is **not yet
+    verified** — the development sandbox routes all HTTPS through a proxy that
+    refuses CONNECT to a bare IP. The mechanics are unit-tested; confirm one
+    live request before enabling this in a deployment.
+- **Egress-proxy ACL (SEC-021).** `deploy/smokescreen-acl.yaml` carries the same
+  ten hosts as `ALLOWED_HOSTS` and is *generated* from it by
+  `scripts/render_egress_acl.py`, with a CI gate. A Kubernetes NetworkPolicy
+  cannot match on hostname, so this is what a real per-host network-layer
+  control needs. Deploying it — Smokescreen as a sidecar, NetworkPolicy
+  restricted to the proxy — remains cluster configuration outside this repo.
+
+### Added
 - **`swisstopo_oereb_at` — ÖREB restrictions at a coordinate in one call**
   (23 → 24 tools, ARCH-007). It resolves the EGRID internally: that identifier
   is an upstream artefact, not something a caller asked for, so requiring a

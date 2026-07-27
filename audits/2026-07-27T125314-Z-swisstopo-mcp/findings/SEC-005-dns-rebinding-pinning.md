@@ -79,3 +79,31 @@ Kubernetes deployment only.
 resolves once and reuses the address while preserving SNI and the `Host` header
 touches every outbound request; it deserves its own change and its own
 verification against real TLS, not a corner of a documentation batch.
+
+---
+
+### Remediation Status (2026-07-27, batch 5)
+
+**Implemented, opt-in, not yet verified end-to-end.**
+
+`PinnedTransport` in `api_client.py` connects to the address the SEC-004 guard
+already vetted, keeping SNI and the `Host` header on the hostname so
+certificate validation is unaffected. 20 tests cover the mechanics: URL host
+rewritten to the IP, `Host` and `sni_hostname` preserved, path and query
+intact, private addresses refused, IP literals left alone.
+
+Two deliberate limits:
+- **Off by default** (`SWISSTOPO_PIN_DNS`). It rewrites the target of every
+  outbound request; a default-on control that breaks egress would be worse
+  than the narrow window it closes.
+- **Automatically inert behind a forward proxy**, since the proxy resolves the
+  name itself and pinning would only break CONNECT.
+
+**Why this stays in-remediation:** the development sandbox forces all HTTPS
+through a forward proxy (`HTTPS_PROXY`), which refuses CONNECT to a bare IP.
+A direct-connection probe was attempted and failed for that reason, so the TLS
+handshake against a real endpoint with a pinned IP is **untested**. The
+mechanics are verified; the handshake is not. Before enabling this in a
+deployment, run one request against `api3.geo.admin.ch` with
+`SWISSTOPO_PIN_DNS=true` from a host with direct egress and confirm a 200.
+Claiming closure on unit tests alone would misrepresent what was checked.

@@ -73,3 +73,22 @@ does not know — the drift is a CI failure now, not a review item.
 **Still open:** the network layer is not narrowed to the host list. That needs
 an egress proxy (Smokescreen or equivalent), which is infrastructure this
 repository does not own. The trade-off is now written down rather than implied.
+
+---
+
+### Remediation Status (2026-07-27, batch 5)
+
+**Repository side complete; deployment side is not this repo's to do.**
+
+The documentation contradictions were fixed earlier. This adds the artefact
+that was missing: `deploy/smokescreen-acl.yaml`, an egress-proxy ACL carrying
+the same ten hosts as `ALLOWED_HOSTS`. It is **generated** from the frozenset by
+`scripts/render_egress_acl.py` and checked in CI, so the network-layer list
+cannot drift from the code-layer one — which was the failure mode behind this
+finding in the first place.
+
+**What remains is deployment, not code:** running Smokescreen as a sidecar and
+restricting the NetworkPolicy so the pod's only permitted egress is the proxy.
+That is cluster configuration this repository does not own. Until it is
+deployed, the code-layer list is still the only per-host control and protects
+the process, not a compromised image — `docs/network-egress.md` says so.

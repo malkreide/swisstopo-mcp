@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import ipaddress
+import os
 import socket
 from functools import lru_cache
 from typing import Any
@@ -136,6 +137,67 @@ def assert_host_allowed(url: str) -> None:
     assert_resolved_ip_public(host)
 
 
+# --- DNS pinning (SEC-005) ---
+#
+# `assert_resolved_ip_public` checks the address a host resolves to, but the
+# connection then resolves it *again* — a rebinding window between check and
+# connect. This transport closes it by connecting to the address that was
+# checked, while keeping SNI and the Host header on the original hostname so
+# certificate validation is unaffected.
+#
+# Two deliberate limits:
+#
+# 1. **Off by default** (`SWISSTOPO_PIN_DNS`). It rewrites the target of every
+#    outbound request; a default-on control that breaks egress is worse than the
+#    narrow risk it closes. Enable it once verified in your environment.
+# 2. **Inert behind a forward proxy.** When HTTPS_PROXY is set the proxy does the
+#    resolving, so client-side pinning cannot apply — silently pinning anyway
+#    would just break CONNECT.
+
+
+def _proxy_configured() -> bool:
+    return bool(
+        os.environ.get("HTTPS_PROXY")
+        or os.environ.get("https_proxy")
+        or os.environ.get("ALL_PROXY")
+        or os.environ.get("all_proxy")
+    )
+
+
+class PinnedTransport(httpx.AsyncHTTPTransport):
+    """Connect to the pre-validated IP, keeping SNI and Host on the hostname."""
+
+    async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
+        host = request.url.host
+        # Only pin names, never literals, and never when a proxy owns resolution.
+        if not host or _proxy_configured() or _is_ip_literal(host):
+            return await super().handle_async_request(request)
+
+        try:
+            addresses = _resolve(host)
+        except socket.gaierror:
+            return await super().handle_async_request(request)
+        if not addresses:
+            return await super().handle_async_request(request)
+
+        # Reuse the address the SSRF guard already vetted (SEC-004).
+        assert_resolved_ip_public(host)
+        address = addresses[0]
+
+        request.headers["Host"] = host
+        request.extensions = {**dict(request.extensions), "sni_hostname": host}
+        request.url = request.url.copy_with(host=address)
+        return await super().handle_async_request(request)
+
+
+def _is_ip_literal(host: str) -> bool:
+    try:
+        ipaddress.ip_address(host)
+    except ValueError:
+        return False
+    return True
+
+
 # --- HTTP Client ---
 #
 # A single AsyncClient is created once at server startup (see the FastMCP
@@ -147,12 +209,19 @@ def assert_host_allowed(url: str) -> None:
 _shared_client: httpx.AsyncClient | None = None
 
 
+def _pinning_enabled() -> bool:
+    """True when DNS pinning is switched on and actually applicable."""
+    flag = os.environ.get("SWISSTOPO_PIN_DNS", "").strip().lower()
+    return flag in {"1", "true", "yes"} and not _proxy_configured()
+
+
 def _build_client() -> httpx.AsyncClient:
     """Build a freshly configured AsyncClient."""
     return httpx.AsyncClient(
         timeout=REQUEST_TIMEOUT,
         headers={"User-Agent": USER_AGENT},
         follow_redirects=False,
+        transport=PinnedTransport() if _pinning_enabled() else None,
     )
 
 

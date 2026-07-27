@@ -1,0 +1,24 @@
+check_run:
+  id: SDK-003
+  status: partial
+  evidence_collected: 5
+  evidence_required: 2
+  findings:
+    - "Context injection is wired for two tools: swisstopo_elevation_profile (src/swisstopo_mcp/server.py:337 declares ctx: Context and forwards it at :345) and swisstopo_get_oereb_extract (src/swisstopo_mcp/server.py:484, forwards at :491)"
+    - "Those handlers actually use the context rather than merely accepting it: ctx.info() at src/swisstopo_mcp/height.py:179 and src/swisstopo_mcp/oereb.py:147, ctx.report_progress() at src/swisstopo_mcp/height.py:204 — this closes the gap the 2026-05-29 audit recorded as SDK-003 open ('No tool injects ctx: Context')"
+    - "No print() anywhere in src/, and structlog is bound to stderr explicitly so stdout stays reserved for the stdio protocol: src/swisstopo_mcp/logging_config.py:47-48 (WriteLoggerFactory(file=sys.stderr))"
+    - "GAP — find_commune can issue up to 40 sequential upstream requests without any ctx: _list_by_canton / _list_by_district (src/swisstopo_mcp/openplz.py:479, :501) call _fetch_all_pages (src/swisstopo_mcp/openplz.py:152-185), which loops pageSize=50 up to OPENPLZ_MAX_RECORDS=2000 (src/swisstopo_mcp/openplz.py:48-49). The tool wrapper takes no Context (src/swisstopo_mcp/server.py:618), so a multi-second canton listing reports nothing to the client"
+    - "GAP — query_osm_features runs against Overpass with a 30s client timeout and 25s server-side timeout hint (src/swisstopo_mcp/overpass.py:39-40, request at :164) and also takes no Context (src/swisstopo_mcp/server.py:561); this is the single slowest tool in the surface and the most likely to hit a client-side timeout with no progress signal"
+  gaps:
+    - "find_commune (canton/district modes) and query_osm_features exceed the 2s threshold in the check yet declare no ctx: Context and emit no progress — src/swisstopo_mcp/server.py:618, :561."
+    - "elevation_profile reports progress only once, after the upstream call has already returned (progress=1, total=1 at src/swisstopo_mcp/height.py:204). This is a completion marker, not the '1-2s cadence' the pass criteria ask for; the actual wait (the profile request) is unreported."
+    - "A swallowed upstream failure is not surfaced via ctx.warning(): layer_info catches the legend fetch exception bare and sets legend=None (src/swisstopo_mcp/rest_api.py:494-501). The null is visible in the result, but the reason for it never reaches the client."
+    - "New tools added since the last audit (convert_coordinates, zoning_at, municipality_at) take no ctx — acceptable, each is a single fast upstream call (src/swisstopo_mcp/coords.py:269, src/swisstopo_mcp/rest_api.py:387)."
+  evaluator_notes: |
+    Real progress over the previous run: two tools now inject and use Context.
+    Still partial because the two genuinely slow tools in the surface — paged
+    OpenPLZ commune listings and the Overpass POI query — are exactly the ones
+    without Context, and the one progress call that exists fires after the wait
+    rather than during it. Remediation is small (add ctx to two wrappers, report
+    per page / before the Overpass request, add ctx.warning on the swallowed
+    legend error).

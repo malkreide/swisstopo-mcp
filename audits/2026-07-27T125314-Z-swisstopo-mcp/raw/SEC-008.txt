@@ -1,0 +1,21 @@
+check_run:
+  id: SEC-008
+  status: pass
+  evidence_collected: 5
+  evidence_required: 2
+  findings:
+    - "No install-time code execution: pyproject.toml uses the hatchling backend with no custom build hooks (pyproject.toml:1-3), and the only entry point is a plain console script (pyproject.toml:47-48, `swisstopo-mcp = \"swisstopo_mcp.server:mcp.run\"`). There is no setup.py, no package.json, and therefore no pre/postinstall hook — confirmed by the repo root listing."
+    - "README shows the unabbreviated installation command with no wrapper script: `uvx swisstopo-mcp` at README.md:78 and the full claude_desktop_config.json JSON block at README.md:118-127, plus the pip/uv variants at README.md:64-72."
+    - "PyPI publishing uses an OIDC Trusted Publisher, so releases carry Sigstore attestations: .github/workflows/publish.yml declares `environment: name: pypi`, `permissions: id-token: write` and calls pypa/gh-action-pypi-publish@release/v1 with no API token (.github/workflows/publish.yml, publish job)."
+    - "MCP Registry publication also uses GitHub OIDC rather than a stored credential (.github/workflows/publish.yml, publish-mcp job: `id-token: write` + `mcp-publisher login github-oidc`)."
+    - "Build process is documented for independent verification: CONTRIBUTING.md and CONTRIBUTING.de.md exist at the repo root; the CI workflow that gates every push runs the same `pip install -e \".[dev]\"` + pytest + ruff sequence (.github/workflows/ci.yml)."
+  gaps:
+    - "The publish-mcp job downloads the mcp-publisher binary at release time via `curl ... /releases/latest/download/... | tar xz` with no checksum or version pin (.github/workflows/publish.yml, 'Install mcp-publisher' step). This is a CI supply-chain exposure, not an end-user install hook, so it does not affect the Pass-Criteria."
+    - "README does not state the Sigstore verification command for users who want to check the signature themselves (Remediation Schritt 4)."
+  evaluator_notes: |
+    All Pass-Criteria are met: no hidden setup steps, transparent install command
+    in the README, no dynamic code loading, and OIDC Trusted Publisher signing on
+    both PyPI and the MCP Registry. The two gaps recorded are hardening
+    suggestions from the Remediation section rather than criteria. Note the
+    `latest`-tag curl in the release workflow — worth pinning, but it runs in CI
+    under maintainer control and never on a user's machine.

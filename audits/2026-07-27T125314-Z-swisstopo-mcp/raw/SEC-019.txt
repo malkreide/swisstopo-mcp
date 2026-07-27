@@ -1,0 +1,22 @@
+check_run:
+  id: SEC-019
+  status: pass
+  evidence_collected: 5
+  evidence_required: 3
+  findings:
+    - "A Lethal-Trifecta assessment table is documented with a score: README.md:319-327 rates 'Access to private data' ❌ No (Public Open Data only), 'Exposure to untrusted content' ⚠️ Limited (fixed allow-list of trusted geo.admin / OEREB hosts), 'External communication (write/send)' ❌ No, concluding 'at most 1 of 3 — safe by design'. Mirrored in the posture table at SECURITY.md:32."
+    - "Leg 1 (private data) verified absent: all upstreams are keyless public open-data endpoints (src/swisstopo_mcp/api_client.py:51-64), there is no database, no filesystem tool and no PII field in any model; data_class is Public Open Data per the profile."
+    - "Leg 3 (external send) verified absent: grep -rE 'send_mail|smtplib|slack|webhook' over src/ returns zero hits. The only non-GET outbound call is the Overpass POST at src/swisstopo_mcp/overpass.py:159-165, whose target is the fixed OVERPASS_INTERPRETER constant on an allow-listed host — it carries a generated query, not caller-supplied data to a caller-chosen recipient."
+    - "Write capability is structurally absent and asserted per tool: all 23 registrations carry readOnlyHint: true and destructiveHint: false (e.g. src/swisstopo_mcp/server.py:89-95, :350-357, :553-560, :637-643). The read-only phase is stated at README.md:313-316 and SECURITY.md:38-42."
+    - "The residual leg-2 exposure is bounded by the same frozenset the check's Modus-3 pattern asks for: assert_host_allowed (src/swisstopo_mcp/api_client.py:67-74) is a hard-coded frozenset, not env-configurable, and is enforced before every retried request (api_client.py:162-163) — matching the 'Allow-List als FrozenSet im Code, nicht config-mutierbar' criterion."
+  gaps:
+    - "SECURITY.md:18 and :40 still say 'All 13 tools' while the server now exposes 23 (src/swisstopo_mcp/server.py:4, README.md:314). The trifecta claim is unchanged in substance but the document is stale against the current surface."
+    - "The trifecta table does not mention that geodata.py consumes URLs out of an upstream catalogue response (src/swisstopo_mcp/geodata.py:96-104, :447, :464) — still allow-list-bounded, but a slightly wider leg-2 surface than 'reads only from a fixed allow-list' suggests."
+  evaluator_notes: |
+    Score is 1 of 3 (leg 2 only, and limited): no private data, no write/send.
+    The assessment is documented in both README and SECURITY.md as the check
+    requires, so no ADR is needed and no recipient allow-list applies. All Pass
+    Criteria met.
+    The two gaps are documentation-freshness items to fold into the next
+    CHANGELOG pass — the '13 tools' figure predates three tool-expansion
+    releases and will mislead the next reviewer.

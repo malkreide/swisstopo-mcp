@@ -1,0 +1,20 @@
+check_run:
+  id: ARCH-005
+  status: pass
+  evidence_collected: 5
+  evidence_required: 3
+  findings:
+    - "No hardcoded secrets in source: pattern search over src/ for (api[_-]?key|password|passwd|secret|token|credential) returns exactly one hit — the word 'credentials' in a CORS comment at src/swisstopo_mcp/server.py:663. Searches for connection strings ((postgres|mysql|mongodb)://) and AWS keys (AKIA[0-9A-Z]{16}) over the whole repo return zero hits."
+    - "No default-value secrets: the only os.environ.get() defaults in the codebase are non-secret ('ZH' at src/swisstopo_mcp/oereb.py:33, 'INFO' at src/swisstopo_mcp/logging_config.py:32). The Settings object (src/swisstopo_mcp/config.py:12-30) declares only http_host, http_port, allowed_origins and log_level — no credential fields."
+    - "The server holds no secrets by design: every upstream is a key-less public API (api3.geo.admin.ch, data.geo.admin.ch, geodesy.geo.admin.ch, geodienste.ch, overpass.osm.ch, openplzapi.org), stated at src/swisstopo_mcp/server.py:9 and .env.example:2-3. SecretStr is therefore not applicable — there is no in-memory secret to wrap."
+    - ".gitignore ignores .env and .env.* while whitelisting the template (.gitignore lines 11-13: `.env`, `.env.*`, `!.env.example`); no real .env file is present in the working tree (ls of repo root shows only .env.example)."
+    - ".env.example exists at repo root with placeholder/non-secret values only (SWISSTOPO_OEREB_CANTONS, SWISSTOPO_HTTP_HOST/PORT, SWISSTOPO_ALLOWED_ORIGINS, SWISSTOPO_LOG_LEVEL) and a header stating none of them are secrets; a gitleaks scan runs on every push and PR to master/main via .github/workflows/security.yml:10-21 (gitleaks/gitleaks-action@v3 with fetch-depth: 0 for full-history scanning)."
+  gaps: []
+  evaluator_notes: |
+    Both gaps from the 2026-05-29 finding are closed: .env.example is present
+    with placeholders, and .github/workflows/security.yml runs gitleaks with
+    full history on every push and PR. All applicable pass criteria are met.
+    The SecretStr criterion is vacuously satisfied — the server authenticates
+    to nothing, so there is no secret to represent. Logging was checked for
+    leakage as well: logging_config.py renders structured JSON to stderr and
+    no settings object is formatted into a log line.

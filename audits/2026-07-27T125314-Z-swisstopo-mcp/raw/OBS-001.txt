@@ -1,0 +1,31 @@
+check_run:
+  id: OBS-001
+  status: pass
+  evidence_collected: 5
+  evidence_required: 2
+  findings:
+    - "All 23 tool handlers wrap their body in try/except and return a structured ToolResponse with is_error=true instead of raising. Verified on the new handlers: src/swisstopo_mcp/rest_api.py:431-432 (zoning_at), rest_api.py:464-467 (municipality_at), rest_api.py:504-505 (layer_info) and src/swisstopo_mcp/coords.py:305-310 (convert_coordinates, which additionally separates ValueError from generic upstream failures)."
+    - "The execution-error flag is a first-class field of the envelope: src/swisstopo_mcp/models.py:74 (`is_error: bool`) and models.py:98-100 (`ToolResponse.error()` sets is_error=True, count=0, results=[]). FastMCP emits it as structured content with an output schema (tests/test_responses.py:79-84)."
+    - "Protocol errors are deliberately NOT caught: no handler raises McpError or constructs JSON-RPC codes itself (grep for McpError / ErrorData / -32601 / -32602 / -32603 over src/: 0 hits). Unknown tool and schema-violating arguments bubble to the MCP SDK, which maps them to standard JSON-RPC codes."
+    - "Execution-error path is tested: tests/test_places.py:142-147 (upstream 500 on zoning_at -> is_error true, upstream body 'boom' absent from summary), tests/test_places.py:240-246 (layer_info upstream 500), tests/test_places.py:134-140 (empty upstream result is a soft miss with match_type='none', is_error=false — not an error), plus equivalents across tests/test_rest_api.py, tests/test_height.py, tests/test_oereb.py."
+    - "Protocol-error path is tested: tests/test_responses.py:87-103 (TestProtocolErrors) asserts that invalid params (search_text below min_length -> -32602) and an unknown tool name both raise out of mcp.call_tool rather than returning a ToolResponse. The contract is documented in README.md:355-362 and README.de.md:357-364."
+  gaps:
+    - "The envelope field is `is_error` in structured content; the MCP protocol-level `isError` flag on the tool result is left at false. The LLM-visible signal is present and documented, but a client keying purely on the protocol flag would not see handled errors."
+    - "No named error-code constants (INVALID_PARAMS, RATE_LIMIT_EXCEEDED, ...) exist in src/; the -32602 code appears only in a test comment (tests/test_responses.py:96) and in README prose (README.md:361). Protocol codes are entirely delegated to the SDK."
+  evaluator_notes: |
+    PASS. The separation demanded by the check is implemented consistently and
+    survived the 19 -> 23 tool growth: every one of the four new/changed
+    handlers (zoning_at, municipality_at, layer_info, convert_coordinates)
+    follows the same catch-and-return pattern, and none of them raise on
+    upstream failure, empty results or bad values.
+
+    Both required test paths exist and are explicit (tests/test_places.py for
+    execution errors, tests/test_responses.py::TestProtocolErrors for protocol
+    errors). Notably the "no results" case is correctly modelled as
+    match_type='none' with is_error=false rather than as an error, which is the
+    ARCH-003 anti-pattern this check's sibling guards against.
+
+    The `is_error` vs protocol `isError` nuance is recorded as a gap rather than
+    a downgrade: the diagnostic content the LLM needs (user-friendly German
+    summary + explicit boolean) is present in the structured output, which is
+    what the check's rationale is about.

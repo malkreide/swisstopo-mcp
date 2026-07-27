@@ -1,0 +1,38 @@
+check_run:
+  id: ARCH-007
+  status: partial
+  evidence_collected: 6
+  evidence_required: 2
+  findings:
+    - "The 2026-05-29 remediation ('add a higher-level tool that resolves a common case in one call instead of a discovery chain') IS satisfied for point questions. swisstopo_zoning_at (src/swisstopo_mcp/rest_api.py:405-432) and swisstopo_municipality_at (rest_api.py:435-467) each answer a complete user question from a bare coordinate: they hardcode the layer (rest_api.py:30-32), run the identify internally via the shared helper _identify_lv95 (rest_api.py:381-402) and return a thought-complete record — zone type + code + municipality + BFS number + canton, or municipality + BFS number + canton. No layer-discovery call is required and the descriptions state this explicitly (src/swisstopo_mcp/server.py:361-362)."
+    - "Both tools encapsulate non-trivial internal logic rather than exposing it: municipality_at filters the swissBOUNDARIES3D layer's one-polygon-per-historical-year records down to the current year (src/swisstopo_mcp/rest_api.py:442-447), and _as_bfs_number (rest_api.py:126-139) normalises the BFS join key across two upstream layers that disagree on its type. This is exactly the 'composability intern, Atomarität extern' pattern."
+    - "Provenance travels with the aggregate: zoning results carry the ARE non-binding legal caveat on every record, not only in the prose summary (src/swisstopo_mcp/rest_api.py:419-421 with the constant at src/swisstopo_mcp/models.py:30-33), and both tools set an explicit source (rest_api.py:429, rest_api.py:462)."
+    - "Pointer-only tools remain, which is the check's named fail pattern. swisstopo_get_egrid returns nothing but a parcel ID whose only use is the follow-up call to swisstopo_get_oereb_extract (src/swisstopo_mcp/server.py:465-471, description literally 'Vorstufe zu swisstopo_get_oereb_extract'). Likewise swisstopo_search_layers returns layer IDs only (src/swisstopo_mcp/rest_api.py:159 '<important_notes>Liefert Layer-IDs, keine Feature-Daten'), swisstopo_search_geodata requires swisstopo_get_collection for the actual download links (server.py:249-250), and list_available_layers returns only keys for query_geodata (server.py:514)."
+    - "No internal parallelisation anywhere: asyncio.gather / TaskGroup appear zero times in src/. The clearest missed case is the newly added swisstopo_layer_info, which makes two independent upstream calls sequentially — layer metadata at src/swisstopo_mcp/rest_api.py:474 and the legend at rest_api.py:495-498 — where the check explicitly asks for gather. The second pass criterion is unmet."
+    - "The larger surface created a genuine tool-selection ambiguity that is only half-mitigated. Zoning at a point is now reachable three ways: swisstopo_zoning_at, swisstopo_identify_features with layers='ch.are.bauzonen' (the same layer, src/swisstopo_mcp/rest_api.py:32), and query_geodata with a geodienste:<nutzungsplanung>:<canton> key (src/swisstopo_mcp/geodata.py:406-415). The repo's own merge plan flagged this as a pre-merge blocker requiring 'in `instructions` eine klare Entscheidungsregel' (docs/merge-plan-swiss-geodata-mcp.md:246-251). What landed is a mention, not a rule: src/swisstopo_mcp/server.py:50-52 says the direct tools exist, but states no precedence, and neither swisstopo_identify_features (server.py:174-182) nor query_geodata (server.py:534-544) cross-references swisstopo_zoning_at."
+  gaps:
+    - "Three paths to zoning data with no stated precedence rule — the countermeasure the merge plan itself required (docs/merge-plan-swiss-geodata-mcp.md:250-251) was implemented only as a mention in the instructions string (src/swisstopo_mcp/server.py:50-52), not as an explicit routing rule, and not mirrored into the competing tools' descriptions."
+    - "swisstopo_get_egrid still returns a bare ID that is useless without a second call (src/swisstopo_mcp/server.py:465-471); the ÖREB pair is the one remaining chain where a one-call aggregate (coordinate → ÖREB extract) would be a direct analogue of what zoning_at/municipality_at did for the layer chain."
+    - "No asyncio.gather in the codebase; swisstopo_layer_info's two independent upstream requests (src/swisstopo_mcp/rest_api.py:474 and :495) run sequentially."
+  evaluator_notes: |
+    Honest answer to the re-audit question: the old remediation is genuinely
+    addressed. zoning_at and municipality_at are real one-call resolutions of
+    common point questions, with the layer choice, historical-year filter and
+    BFS-type normalisation hidden server-side — textbook ARCH-007. That is a
+    clear improvement over the 'partial' of the earlier run, and it is not
+    cosmetic.
+    But the check is not only about the one thing that was fixed. Two of its
+    four pass criteria remain unmet on the new surface: several tools still
+    return pointers rather than thought-complete results (get_egrid above all,
+    which is the check's own fail-pattern verbatim), and there is no
+    parallelised aggregation anywhere — including inside the newly added
+    layer_info, which had the obvious opportunity.
+    And the larger surface did create the ambiguity the task asked about.
+    Three routes now reach zoning data, and the repo's merge plan predicted
+    this precisely and specified the countermeasure as a decision rule in the
+    instructions string; the instructions were updated to advertise the new
+    tools but stop short of stating which route wins. swisstopo_layer_info
+    also cuts slightly against the check's grain: it makes the discovery chain
+    more usable but adds a step to it rather than removing one.
+    Net: real progress, criteria still not fully met — partial, with the
+    ambiguity as the primary open item.

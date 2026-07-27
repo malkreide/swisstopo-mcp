@@ -1,0 +1,21 @@
+check_run:
+  id: SEC-007
+  status: pass
+  evidence_collected: 6
+  evidence_required: 3
+  findings:
+    - "Dockerfile drops to a fixed non-root UID above 10000: useradd --uid 10001 at Dockerfile:16 and `USER 10001` at Dockerfile:20, on a multi-stage python:3.11-slim build (Dockerfile:6, 13) that copies only the installed prefix (Dockerfile:18)."
+    - "Kubernetes pod securityContext sets runAsNonRoot: true, runAsUser/runAsGroup/fsGroup 10001 and seccompProfile type RuntimeDefault: deploy/kubernetes.yaml:27-33."
+    - "Container securityContext sets allowPrivilegeEscalation: false, readOnlyRootFilesystem: true and capabilities.drop: [\"ALL\"]: deploy/kubernetes.yaml:44-48."
+    - "Read-only root filesystem is made workable by a size-limited tmpfs for /tmp: volumeMounts at deploy/kubernetes.yaml:68-70 and the emptyDir with sizeLimit 64Mi at deploy/kubernetes.yaml:71-74; the Dockerfile documents the equivalent `docker run --read-only --tmpfs /tmp --cap-drop ALL --security-opt no-new-privileges` invocation at Dockerfile:35-37."
+    - "No filesystem tools are exposed and no host paths are mounted, so the Modus-3 volume-scoping criterion is vacuously satisfied — stated at docs/deployment.md:38 and confirmed by the absence of any path/open/pathlib usage in src/ (grep for os.path/pathlib/open( in tool handlers returns nothing)."
+    - "Resource limits are set (deploy/kubernetes.yaml:61-67) and liveness/readiness probes hit the /healthz route added in src/swisstopo_mcp/server.py:671-675."
+  gaps:
+    - "No container image vulnerability scan in CI — .github/workflows/security.yml only runs gitleaks; there is no Trivy/Snyk step (remediation Schritt 4, not a Pass-Criterion)."
+    - "The runtime_test mode (docker exec id / touch /etc/test / CapEff) was not executed in this audit; verdict rests on manifest and Dockerfile review."
+  evaluator_notes: |
+    Every Pass-Criterion for this check is satisfied by an explicit line in
+    either the Dockerfile or deploy/kubernetes.yaml, and the hardening table in
+    docs/deployment.md:28-36 maps each control to its location. The one missing
+    item (container scanning in CI) is listed under Remediation, not under Pass
+    Criteria, so it is recorded as a gap rather than downgrading the status.

@@ -1,0 +1,29 @@
+check_run:
+  id: SEC-018
+  status: partial
+  evidence_collected: 7
+  evidence_required: 3
+  findings:
+    - "Every tool-boundary model declares strict mode explicitly. All 23 tools take a single Pydantic model parameter, and each of those models carries `model_config = ConfigDict(str_strip_whitespace=True, extra=\"forbid\", strict=True)` — geocoding.py:19 and :41, rest_api.py:40, :54, :75, :84, :92, :96, :100, stac.py:19 and :32, wmts.py:29, height.py:28 and :42, oereb.py:49 and :61, coords.py:181, geodata.py:158 and :199, openplz.py:247, :257, :304."
+    - "Runtime-verified (python -c against the installed package): HeightInput(lat=47.0, lon=8.0, evil='x') → rejected; HeightInput(lat='47.0', lon='8.0') → rejected; IdentifyInput(..., evil=1) → rejected; ConvertCoordinatesInput(easting='8.5', northing='47.4') → rejected. Effective model_config for HeightInput and ConvertCoordinatesInput both resolve to {'str_strip_whitespace': True, 'extra': 'forbid', 'strict': True}."
+    - "Whitelist (not blacklist) patterns are centralised and applied to free-text arguments: src/swisstopo_mcp/api_client.py:39-43 defines TEXT_PATTERN, ID_PATTERN, COORDS_PATTERN, LANG_PATTERN, CANTON_PATTERN, all anchored ^...$ positive character classes. Applied e.g. at geocoding.py:21-27, rest_api.py:42-48, rest_api.py:78-81, oereb.py:63-73, height.py:44-52."
+    - "The new ConvertCoordinatesInput is bounded: strict/extra=forbid at coords.py:181, plus a model_validator (coords.py:202-227) that range-checks against the direction — 5.9–10.5 / 45.8–47.9 degrees for wgs84_to_lv95 and LV95_E_MIN..LV95_E_MAX / LV95_N_MIN..LV95_N_MAX (coords.py:48-49) for lv95_to_wgs84 — and rejects swapped axes rather than returning a wrong point."
+    - "GAP — the new shared SwissPointInput base model declares NO model_config (src/swisstopo_mcp/coords.py:77-108). Runtime-verified: SwissPointInput(lat=47.0, lon=8.0, evil='x') is ACCEPTED, and SwissPointInput(lat='47.0', lon='8.0') coerces the strings to floats; SwissPointInput.model_config == {}. The tool surface is safe today only because all five subclasses re-declare the config (height.py:28, rest_api.py:54, :92, :96, oereb.py:49). A future point-based tool that inherits SwissPointInput and forgets that line silently gets extra='ignore' and coercion."
+    - "GAP — three tool arguments are unbounded integers forwarded straight into upstream query params. `sr: int = Field(default=4326, ...)` with no ge/le, no Literal and no validator at geocoding.py:36 (GeocodeInput), geocoding.py:46 (ReverseGeocodeInput) and rest_api.py:89 (GetFeatureInput); the values reach the upstream request at geocoding.py:95, geocoding.py:132 and rest_api.py:368. The helper written for exactly this, `validate_sr()` at api_client.py:345-352, is dead code — grep shows no call site anywhere in src/. By contrast HeightInput, ElevationProfileInput and IdentifyInput do guard `sr` via check_deprecated_sr (height.py:37, height.py:71, rest_api.py:70)."
+    - "GAP — IdentifyInput.layers (rest_api.py:56-61) and FindFeaturesInput.layer / search_field (rest_api.py:78, :80) have min_length and a pattern but no max_length, so an arbitrarily long comma-separated layer string passes validation into the upstream query string."
+  gaps:
+    - "SwissPointInput (coords.py:77) omits strict=True / extra='forbid'; protection depends entirely on each subclass repeating it."
+    - "GeocodeInput.sr, ReverseGeocodeInput.sr and GetFeatureInput.sr are unconstrained ints passed to the upstream API; validate_sr() exists but is never called."
+    - "Several string fields lack max_length (rest_api.py:56, :78, :80)."
+    - "tests/test_input_validation.py covers patterns, strict mode and extra-field rejection for GeocodeInput / GetFeatureInput / GetOerebExtractInput but has no case asserting SwissPointInput's own config, which is why the omission survived."
+  evaluator_notes: |
+    The tool boundary itself is genuinely strict — verified at runtime, not just
+    by grep — and the whitelist patterns are correctly positive-anchored. Two
+    concrete deviations from the Pass-Criteria keep this off pass.
+    The material one is the new shared SwissPointInput: the check requires
+    strict=True and extra='forbid' to be set explicitly, and on this model they
+    are absent. No tool is exposed through it today, so this is a latent
+    regression risk rather than a live hole — but it is exactly the pattern the
+    check's Common-Failures table calls out ("extra='allow' (Default)").
+    The second is the unbounded `sr` on three models with a purpose-built
+    validator sitting unused two files away. Both are one-line fixes.

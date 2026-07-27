@@ -1,0 +1,22 @@
+check_run:
+  id: SDK-002
+  status: partial
+  evidence_collected: 5
+  evidence_required: 2
+  findings:
+    - "All 23 registered tools annotate -> ToolResponse, including the three new REST tools (src/swisstopo_mcp/server.py:358 zoning_at, :381 municipality_at, :403 layer_info) and the new coords tool (src/swisstopo_mcp/server.py:432 convert_coordinates)"
+    - "Runtime verification against the live server object: mcp.list_tools() returns 23 tools and every single one carries a non-null outputSchema; the schema is the ToolResponse envelope (summary/results/count/match_type/source/license/provenance/retrieved_at/is_error) — no tool falls back to an unschema'd dict"
+    - "The envelope satisfies the structural criteria: Literal types for enumerables (Provenance/MatchType at src/swisstopo_mcp/models.py:15-16), Field(default_factory=list) for results (src/swisstopo_mcp/models.py:63-65), extra=\"forbid\" (src/swisstopo_mcp/models.py:60), and ok()/error() constructors that always set count consistently (src/swisstopo_mcp/models.py:76-100)"
+    - "Pydantic >= 2 is a hard dependency (pyproject.toml:38 \"pydantic>=2.0.0\") and v2-only APIs are used throughout (ConfigDict, model_validator(mode=\"after\") — e.g. src/swisstopo_mcp/coords.py:19, :110, :202); no v1 syntax (.parse_obj / class Config) anywhere in src/"
+    - "DEFECT — four inner handlers in src/swisstopo_mcp/rest_api.py declare `-> str` but return ToolResponse objects on every path: search_layers (src/swisstopo_mcp/rest_api.py:289, returns ToolResponse at :302 and :308), identify_features (:312, returns at :330/:336), find_features (:340, returns at :353/:359), get_feature (:363, returns at :372/:378). The new handlers in the same file are correct (zoning_at src/swisstopo_mcp/rest_api.py:406, municipality_at :436, layer_info :471 all -> ToolResponse), so the file is internally inconsistent"
+  gaps:
+    - "The four `-> str` annotations at src/swisstopo_mcp/rest_api.py:289,312,340,363 disagree with the actual return type. Client-facing schema is unaffected because FastMCP derives the outputSchema from the decorated wrappers in server.py (verified at runtime), but the annotations are wrong, would fail any mypy/pyright gate, and would let a future `return \"...\"` in these handlers pass review while silently breaking the envelope contract for that tool."
+    - "No static type checker is configured to catch this class of drift: pyproject.toml:65-78 enables ruff with select = [E, F, W, I, UP] only — no mypy/pyright in dependencies or in .github/workflows/ci.yml."
+  evaluator_notes: |
+    Every MCP-visible tool return is a structured, schema-exposed Pydantic v2
+    envelope with source/provenance/results/count — the substance of SDK-002 is
+    met and was confirmed at runtime, not only by grep. Status is partial rather
+    than pass solely because four handler signatures actively misstate their
+    return type; the impact today is type-correctness and reviewability, not a
+    broken schema. Fix is mechanical (`-> str` -> `-> ToolResponse` on four
+    lines) and worth pairing with a mypy gate so it cannot recur.

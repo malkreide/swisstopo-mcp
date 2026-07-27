@@ -1,0 +1,21 @@
+check_run:
+  id: SCALE-004
+  status: pass
+  evidence_collected: 5
+  evidence_required: 2
+  findings:
+    - "Multi-stage build with named stages: FROM python:3.11-slim AS builder (Dockerfile:6) and FROM python:3.11-slim AS runtime (Dockerfile:13) — two FROM statements, both on a -slim base"
+    - "Build artefacts only are carried over: the builder installs into an isolated prefix (RUN pip install --no-cache-dir --prefix=/install ., Dockerfile:11) and the runtime stage copies just that prefix (COPY --from=builder /install /usr/local, Dockerfile:18). No compiler/apt build-essential is installed in either stage, so no build toolchain survives into the runtime image"
+    - "Non-root execution: a fixed high UID/GID account is created (RUN useradd --uid 10001 --user-group --create-home --shell /usr/sbin/nologin mcp, Dockerfile:16) and USER 10001 is set before CMD (Dockerfile:20); matched at the orchestrator layer by runAsNonRoot/runAsUser 10001 (deploy/kubernetes.yaml:28-31)"
+    - "HEALTHCHECK directive present with sane timings and no extra tooling: --interval=30s --timeout=3s --start-period=5s --retries=3 using stdlib urllib against /healthz (Dockerfile:32-33); the route it probes exists (src/swisstopo_mcp/server.py:671-675) and was verified live to return 200 {\"status\":\"ok\"}"
+    - "EXPOSE 8000 (Dockerfile:29) matches the K8s containerPort and probe port (deploy/kubernetes.yaml:39-40, :49-60), and .dockerignore exists to keep build context lean"
+  gaps:
+    - "Final image size (< 200 MB criterion) could NOT be measured: no Docker daemon is reachable in this audit environment (docker build failed with 'failed to connect to the docker API at unix:///var/run/docker.sock'). python:3.11-slim (~130 MB) plus mcp/httpx/pydantic/pydantic-settings/structlog/uvicorn puts the expected result close to the 200 MB line — recommend recording `docker images` output in CI so the criterion is measured rather than assumed."
+    - "Minor: the HEALTHCHECK URL hardcodes 127.0.0.1:8000 (Dockerfile:33) while the port is overridable via --port / SWISSTOPO_HTTP_PORT — running the image on a different port silently yields a permanently unhealthy container."
+  evaluator_notes: |
+    Every structurally verifiable criterion passes: two named stages, slim base,
+    no build toolchain in the runtime layer, explicit non-root user, and a
+    working HEALTHCHECK. The single unverified item is image size, blocked by the
+    absence of a Docker daemon here rather than by anything in the repo, and the
+    build is structured such that a large image would be surprising. Recorded as
+    a gap to measure, not as a failure.

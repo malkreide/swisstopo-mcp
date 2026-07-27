@@ -1,0 +1,24 @@
+check_run:
+  id: ARCH-003
+  status: partial
+  evidence_collected: 5
+  evidence_required: 2
+  findings:
+    - "The response envelope carries a machine-readable match_type field (exact | fuzzy | none) — src/swisstopo_mcp/models.py:16 and models.py:67-69 — and it is set on 39 call sites across the tool modules, so empty results are reported as `match_type: none` rather than as an error. Second pass criterion met."
+    - "Two tools do return an actionable hint on empty: src/swisstopo_mcp/geocoding.py:56-62 ('Versuche einen kürzeren oder allgemeineren Suchbegriff, prüfe die Schreibweise, oder grenze mit dem Parameter `origins` ein') and src/swisstopo_mcp/openplz.py:327-329 / openplz.py:486-487 / openplz.py:507-509, which explain that OpenPLZ answers an unknown key with HTTP 200 + [] and name the likely cause."
+    - "No fuzzy or suggestion mechanism exists anywhere in the codebase: the literal \"fuzzy\" appears only in the type definition at src/swisstopo_mcp/models.py:16 and is never emitted by any handler (grep over src/, 0 producing call sites). The first pass criterion — empty results trigger a fuzzy match or a suggestion mechanism — is unmet."
+    - "Several core search tools return a bare negative with no follow-up path: src/swisstopo_mcp/rest_api.py:196 ('Keine Layer gefunden für {query}.'), rest_api.py:215, rest_api.py:240, src/swisstopo_mcp/stac.py:154-156 and src/swisstopo_mcp/geodata.py:637. These are the primary discovery entry points, so an empty answer there ends the chain without offering a refinement."
+    - "The repository itself records this as open: docs/roadmap.md:33 lists '[ ] Suggestion mechanism for empty results — still open (ARCH-003)' under Phase 2, directly beneath the completed match_type item."
+  gaps:
+    - "No fuzzy fallback or suggestion generator for any non-sensitive search tool (swisstopo_search_layers, swisstopo_find_features, swisstopo_search_geodata, list_available_layers)."
+    - "For those tools the `match_type: none` response carries no actionable note — only a statement that nothing was found."
+  evaluator_notes: |
+    The structural half of the check is fully in place (match_type on every
+    search-style tool, empty != error, no 'No results found' string returns,
+    and the sensitive-data exception is not applicable since all data are
+    public OGD). The behavioural half is not: pass criteria 1 and 3 require a
+    fuzzy/suggestion fallback and an actionable hint at match_type == none, and
+    five of the search tools return a bare negative. Two tools (geocode,
+    openplz) show the intended pattern, which is why this is partial rather
+    than fail. docs/roadmap.md:33 confirms the maintainer regards this as
+    unfinished, so a pass here would contradict the repo's own record.

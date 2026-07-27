@@ -1,0 +1,24 @@
+check_run:
+  id: SDK-004
+  status: partial
+  evidence_collected: 6
+  evidence_required: 2
+  findings:
+    - "CORS middleware is configured on the Streamable-HTTP app with the critical header exposed: expose_headers=[\"Mcp-Session-Id\"] and allow_headers including \"Mcp-Session-Id\" — src/swisstopo_mcp/server.py:676-682"
+    - "Origins are never wildcarded: allow_origins=allowed_origins or [] (src/swisstopo_mcp/server.py:678), fed from the SWISSTOPO_ALLOWED_ORIGINS env var via pydantic-settings (src/swisstopo_mcp/config.py:25-31, passed at src/swisstopo_mcp/server.py:696). Default is the empty list, i.e. no cross-origin access unless configured"
+    - "allow_credentials is not enabled (absent at src/swisstopo_mcp/server.py:676-682), which is correct for auth_model=none and avoids the wildcard+credentials CORS violation"
+    - "Regression tests assert the config: tests/test_http_app.py:19-33 check expose_headers, allow_headers and the explicit origin list, plus the no-origins default"
+    - "RUNTIME (Modus 2) — preflight is correct: OPTIONS /mcp with Origin: https://client.example.com returns HTTP 200 with access-control-allow-origin: https://client.example.com, access-control-allow-methods: GET, POST, OPTIONS and access-control-allow-headers including Mcp-Session-Id. A POST without Origin returns HTTP 200 and an mcp-session-id header, so the session mechanism itself works"
+    - "RUNTIME DEFECT — the actual cross-origin POST from the explicitly allowed origin is rejected: POST /mcp with Origin: https://client.example.com returns HTTP 403 'Invalid Origin header' (response still carries access-control-expose-headers: Mcp-Session-Id, so CORS is fine — the request is killed one layer earlier). Cause: FastMCP auto-enables DNS-rebinding protection with a localhost-only origin allow-list when its internal host is 127.0.0.1 (mcp 1.28.1, mcp/server/fastmcp/server.py:177-183), and the server never passes transport_security= (src/swisstopo_mcp/server.py:42-44) nor mirrors settings.allowed_origins into it — grep for transport_security/TransportSecuritySettings across src/, tests/ and docs/ returns nothing"
+  gaps:
+    - "SWISSTOPO_ALLOWED_ORIGINS reaches CORSMiddleware only. The MCP SDK's TransportSecurityMiddleware keeps its auto-derived allowed_origins = [http://127.0.0.1:*, http://localhost:*, http://[::1]:*], so every configured browser origin is 403'd before the handler runs — the exact 'CORS looks right, browser client still breaks' symptom SDK-004 exists to prevent, only moved one layer down."
+    - "No test covers a real cross-origin POST; tests/test_http_app.py inspects middleware kwargs only, which is why the 403 was invisible to CI."
+    - "Remediation: pass transport_security=TransportSecuritySettings(enable_dns_rebinding_protection=True, allowed_origins=settings.origins_list, allowed_hosts=[...]) to FastMCP (or configure it before building the HTTP app) and add an end-to-end cross-origin request test. See SCALE-001 for the matching Host-header failure."
+  evaluator_notes: |
+    The CORS configuration itself meets every pass criterion and is
+    test-covered — that part is genuinely correct. Status is partial because the
+    live probe shows the configured browser origin is still refused (403) by the
+    SDK's transport-security layer, so the intended outcome of the check (a
+    browser client can read Mcp-Session-Id and complete a session) is not
+    achieved in any configuration a deployment can reach. This is new evidence
+    that the previous, code-review-only pass did not surface.

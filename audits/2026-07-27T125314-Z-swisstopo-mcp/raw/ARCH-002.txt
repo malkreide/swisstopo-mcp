@@ -1,0 +1,20 @@
+check_run:
+  id: ARCH-002
+  status: pass
+  evidence_collected: 4
+  evidence_required: 2
+  findings:
+    - "23/23 tools (100%, threshold is 80%) contain a <use_case> tag in the description delivered over the wire — measured at runtime on the assembled FastMCP instance (src/swisstopo_mcp/server.py:42). Example src/swisstopo_mcp/server.py:100-102."
+    - "Description length: median 369 chars, minimum 181 chars (swisstopo_reverse_geocode, src/swisstopo_mcp/server.py:118-121). Both pass criteria (median >= 100, no tool < 50) are met with a wide margin."
+    - "17/23 tools additionally carry <important_notes> with real caveats, not filler: src/swisstopo_mcp/server.py:363-366 (ch.are.bauzonen is an ARE synthesis and NOT legally binding), src/swisstopo_mcp/server.py:438-441 (REFRAME axis order easting=lon reverses the lat/lon order used elsewhere), src/swisstopo_mcp/server.py:567-569 (Overpass is ODbL and rate-limited)."
+    - "Differentiation between similar tools is explicit inside the descriptions: identify_features vs find_features cross-reference each other (src/swisstopo_mcp/server.py:179-180 and 200-201), and swisstopo_layer_info names its role as the bridge that supplies valid `search_field` values to swisstopo_find_features (src/swisstopo_mcp/server.py:406-408)."
+  gaps:
+    - "The newly added swisstopo_zoning_at does not name the competing generic paths to the same data. Its <use_case> (src/swisstopo_mcp/server.py:361-362) only contrasts itself with the swisstopo_search_layers chain; neither swisstopo_identify_features (server.py:174-182) nor query_geodata (server.py:534-544) mentions that zoning at a point should go through swisstopo_zoning_at. See ARCH-007 for the routing consequence."
+  evaluator_notes: |
+    Measured against the actual serialized descriptions, not the source text.
+    Coverage (100% use_case), length (median 369) and caveat quality all clear
+    the pass criteria. The fourth criterion ("bei mehreren ähnlichen Tools:
+    Description macht Differenzierung explizit") is met for the identify/find
+    pair and for layer_info, and only partially for the zoning cluster — a
+    single unmet sub-point against three solid ones keeps this at pass, with
+    the ambiguity carried as the substantive finding under ARCH-007.

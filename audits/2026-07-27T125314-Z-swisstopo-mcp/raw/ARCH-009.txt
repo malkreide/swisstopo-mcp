@@ -1,0 +1,23 @@
+check_run:
+  id: ARCH-009
+  status: pass
+  evidence_collected: 5
+  evidence_required: 2
+  findings:
+    - "All 23 tools carry explicit annotations — none rely on SDK defaults. Verified at runtime by dumping tool.annotations for every entry of mcp.list_tools(); each returns {'title': ..., 'readOnlyHint': True, 'destructiveHint': False, 'idempotentHint': True, 'openWorldHint': True}. Registration sites e.g. src/swisstopo_mcp/server.py:89-95, 146-152, 350-356, 424-430, 587-593."
+    - "The three tools added since the last audit are annotated to the same standard, so no drift was introduced: swisstopo_zoning_at (src/swisstopo_mcp/server.py:350-356), swisstopo_municipality_at (server.py:373-379), swisstopo_layer_info (server.py:395-401), plus swisstopo_convert_coordinates (server.py:424-430)."
+    - "readOnlyHint is consistent with actual behaviour: every handler issues only GET-style reads through the shared client (src/swisstopo_mcp/api_client.py) and no tool writes, deletes, or sends. No tool name carries a delete_/create_/update_/remove_ prefix — the check's inconsistency grep returns zero hits — and destructiveHint is explicitly False everywhere rather than omitted."
+    - "openWorldHint: True is correct and not blanket-guessed: every one of the 23 tools reaches an external host (api3/data/geodesy.geo.admin.ch, geodienste.ch, overpass.osm.ch, openplzapi.org, cantonal OEREB endpoints), matching the profile's tools_make_external_requests=true. idempotentHint: True is correct for a read-only surface where repeated calls with equal arguments return equal results."
+    - "The annotations policy is documented in both READMEs: README.md:313-317 ('This server is in Phase 1 — Read-only wrapper. All 23 tools are readOnlyHint: true / destructiveHint: false; there are no write or send capabilities') and README.de.md:311-315, with the phase model in docs/roadmap.md:53-57 stating that any write tool would first require a re-run of the Lethal-Trifecta assessment."
+  gaps:
+    - "The README overview states readOnlyHint and destructiveHint only — idempotentHint and openWorldHint appear nowhere in README.md, README.de.md or docs/ (grep: 0 hits), so the documented policy is narrower than the shipped annotations."
+    - "No CI drift test asserts that annotations stay consistent with tool behaviour; tests/ contains no assertion over tool.annotations (the only list_tools() use is tests/test_responses.py:78, which checks output schemas)."
+  evaluator_notes: |
+    All five substantive pass criteria are met: every tool is explicitly
+    annotated with all four hints, the values match observable behaviour, and
+    both READMEs document the policy. Since the whole surface is uniformly
+    read-only, a per-tool table would be redundant — the blanket statement
+    covers all 23 accurately, which satisfies the 'Annotations-Übersicht im
+    README' criterion. The two gaps are documentation completeness and drift
+    protection, not incorrect annotations, so neither weakens the host-side
+    safety model this high-severity check protects.

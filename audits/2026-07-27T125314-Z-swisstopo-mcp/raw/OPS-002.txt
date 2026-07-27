@@ -1,0 +1,38 @@
+check_run:
+  id: OPS-002
+  status: pass
+  evidence_collected: 8
+  evidence_required: 4
+  findings:
+    - "All eight mandatory README sections are present in README.md: Anchor demo query (:34-36), Installation (:62-81 and the generated uvx block :484-500), Available Tools (:147-221, tables per family), Configuration (:101-145), Security & Compliance (:309-362), Architecture ASCII diagram (:240-262), Known Limitations (:402-407), License (:457-461) and Contributing (:451-455)."
+    - "Anchor demo query is concrete and natural-language, not a tool invocation: README.md:34 — 'Which communes are in the Uster district, and what are their BFS numbers for joining with BFS statistics data?' with the join-key rationale at :35 and a pointer to EXAMPLES.md at :36. Mirrored in German at README.de.md:33-35."
+    - "ASCII architecture diagram uses box-drawing characters and shows the data flow across all upstream families: README.md:241-261 (Claude/MCP Host -> swisstopo-mcp with '23 Tools' and 'Stdio | Streamable HTTP' -> Swisstopo REST, Geocoding, STAC, OEREB cantonal, geodienste.ch, overpass.osm.ch (ODbL), OpenPLZ). Present in German at README.de.md:240-262."
+    - "Known Limitations lists 4 explicit limits (README.md:404-407: OEREB canton requirement, STAC v0.9 metadata gaps, Swiss-addresses-only geocoding, Swisstopo rate limits) plus a dated live-probe findings subsection (README.md:409+ 'Known findings — OpenPLZ live probe (2026-07-20)'). German equivalent at README.de.md:405-412."
+    - "Bilingual parity holds: `grep -E '^## '` on both files yields the same 19 top-level sections modulo translation (Overview/Uebersicht, Available Tools/Verfuegbare Tools, Response Format/Antwortformat, Known Limitations/Bekannte Einschraenkungen, Security & Compliance/Sicherheit & Compliance, MCP Primitives/MCP-Primitive, ...). The one difference is the machine-generated uvx install block, which exists only in README.md:483-500 (marked <!-- BEGIN GENERATED: install -->)."
+    - "CHANGELOG.md follows Keep a Changelog: header + link at CHANGELOG.md:1-6, [Unreleased] section at :8 with Added (:10-58), Changed (:60-67) and Fixed (:69-77) subsections, dated releases below ([0.2.0] - 2026-07-20 at :79)."
+    - "The new surface is documented in the CHANGELOG with the reasoning, not just the fact: CHANGELOG.md:11-27 covers all three ported tools and states the ARE non-binding caveat and that it travels per record; :29-32 explains the bfs_commune_number int normalisation and why the two layers disagree; :44-58 covers the REFRAME tool including the new egress host and the axis-order trap."
+    - "CONTRIBUTING is bilingual (CONTRIBUTING.md + CONTRIBUTING.de.md), as are SECURITY.md/SECURITY.de.md — both referenced from the README (README.md:311, :453)."
+  gaps:
+    - "The architecture diagram (README.md:241-261, README.de.md:240-262) was not updated for the new upstream: geodesy.geo.admin.ch (REFRAME) is absent even though it is a new egress host added this release (api_client.py:17, ALLOWED_HOSTS api_client.py:55)."
+    - "The Overview source table (README.md:22-33 / README.de.md:22-32) lists 9 sources but does not name ARE / ch.are.bauzonen or swissBOUNDARIES3D, so the two new data producers are invisible at the overview level. It also has no licence column — see CH-004."
+    - "Known Limitations was not extended for the new tools: the ARE non-binding caveat and the municipality-on-a-boundary empty-result case are documented only in the tool descriptions (server.py:363-366, :386-388) and the CHANGELOG, not in the README's limits list."
+    - "README.de.md has no equivalent of the generated uvx Installation block (README.md:483-500), so a German-only reader gets the clone-and-install path only."
+  evaluator_notes: |
+    PASS. Every criterion the check enumerates is satisfied: all eight mandatory
+    sections exist, the anchor demo query is genuinely non-technical and
+    specific, the ASCII diagram is real box-drawing (not prose), the limits
+    section names four limits (bar is three), CHANGELOG is Keep-a-Changelog
+    with an actively maintained [Unreleased], and CONTRIBUTING exists in both
+    languages with full top-level section parity between the two READMEs.
+
+    The documentation quality is above the bar in places the check does not
+    even ask for — the CHANGELOG explains *why* decisions were made (the
+    polynomial-vs-REFRAME trade-off, the bfs_no type disagreement), and
+    README.md:355-362 documents the execution-vs-protocol error contract.
+
+    The gaps are all currency issues from the 19 -> 23 growth rather than
+    missing structure: the diagram and the overview source table lag the code
+    by one release. None of them breaks a stated pass criterion, so they are
+    recorded as gaps. The missing per-source licence documentation is the same
+    underlying omission reported as a partial under CH-004; it is scored there
+    rather than double-counted here.

@@ -1,0 +1,27 @@
+check_run:
+  id: OBS-002
+  status: pass
+  evidence_collected: 5
+  evidence_required: 2
+  findings:
+    - "Central masking helper: src/swisstopo_mcp/api_client.py:250-280 (`handle_api_error`). Unexpected exceptions are logged to stderr with type+detail (api_client.py:279) and the caller receives only 'Unerwarteter interner Fehler. Bitte spaeter erneut versuchen.' (api_client.py:280) — the raw exception text never reaches the LLM. Comment at api_client.py:277-278 names OBS-002 explicitly."
+    - "Only intentional, user-facing validation errors keep their text: api_client.py:273-275 special-cases ValueError/PermissionError (the Pydantic/egress-allowlist messages that the LLM is meant to act on), logged at warning level. HTTP status errors are translated to fixed German strings (api_client.py:254-264) that expose nothing beyond the status code."
+    - "No traceback leakage anywhere: grep for traceback / format_exc / sys.exc_info over src/ returns only src/swisstopo_mcp/logging_config.py:43 (structlog format_exc_info processor) and logging_config.py:79 (exc_info=True on the tool_failed log record) — both write to stderr, never into a tool return."
+    - "All three new-source handlers route their generic except through the masking helper: src/swisstopo_mcp/rest_api.py:432 and 466, src/swisstopo_mcp/coords.py:309. Regression-tested at tests/test_places.py:142-147, which asserts the upstream response body ('boom') does not appear in the returned summary."
+    - "`mask_error_details` is not set on the FastMCP constructor (src/swisstopo_mcp/server.py:42-76) because the parameter does not exist in this SDK. Verified against the pinned dependency: mcp 1.28.1, mcp.server.fastmcp.FastMCP.__init__ parameters are name, instructions, website_url, icons, auth_server_provider, token_verifier, event_store, retry_interval, tools, debug, log_level, host, port, mount_path, sse_path, message_path, streamable_http_path, json_response, stateless_http, warn_on_duplicate_*, dependencies, lifespan, auth, transport_security — no mask_error_details (that flag belongs to the third-party fastmcp 2.x package, not mcp[cli] as pinned in pyproject.toml:33)."
+  gaps:
+    - "src/swisstopo_mcp/coords.py:305-306 catches ValueError broadly and returns f'Fehler bei Eingabe: {e}'. That path also catches the _to_float failure at coords.py:242, which embeds the raw upstream REFRAME value via {value!r}. It is upstream public API data rather than server internals, so the disclosure risk is negligible, but the message is not a fixed string."
+    - "Logs are written unredacted to stderr by design; no PII filter or DLP processor in the structlog chain (logging_config.py:37-52). Acceptable here because auth_model=none and no user identity or credential ever enters a log record."
+  evaluator_notes: |
+    PASS. The pass criterion 'FastMCP-Init hat mask_error_details=True' is not
+    applicable to this stack — I verified against the installed, pinned SDK
+    (mcp 1.28.1) that the constructor has no such parameter. The check's intent
+    is satisfied by an equivalent in-handler mechanism that is arguably stronger
+    than the framework flag, because it distinguishes actionable validation
+    errors (kept verbatim so the LLM can self-correct) from unexpected internals
+    (replaced with a fixed string and logged to stderr).
+
+    All four handlers added or changed since the last audit go through the same
+    helper, so the 19 -> 23 tool growth did not open a new leak path. The one
+    non-fixed message (coords.py:306) echoes an upstream REFRAME field value,
+    not server state, and is recorded as a gap rather than a finding.

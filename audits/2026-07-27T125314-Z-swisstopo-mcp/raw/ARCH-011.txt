@@ -1,0 +1,29 @@
+check_run:
+  id: ARCH-011
+  status: partial
+  evidence_collected: 6
+  evidence_required: 3
+  findings:
+    - "All five mandatory top-level files are present at the repo root: README.md, README.de.md, CHANGELOG.md, LICENSE, pyproject.toml — plus the bilingual extras CONTRIBUTING.md / CONTRIBUTING.de.md and SECURITY.md / SECURITY.de.md."
+    - "All three mandatory directories exist: src/, tests/ and .github/workflows/. tests/ holds 22 test modules and is correctly outside src/."
+    - "The src-layout is correct: src/ contains the package directory src/swisstopo_mcp/ (not loose .py files), and pyproject.toml declares it explicitly — build-backend hatchling with [tool.hatch.build.targets.wheel] packages = [\"src/swisstopo_mcp\"] (pyproject.toml lines 1-3 and 56-57)."
+    - "CI coverage exceeds the minimum: .github/workflows/ci.yml runs pytest -m 'not live' plus ruff across Python 3.11/3.12/3.13 (ci.yml:29-37), .github/workflows/publish.yml publishes on release, and .github/workflows/security.yml runs gitleaks. The 'not live' marker is declared in pyproject.toml under [tool.pytest.ini_options] markers."
+    - "README.de.md is a genuine parallel document, not a stub: 20 top-level sections in README.md vs 19 in README.de.md, mapping 1:1 semantically (Overview/Uebersicht, Available Tools/Verfuegbare Tools, Security & Compliance, MCP Primitives/MCP-Primitive, …). The single difference is the generated uvx install block (README.md:484, between the BEGIN/END GENERATED: install markers), which has no German counterpart."
+    - "Tool bodies are split by domain module — geocoding.py, rest_api.py, height.py, stac.py, wmts.py, oereb.py, geodata.py, overpass.py, openplz.py, coords.py — and src/swisstopo_mcp/server.py contains only registrations that delegate (e.g. server.py:358 `return await zoning_at(params)`). However there is no src/swisstopo_mcp/tools/ directory, and server.py is 701 lines against the check's <200-line guidance for a registry file; the bulk is decorator blocks and docstrings, not logic."
+  gaps:
+    - "No tools/ sub-package despite 23 tools; the equivalent split lives as flat per-domain modules under src/swisstopo_mcp/, and src/swisstopo_mcp/server.py is 701 lines (check guidance: <200 for a registry-only file)."
+    - "This deviation is not justified anywhere: README.md:266-305 and README.de.md:266-303 render the layout as a tree but give no rationale, and the check requires deviations from the standard structure to be argued in the README."
+    - "README.de.md lacks the generated uvx '## Installation' section present at README.md:484, so the section inventory is 20 vs 19."
+  evaluator_notes: |
+    Five of the seven pass criteria are met cleanly — mandatory files,
+    mandatory directories, correct src-layout, CI workflows beyond the
+    required minimum, and a real bilingual README parity. Two are not: the
+    >5-tools structural criterion (tools/ directory, registry file under 200
+    lines) and the requirement that any deviation be justified in the README.
+    Substantively the intent of the layout rule is honoured — no 800-line
+    god-file, tool logic sits in per-domain modules that mirror the upstream
+    API families, and server.py holds only wiring. So this is a low-impact,
+    documentation-shaped partial: either move the domain modules under
+    tools/ or add two sentences to the README's Project Structure section
+    explaining the flat-module choice. Not a pass as written, because the
+    check explicitly conditions deviations on being argued.

@@ -1,0 +1,39 @@
+check_run:
+  id: OBS-006
+  status: fail
+  evidence_collected: 5
+  evidence_required: 3
+  findings:
+    - "No OpenTelemetry SDK anywhere in the dependency tree: pyproject.toml:31-40 ([project].dependencies = mcp[cli], httpx, pydantic, pydantic-settings, structlog) and pyproject.toml:43-49 ([project.optional-dependencies].dev = pytest, pytest-asyncio, pytest-cov, respx, ruff). No opentelemetry-api / -sdk / -exporter-otlp / -instrumentation-httpx."
+    - "No tracing code in src/: case-insensitive grep for opentelemetry | otel | tracer | start_as_current_span | set_attribute over src/ returns zero tracing hits (the only 'span'-adjacent matches are the word 'lifespan' at api_client.py:80,82,98 and server.py:28,44). There is no observability module and no traced_tool decorator; the only cross-cutting instrumentation is the structlog decorator at logging_config.py:63-91 (OBS-003)."
+    - "No auto-instrumentation of the HTTP client, so upstream latency is untraced: src/swisstopo_mcp/api_client.py:88-99 builds the shared httpx.AsyncClient with no HTTPXClientInstrumentor().instrument() call, and the retry wrapper at api_client.py:146-187 records nothing beyond a debug log line (api_client.py:169). Backend hop latency to api3.geo.admin.ch / geodesy.geo.admin.ch / overpass.osm.ch / openplzapi.org is therefore invisible as a child span."
+    - "No OTLP configuration in any deployment artifact: grep for OTEL_EXPORTER_OTLP_ENDPOINT | OTEL_SERVICE_NAME | OTEL_RESOURCE_ATTRIBUTES over deploy/, Dockerfile and docs/ returns zero hits. deploy/kubernetes.yaml:39-44 sets only SWISSTOPO_HTTP_HOST and SWISSTOPO_ALLOWED_ORIGINS; the container has liveness/readiness probes on /healthz (deploy/kubernetes.yaml:50-60) but no telemetry sidecar, collector reference or service-name tag."
+    - "No observability plan in the docs either: grep for observab|metric|prometheus|trace|tracing|monitor over deploy/, docs/, README.md and SECURITY.md returns a single unrelated hit (docs/geodaten-erweiterung-phase1.md:280, about error messages vs stacktraces). docs/roadmap.md lists no tracing item in any phase."
+  gaps:
+    - "OpenTelemetry SDK not installed and TracerProvider/OTLP exporter not initialised."
+    - "No per-tool-call span with mcp.tool.name / mcp.user.id / mcp.tool.result.is_error attributes."
+    - "No HTTPX auto-instrumentation, so the four external upstreams produce no child spans and backend bottlenecks cannot be attributed."
+    - "No OTEL_EXPORTER_OTLP_ENDPOINT / OTEL_SERVICE_NAME env wiring in deploy/kubernetes.yaml or the Dockerfile, despite is_cloud_deployed=true."
+    - "No P99 latency or anomalous-tool-sequence forensics possible; only per-call duration_ms in unaggregated stderr JSON logs (logging_config.py:83)."
+  evaluator_notes: |
+    FAIL. applies_when is `is_cloud_deployed == true`, which the server profile
+    asserts and the repo corroborates (Dockerfile, deploy/kubernetes.yaml,
+    deploy/ingress-sticky-sessions.yaml, docs/deployment.md, a dual-transport
+    HTTP app with /healthz at server.py:657-683). The check is therefore in
+    scope and nothing that satisfies it exists — this is an absence, not a
+    partial implementation, so partial would overstate it.
+
+    Note this check was NOT part of the 2026-05-29 run (36 checks, OBS-006
+    absent from verification-results.json), so this is a first evaluation
+    rather than a regression.
+
+    Mitigating context for triage, not for the status: severity is medium; the
+    server is unauthenticated public-open-data and read-only, so the
+    user-behaviour forensics motivation (leg 2 of the check's rationale) is weak
+    here — there is no user identity to attach to a span and no
+    read+exfiltrate pattern to detect. The genuinely missing capability is
+    backend-bottleneck attribution across four independent upstream APIs, three
+    of which (overpass.osm.ch, openplzapi.org, geodienste.ch) are
+    community/third-party endpoints with known transient 503s (api_client.py:130-138).
+    structlog already emits per-call duration_ms, so an OTLP exporter plus
+    HTTPXClientInstrumentor would be a small increment rather than a rebuild.

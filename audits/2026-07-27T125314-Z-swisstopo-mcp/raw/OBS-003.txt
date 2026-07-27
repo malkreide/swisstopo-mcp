@@ -1,0 +1,29 @@
+check_run:
+  id: OBS-003
+  status: pass
+  evidence_collected: 6
+  evidence_required: 2
+  findings:
+    - "structlog is a hard runtime dependency, not a dev extra: pyproject.toml:39 ('structlog>=24.1.0' in [project].dependencies)."
+    - "JSON output configured centrally: src/swisstopo_mcp/logging_config.py:37-52 — processor chain is merge_contextvars, add_log_level, TimeStamper(fmt='iso'), StackInfoRenderer, format_exc_info, JSONRenderer. configure_logging() is idempotent (logging_config.py:21,26-31,53) and level-configurable via SWISSTOPO_LOG_LEVEL (logging_config.py:32) / settings.log_level (server.py:23)."
+    - "Per-tool-call bound context: src/swisstopo_mcp/logging_config.py:63-91 — the @log_tool_call decorator binds `tool` and a `correlation_id` (uuid4 hex, 12 chars) at logging_config.py:70 and emits tool_invoked (:71), tool_completed with duration_ms (:82-86) and tool_failed with duration_ms + exc_info (:76-80)."
+    - "Coverage is complete for the grown surface: 23 @log_tool_call decorators for 23 @mcp.tool registrations. The four new handlers are included — rest_api.py:405 (swisstopo_zoning_at), rest_api.py:435 (swisstopo_municipality_at), rest_api.py:470 (swisstopo_layer_info), coords.py:265 (swisstopo_convert_coordinates)."
+    - "Four severity levels are actually used, not just info: debug (api_client.py:169 upstream_retry, :193/:205/:220/:228/:244 upstream_request), info (logging_config.py:71,82; server.py:33,39 server_started/server_stopped), warning (api_client.py:274 handled_error), error (api_client.py:279 unexpected_error; logging_config.py:76 tool_failed)."
+    - "Regression-tested: tests/test_logging.py:14-16 (idempotency), :19-32 (JSON rendering), :36-51 (tool_invoked/tool_completed at info with correlation_id bound on every record), :53-68 (tool_failed at error level), :70-78 (decorator transparency on a real handler). Runtime probe confirmed the emitted shape: {\"k\": 1, \"event\": \"probe_event\", \"level\": \"info\", \"timestamp\": \"2026-07-27T13:01:51Z\"}."
+  gaps:
+    - "The correlation_id is generated per tool call inside the decorator (logging_config.py:70); it is not derived from or joined to an inbound MCP session id or a client-supplied trace header, so multi-step workflows cannot be stitched together across tool calls. See OBS-006 for the tracing counterpart."
+  evaluator_notes: |
+    PASS on every criterion: structured logger in dependencies, JSON output,
+    four severity levels in live use, bound per-call context with tool name and
+    correlation id, and no print() anywhere in src/.
+
+    The important re-audit question was whether the tool-surface growth left
+    handlers unlogged. It did not — the decorator count (23) matches the tool
+    count (23) exactly, and all four handlers added since the last run carry it.
+
+    The only shortfall is workflow-level correlation: each call gets a fresh
+    random id with no parent, so a multi-tool chain (e.g. geocode ->
+    zoning_at -> municipality_at) produces three unrelated ids. That is a
+    genuine limitation of the check's 'Multi-Step-Workflows nicht
+    nachvollziehbar' anti-pattern, but the per-call binding the criterion
+    literally requires is present, so it is recorded as a gap.

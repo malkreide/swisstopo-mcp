@@ -1,0 +1,23 @@
+check_run:
+  id: SCALE-003
+  status: partial
+  evidence_collected: 4
+  evidence_required: 2
+  findings:
+    - "Header-based routing is specified with the right primitives: HAProxy backend with `stick on req.hdr(Mcp-Session-Id)` over a `stick-table type string len 64 size 100k expire 1h` — deploy/ingress-sticky-sessions.yaml:11-18. Capacity (100k sessions) and TTL (1h) both meet the pass criteria"
+    - "GAP — that HAProxy block is a YAML comment, not deployable configuration: lines deploy/ingress-sticky-sessions.yaml:11-18 are all `#`-prefixed. No haproxy.cfg or nginx.conf exists in the repo (searched for haproxy.cfg / nginx.conf / ingress*.yaml — only deploy/ingress-sticky-sessions.yaml is present)"
+    - "GAP — the only executable manifest in the file is Option B, NGINX Ingress cookie affinity (deploy/ingress-sticky-sessions.yaml:28-49). It does not read Mcp-Session-Id at all; the file itself states 'NGINX cannot stick on an arbitrary request header, so it pins clients with an affinity cookie instead' (deploy/ingress-sticky-sessions.yaml:23-25). It also omits nginx.ingress.kubernetes.io/upstream-hash-by: \"$http_mcp_session_id\", which the check's own remediation snippet prescribes"
+    - "GAP — nothing in the repo applies any of it by default: deploy/kubernetes.yaml ships replicas: 1 (deploy/kubernetes.yaml:18) and a plain ClusterIP Service with no sessionAffinity (deploy/kubernetes.yaml:76-86); the ingress file is explicitly conditional ('Apply ONE of these alongside deploy/kubernetes.yaml after raising replicas', deploy/ingress-sticky-sessions.yaml:8)"
+  gaps:
+    - "The edge LB does not read the Mcp-Session-Id header in any applicable configuration: header-based sticking exists only as commented HAProxy pseudo-config, and the deployable NGINX path is cookie-based. A non-browser MCP client (no cookie jar) scaled beyond one replica would therefore break — the NAT/cookie caveat the check calls out."
+    - "Service in deploy/kubernetes.yaml:76-86 sets no sessionAffinity: ClientIP either, so there is no fallback affinity at the Service layer."
+    - "No failover behaviour has been tested or documented (Modus 2 not run; nothing in tests/ or docs/deployment.md covers it)."
+  evaluator_notes: |
+    Applicable under this profile (transport=dual, is_cloud_deployed=true) and
+    likely not evaluated in the previous run, which recorded
+    is_cloud_deployed=false. The team clearly knows the correct pattern — the
+    HAProxy stick-table snippet is exactly right, including size and TTL — but it
+    exists as documentation rather than configuration, and the one manifest that
+    could actually be applied routes by cookie, not by Mcp-Session-Id. Partial:
+    the knowledge is captured, the routing layer is not. Low urgency while
+    replicas stays at 1; must be closed before any scale-out.

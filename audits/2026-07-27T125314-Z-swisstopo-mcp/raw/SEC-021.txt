@@ -1,0 +1,33 @@
+check_run:
+  id: SEC-021
+  status: partial
+  evidence_collected: 8
+  evidence_required: 4
+  findings:
+    - "Code-layer allow-list is a frozenset, not env-derived: src/swisstopo_mcp/api_client.py:51-64 declares ALLOWED_HOSTS with an inline comment stating it is deliberately not loaded from env so it cannot be silently widened at runtime. The new REFRAME host is present: api_client.py:56 (`\"geodesy.geo.admin.ch\",  # REFRAME — official coordinate transformation`)."
+    - "Pre-request check is enforced centrally: assert_host_allowed at src/swisstopo_mcp/api_client.py:67-74, called before the first attempt in request_with_retry (api_client.py:162-163), which is the path used by geo_admin_request (:194), geo_admin_request_text (:206), reframe_request (:221), stac_request (:229), openplz_request (:245), geodata.py:113/:449/:464 and overpass.py:159. The two handlers that call the client directly still assert first: src/swisstopo_mcp/oereb.py:98 and src/swisstopo_mcp/oereb.py:161. No call site passes check_host=False (grep: the parameter appears only at api_client.py:154 and :162)."
+    - "The new host is documented in docs/network-egress.md:13 — the table row `geodesy.geo.admin.ch | REFRAME — official LV95<->WGS84 coordinate transformation | convert_coordinates` — and the CHANGELOG records the addition at CHANGELOG.md:50 ('New egress host `geodesy.geo.admin.ch` (SEC-021 allow-list + docs)')."
+    - "Update procedure is documented as a 5-step checklist including the network-layer rule and a PR justification: docs/network-egress.md:40-49."
+    - "Network-layer egress control exists for the containerised deployment: deploy/kubernetes.yaml:90-118 defines NetworkPolicy `swisstopo-mcp-egress` (policyTypes: Egress) permitting TCP/443 to 0.0.0.0/0 except RFC1918 and 169.254.0.0/16, with DNS explicitly allowed via UDP/53 to kube-system (deploy/kubernetes.yaml:112-118) — the DNS-path criterion is met."
+    - "Regression tests exist and cover the new host: tests/test_egress_allowlist.py:23-25 parametrises over every member of ALLOWED_HOSTS, :27-38 asserts rejection of evil.example.com, 169.254.169.254, the suffix-trick host api3.geo.admin.ch.evil.com and localhost, and :41-48 asserts every OEREB_ENDPOINTS host is on the list. tests/test_coords.py:190-197 adds a REFRAME-specific pair (geodesy.geo.admin.ch allowed; geodesy.geo.admin.ch.evil.com raises PermissionError)."
+    - "GAP — docs/network-egress.md:34-38 is factually wrong and contradicts the shipped manifest. It states: 'the server runs locally over stdio today and is not cloud-deployed, so no Kubernetes NetworkPolicy / security-group egress rule is shipped. If/when the server is containerised, add a network-layer egress allow-list'. deploy/kubernetes.yaml:87-118 does ship exactly that policy, docs/deployment.md:5-6 references it as 'the network-layer half of SEC-021', and the audit profile records is_cloud_deployed=true. A reader following the Update-procedure at docs/network-egress.md:48 ('only relevant for cloud deployment') would skip updating a policy that exists."
+    - "GAP — the network layer is a CIDR/port policy, not a host allow-list. deploy/kubernetes.yaml:101-108 permits TCP/443 to the whole public internet minus private ranges; it does not restrict egress to the 10 hosts in ALLOWED_HOSTS. A compromised image that bypassed the code check could still reach any public HTTPS endpoint — which is the precise failure mode ('Bei kompromittiertem Code-Image keine Defense') the two-layer requirement exists to prevent."
+  gaps:
+    - "docs/network-egress.md:34-38 claims no NetworkPolicy is shipped while deploy/kubernetes.yaml:90-118 ships one — stale text contradicting the manifest and the is_cloud_deployed=true profile."
+    - "Network-layer control is CIDR-based, not host-based; it does not mirror ALLOWED_HOSTS as the check's documentation pattern (`NetworkPolicy egress` per host) requires."
+    - "SECURITY.md:24 describes the allow-list as 'restricted to *.geo.admin.ch and the cantonal OEREB endpoints' — stale since geodienste.ch, overpass.osm.ch and openplzapi.org were added (api_client.py:60-62)."
+    - "assert_host_allowed checks only the hostname, never the scheme (api_client.py:69), so http:// to an allow-listed host passes — relevant because geodata.py:447 and :464 build URLs from an upstream catalogue value (geodata.py:96-104)."
+  evaluator_notes: |
+    The re-audit focus resolves cleanly on the first half: geodesy.geo.admin.ch
+    IS on the code-layer frozenset (api_client.py:56), IS documented in
+    docs/network-egress.md:13, IS in the CHANGELOG, and IS covered by two tests.
+    That part is exemplary.
+    The network layer is where this falls short of pass. A NetworkPolicy does
+    exist (deploy/kubernetes.yaml:90-118) — so the check's headline requirement
+    is not simply missing — but it is a private-range blocklist on port 443
+    rather than an allow-list mirroring the 10 hosts, and the egress
+    documentation actively denies that it exists. The contradiction is the more
+    urgent fix of the two: docs/network-egress.md:34-38 tells a maintainer the
+    network layer is out of scope, which will keep it out of sync as hosts are
+    added. Both halves must be true for this check to pass; today the code layer
+    is solid and the network layer is coarse and mis-documented.

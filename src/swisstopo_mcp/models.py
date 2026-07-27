@@ -22,6 +22,20 @@ SWISSTOPO_LICENSE = "Swiss Open Government Data (opendata.swiss)"
 # separate host (geodesy.geo.admin.ch) — named separately so a caller can tell
 # an amtliche transformation apart from the local polynomial approximation.
 REFRAME_SOURCE = "swisstopo REFRAME (geodesy.geo.admin.ch)"
+REFRAME_LICENSE = SWISSTOPO_LICENSE
+ARE_SOURCE = "ch.are.bauzonen (ARE) / geo.admin.ch"
+# ARE is a different federal office than swisstopo, so its licence is asserted
+# rather than inherited from SWISSTOPO_LICENSE by default (audit CH-004).
+ARE_LICENSE = "Swiss Open Government Data (opendata.swiss) — Bundesamt für Raumentwicklung ARE"
+SWISSBOUNDARIES_SOURCE = "swissBOUNDARIES3D (swisstopo) / geo.admin.ch"
+SWISSBOUNDARIES_LICENSE = SWISSTOPO_LICENSE
+# The harmonised zoning layer is a federal synthesis for comparability across
+# cantons; it is NOT the legally binding plan. This caveat must travel with every
+# zoning result, not only in the prose summary.
+ARE_ZONING_CAVEAT = (
+    "Der harmonisierte Layer ch.are.bauzonen ist eine Synthese des ARE. "
+    "Rechtsverbindlich ist allein die kantonale/kommunale Nutzungsplanung."
+)
 OEREB_SOURCE = "ÖREB-Kataster (Kanton)"
 OEREB_LICENSE = "Kantonale ÖREB-Nutzungsbedingungen"
 GEODIENSTE_SOURCE = "geodienste.ch (Kantone)"
@@ -87,5 +101,20 @@ class ToolResponse(BaseModel):
         )
 
     @classmethod
-    def error(cls, summary: str, *, source: str = SWISSTOPO_SOURCE) -> ToolResponse:
-        return cls(summary=summary, results=[], count=0, is_error=True, source=source)
+    def error(
+        cls,
+        summary: str,
+        *,
+        source: str = SWISSTOPO_SOURCE,
+        license: str = SWISSTOPO_LICENSE,
+    ) -> ToolResponse:
+        # `license` mirrors `ok()` so an error envelope attributes the same
+        # source it would have on success (audit CH-004).
+        return cls(
+            summary=summary,
+            results=[],
+            count=0,
+            is_error=True,
+            source=source,
+            license=license,
+        )

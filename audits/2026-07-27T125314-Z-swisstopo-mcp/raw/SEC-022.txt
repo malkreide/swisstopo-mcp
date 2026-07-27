@@ -1,0 +1,34 @@
+check_run:
+  id: SEC-022
+  status: fail
+  evidence_collected: 6
+  evidence_required: 3
+  findings:
+    - "Namespace prefixing is inconsistent across the 23-tool surface: 17 tools carry the `swisstopo_` server prefix (src/swisstopo_mcp/server.py:88, 108, 145, 165, 186, 207, 235, 256, 279, 307, 328, 349, 372, 394, 423, 456, 475) while 6 do not — `list_available_layers` (server.py:504), `query_geodata` (server.py:525), `query_osm_features` (server.py:552), `lookup_postal_code` (server.py:586), `find_commune` (server.py:609) and `search_address` (server.py:636)."
+    - "Those 6 unprefixed names are precisely the collision-prone generic form the check's Fail-Pattern describes. `search_address`, `find_commune`, `query_geodata` and `lookup_postal_code` are names any other Swiss-data MCP server in this portfolio could plausibly register — and the server's own instructions text tells the model these join to swiss-statistics-mcp and zurich-opendata-mcp (src/swisstopo_mcp/server.py:70-74), i.e. exactly the multi-server aggregation scenario where shadowing bites."
+    - "The unprefixed set grew in the two most recent feature releases rather than shrinking: the geodata façade tools were added at CHANGELOG.md:131-152 and the three OpenPLZ tools at CHANGELOG.md:80-107, both without a namespace prefix, while every tool added in the same period under the swisstopo API families kept the prefix (CHANGELOG.md:11-23)."
+    - "No tool-definition hash snapshot exists: `tool-hashes.json` is absent from the repo root, and neither .github/workflows/publish.yml nor .github/workflows/ci.yml contains a hash/sha256/tool-snapshot step (grep over .github/workflows/ returns no match). Rug-pull detection by a host is therefore not possible against a published baseline."
+    - "PARTIAL CREDIT — CHANGELOG.md does name tool-definition changes explicitly and in detail: new tools with rationale (CHANGELOG.md:11-23, :33-44, :45-57), a Changed entry explaining what was deliberately not altered (:59-66), and a Fixed entry describing the `sr` input-contract change that alters existing tool schemas (:68-75)."
+    - "PARTIAL CREDIT — versioning is coherent: pyproject.toml:8 and server.json:5 both read 0.2.0 (the mismatch is recorded as fixed at CHANGELOG.md:76-77), and tool additions were shipped as minor bumps."
+  gaps:
+    - "6 of 23 tools have no server-identity prefix (server.py:504, 525, 552, 586, 609, 636) — Pass-Criteria 1 and 2 unmet."
+    - "No hash snapshot of tool definitions is generated at release and none is stored in the repo — Pass-Criterion 3 unmet."
+    - "CHANGELOG entries carry no per-tool hashes and no 'Re-approval needed in Claude Desktop' note for the `sr` contract change — Pass-Criterion 5 unmet."
+    - "The `sr=2056` fix (CHANGELOG.md:68-75) narrows an accepted input value on three existing tools, which is a breaking change to the tool contract, yet shipped inside a minor/unreleased bump rather than a major — Pass-Criterion 6 arguably unmet."
+  evaluator_notes: |
+    Fail rather than partial: the check's headline control — a consistent
+    server-identity prefix so cross-server shadowing is structurally impossible
+    — is objectively broken on 6 of 23 tools, and the second control (release
+    hash snapshot) is entirely absent. Three of the four remaining criteria are
+    also unmet.
+    Credit where due: CHANGELOG discipline here is genuinely good and covers the
+    "names tool-definition changes" criterion well, which is why this is a
+    targeted fix rather than a rewrite. Renaming the 6 tools to
+    `swisstopo_list_available_layers`, `swisstopo_query_geodata`,
+    `swisstopo_query_osm_features`, `swisstopo_lookup_postal_code`,
+    `swisstopo_find_commune` and `swisstopo_search_address` is a breaking change
+    and should ride a major bump together with the hash-snapshot CI step. Note
+    the tension the maintainer will feel: those 6 are the deliberately
+    source-neutral façade tools (OSM, OpenPLZ, geodienste — not swisstopo data),
+    so the prefix reads as a misnomer. The resolution is that the prefix denotes
+    the *server* identity, not the data source.

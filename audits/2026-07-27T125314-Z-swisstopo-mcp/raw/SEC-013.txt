@@ -1,0 +1,21 @@
+check_run:
+  id: SEC-013
+  status: pass
+  evidence_collected: 5
+  evidence_required: 3
+  findings:
+    - "The server holds no secrets at all. Every environment read in the package is non-sensitive: src/swisstopo_mcp/config.py:12-26 (http_host, http_port, allowed_origins, log_level), src/swisstopo_mcp/logging_config.py:32 (SWISSTOPO_LOG_LEVEL) and src/swisstopo_mcp/oereb.py:33 (SWISSTOPO_OEREB_CANTONS). grep over src/ for KEY|SECRET|TOKEN|PASSWORD in an os.environ context returns zero hits."
+    - "All 10 upstream hosts are keyless public APIs (src/swisstopo_mcp/api_client.py:51-64), and the module docstring states this explicitly (src/swisstopo_mcp/server.py:9: 'Alle Endpunkte sind offen (kein API-Schluessel erforderlich)')."
+    - "The Stufe-1 (plain env-var) posture is documented with its justification: .env.example:2-3 states 'None of these are secrets — the server uses only key-less public APIs', and SECURITY.md:28 records the control row ('Env-vars only; .gitignore guards .env; no hardcoded secrets')."
+    - "Container image carries no secrets in any layer: the only ENV directives are PYTHONUNBUFFERED, PYTHONDONTWRITEBYTECODE, SWISSTOPO_HTTP_HOST and SWISSTOPO_LOG_LEVEL (Dockerfile:22-27); deploy/kubernetes.yaml:39-43 sets only SWISSTOPO_HTTP_HOST and SWISSTOPO_ALLOWED_ORIGINS with no secretKeyRef and no ExternalSecret."
+    - "Regression control against accidental secret introduction: gitleaks runs on every push and PR with full history (.github/workflows/security.yml), and .gitignore covers .env."
+  gaps:
+    - "There is no dedicated docs/secret-management.md; the Stufe-1 justification lives in SECURITY.md:28 and .env.example:2-3 instead of the file named in the Pass-Criteria."
+    - "No rotation procedure is documented — vacuous today (no secret exists) but would need writing the moment a keyed upstream is added."
+  evaluator_notes: |
+    data_class is Public Open Data and the server uses no credentials whatsoever,
+    so the check's Stufe-1 allowance applies and is satisfied: the choice is
+    documented, the container image is clean, and CI scans for regressions.
+    Recorded as pass; the two gaps are documentation-placement items that become
+    material only if a keyed upstream (e.g. a contract-bound cantonal endpoint)
+    is ever added.

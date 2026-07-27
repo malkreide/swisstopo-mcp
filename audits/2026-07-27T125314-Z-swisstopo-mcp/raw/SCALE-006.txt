@@ -1,0 +1,22 @@
+check_run:
+  id: SCALE-006
+  status: pass
+  evidence_collected: 4
+  evidence_required: 2
+  findings:
+    - "Memory and CPU limits are both explicitly set on the container: limits cpu \"500m\" / memory \"256Mi\" — deploy/kubernetes.yaml:65-67"
+    - "Requests are set and strictly smaller than the limits, leaving burst headroom: requests cpu \"50m\" / memory \"128Mi\" (deploy/kubernetes.yaml:62-64) vs the limits above — 10x CPU burst, 2x memory burst"
+    - "Ephemeral storage is capped too, so a runaway temp write cannot fill the node: the only writable mount is an emptyDir with sizeLimit: 64Mi (deploy/kubernetes.yaml:71-74) on a read-only root filesystem (deploy/kubernetes.yaml:46-48)"
+    - "The limits are plausible for this workload rather than arbitrary: a single shared httpx.AsyncClient with httpx default pool caps (src/swisstopo_mcp/api_client.py:88-99), no local data cache or dump storage anywhere in src/, so the 256Mi/500m envelope matches the check's 256 MB-1 GB / 0.5-1 CPU rule of thumb for a stateless API-facade server"
+  gaps:
+    - "No explicit FD/ulimit configuration exists (no ulimits: nofile in any manifest; Kubernetes cannot set it per-container anyway, so the container inherits the runtime default). Acceptable here — the server holds one pooled client with httpx default max_connections, far below 1024 — but it is unverified rather than deliberately chosen."
+    - "OOM behaviour has not been exercised: no load or stress test in tests/ or docs/, so 256Mi is an estimate that has never been validated against a large response (e.g. a full-canton find_commune listing up to OPENPLZ_MAX_RECORDS=2000 records, src/swisstopo_mcp/openplz.py:49)."
+    - "restartPolicy is not stated explicitly in deploy/kubernetes.yaml; it relies on the Deployment default (Always), which is correct but implicit."
+  evaluator_notes: |
+    Applicable for the first time under this profile (is_cloud_deployed=true).
+    The three hard criteria — explicit memory limit, explicit CPU limit, requests
+    below limits — are all met in the shipped manifest, and the disk dimension is
+    capped as well. Remaining items (FD limit, OOM/load validation) are
+    verification gaps rather than missing controls, and the FD default is
+    adequate for a server with one pooled HTTP client. Recommend one load test
+    against the paged OpenPLZ path to confirm 256Mi holds before raising traffic.

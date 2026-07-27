@@ -1,0 +1,765 @@
+{
+  "audit_meta": {
+    "audit_meta": {
+      "server_name": "swisstopo-mcp",
+      "run_id": "2026-07-27T125314-Z-swisstopo-mcp",
+      "started_at": "2026-07-27T12:53:14.045286+00:00",
+      "timezone_offset": "Z",
+      "skill_version": "1.0.0",
+      "output_dir": "/home/user/swisstopo-mcp/audits/2026-07-27T125314-Z-swisstopo-mcp",
+      "catalog_hash": "091f446b27965044ce658a1d5f4b2cabe2b0ab5661dcc1a53b6be8f1f2e093c0",
+      "catalog_dir": "/root/.claude/skills/mcp-audit/checks"
+    },
+    "agent_runs": []
+  },
+  "results": {
+    "ARCH-001": {
+      "status": "pass",
+      "category": "ARCH",
+      "severity": "medium",
+      "evidence": [
+        "All 23 registered tools use exactly one convention (snake_case), verified at runtime via mcp.list_tools(): swisstopo_geocode … search_address. Registration is explicit `name=` on every decorator, e.g. src/swisstopo_mcp/server.py:88, src/swisstopo_mcp/server.py:349, src/swisstopo_mcp/server.py:423.",
+        "No tool name contains spaces, dots, parentheses or non-ASCII characters; all match ^[a-z][a-z0-9_]*$ (23/23 checked at runtime against the live FastMCP instance built from src/swisstopo_mcp/server.py:42).",
+        "Descriptions carry use-case context, not just function: measured runtime description length median 369 chars, min 181 chars (swisstopo_reverse_geocode), max 835 chars (find_commune) — every tool is far above the one-sentence anti-pattern. Example src/swisstopo_mcp/server.py:359-367 (swisstopo_zoning_at, 561 chars incl. legal caveat).",
+        "Near-duplicate tools are disambiguated in the description text itself: src/swisstopo_mcp/server.py:200-201 (find_features: 'Im Gegensatz zu swisstopo_identify_features (Punktabfrage) wird hier nach einem Attribut gesucht') and src/swisstopo_mcp/server.py:179-180 (the reciprocal note on identify_features)."
+      ],
+      "gaps": [
+        "Two prefix families coexist: 17 tools are namespaced `swisstopo_*` while 6 (list_available_layers, query_geodata, query_osm_features, lookup_postal_code, find_commune, search_address — src/swisstopo_mcp/server.py:504, 525, 552, 586, 609, 636) are not. This is a namespacing inconsistency, not a naming-convention violation; the unprefixed six are the non-swisstopo sources (geodienste/OSM/OpenPLZ), so the split is semantically motivated but undocumented."
+      ]
+    },
+    "ARCH-002": {
+      "status": "pass",
+      "category": "ARCH",
+      "severity": "medium",
+      "evidence": [
+        "23/23 tools (100%, threshold is 80%) contain a <use_case> tag in the description delivered over the wire — measured at runtime on the assembled FastMCP instance (src/swisstopo_mcp/server.py:42). Example src/swisstopo_mcp/server.py:100-102.",
+        "Description length: median 369 chars, minimum 181 chars (swisstopo_reverse_geocode, src/swisstopo_mcp/server.py:118-121). Both pass criteria (median >= 100, no tool < 50) are met with a wide margin.",
+        "17/23 tools additionally carry <important_notes> with real caveats, not filler: src/swisstopo_mcp/server.py:363-366 (ch.are.bauzonen is an ARE synthesis and NOT legally binding), src/swisstopo_mcp/server.py:438-441 (REFRAME axis order easting=lon reverses the lat/lon order used elsewhere), src/swisstopo_mcp/server.py:567-569 (Overpass is ODbL and rate-limited).",
+        "Differentiation between similar tools is explicit inside the descriptions: identify_features vs find_features cross-reference each other (src/swisstopo_mcp/server.py:179-180 and 200-201), and swisstopo_layer_info names its role as the bridge that supplies valid `search_field` values to swisstopo_find_features (src/swisstopo_mcp/server.py:406-408)."
+      ],
+      "gaps": [
+        "The newly added swisstopo_zoning_at does not name the competing generic paths to the same data. Its <use_case> (src/swisstopo_mcp/server.py:361-362) only contrasts itself with the swisstopo_search_layers chain; neither swisstopo_identify_features (server.py:174-182) nor query_geodata (server.py:534-544) mentions that zoning at a point should go through swisstopo_zoning_at. See ARCH-007 for the routing consequence."
+      ]
+    },
+    "ARCH-003": {
+      "status": "partial",
+      "category": "ARCH",
+      "severity": "medium",
+      "evidence": [
+        "The response envelope carries a machine-readable match_type field (exact | fuzzy | none) — src/swisstopo_mcp/models.py:16 and models.py:67-69 — and it is set on 39 call sites across the tool modules, so empty results are reported as `match_type: none` rather than as an error. Second pass criterion met.",
+        "Two tools do return an actionable hint on empty: src/swisstopo_mcp/geocoding.py:56-62 ('Versuche einen kürzeren oder allgemeineren Suchbegriff, prüfe die Schreibweise, oder grenze mit dem Parameter `origins` ein') and src/swisstopo_mcp/openplz.py:327-329 / openplz.py:486-487 / openplz.py:507-509, which explain that OpenPLZ answers an unknown key with HTTP 200 + [] and name the likely cause.",
+        "No fuzzy or suggestion mechanism exists anywhere in the codebase: the literal \\\"fuzzy\\\" appears only in the type definition at src/swisstopo_mcp/models.py:16 and is never emitted by any handler (grep over src/, 0 producing call sites). The first pass criterion — empty results trigger a fuzzy match or a suggestion mechanism — is unmet.",
+        "Several core search tools return a bare negative with no follow-up path: src/swisstopo_mcp/rest_api.py:196 ('Keine Layer gefunden für {query}.'), rest_api.py:215, rest_api.py:240, src/swisstopo_mcp/stac.py:154-156 and src/swisstopo_mcp/geodata.py:637. These are the primary discovery entry points, so an empty answer there ends the chain without offering a refinement.",
+        "The repository itself records this as open: docs/roadmap.md:33 lists '[ ] Suggestion mechanism for empty results — still open (ARCH-003)' under Phase 2, directly beneath the completed match_type item."
+      ],
+      "gaps": [
+        "No fuzzy fallback or suggestion generator for any non-sensitive search tool (swisstopo_search_layers, swisstopo_find_features, swisstopo_search_geodata, list_available_layers).",
+        "For those tools the `match_type: none` response carries no actionable note — only a statement that nothing was found."
+      ]
+    },
+    "ARCH-004": {
+      "status": "partial",
+      "category": "ARCH",
+      "severity": "high",
+      "evidence": [
+        "No tool handler touches transport internals: a grep for request.headers / remote_addr / websocket / stdin / stdout across src/ returns zero hits inside handlers. The only starlette imports are function-local inside build_http_app (src/swisstopo_mcp/server.py:667-669), i.e. in transport wiring, not in tool code. The single httpx.RequestError reference (src/swisstopo_mcp/api_client.py:176) is the outbound client, not the inbound transport.",
+        "Where a handler needs session context it takes the transport-agnostic MCP Context: src/swisstopo_mcp/server.py:337 (swisstopo_elevation_profile) and server.py:484 (swisstopo_get_oereb_extract), both forwarding `ctx=ctx` to the module handler. This is the documented pass pattern.",
+        "Both transports are served from one entrypoint and one FastMCP instance: src/swisstopo_mcp/server.py:686-701 selects stdio (mcp.run()) or Streamable HTTP (uvicorn over build_http_app), and build_http_app (server.py:674) derives from the same `mcp` object, so tool behaviour is identical by construction across transports.",
+        "The lifespan is shared by both transports: src/swisstopo_mcp/server.py:27-39 creates one httpx.AsyncClient and is attached at construction time (server.py:44), so the HTTP app and the stdio run reuse the same setup/teardown.",
+        "A pydantic-settings Settings object exists and is used for transport config: src/swisstopo_mcp/config.py:12-33 (env_prefix SWISSTOPO_, .env support), consumed at src/swisstopo_mcp/server.py:23, 694, 696, 697; covered by tests/test_config.py:8-30. Container and K8s override it by environment only (Dockerfile:22-27, deploy/kubernetes.yaml:39-42), never by code fork.",
+        "Two configuration reads bypass the Settings object: src/swisstopo_mcp/oereb.py:33 reads os.environ.get('SWISSTOPO_OEREB_CANTONS', 'ZH') at every call of get_active_cantons(), and src/swisstopo_mcp/logging_config.py:32 falls back to os.environ.get('SWISSTOPO_LOG_LEVEL'). Both contradict the module docstring at src/swisstopo_mcp/config.py:3-5 ('come from a single Settings object instead of ad-hoc sys.argv / os.environ reads'), and SWISSTOPO_OEREB_CANTONS is documented in .env.example:7 but has no field in Settings."
+      ],
+      "gaps": [
+        "Transport is selected by CLI flag (sys.argv, src/swisstopo_mcp/server.py:689-694), not by an env var / Settings field — the pass criterion asks for env-var selectability and Settings has no `transport` field (config.py:22-26).",
+        "src/swisstopo_mcp/oereb.py:33 reads os.environ directly at call time, so the enabled-canton set is a hidden global that is re-read per invocation; this is the 'ad-hoc env read instead of Settings object' pattern the check flags, and it makes the OEREB tool surface dependent on ambient process state rather than injected config."
+      ]
+    },
+    "ARCH-005": {
+      "status": "pass",
+      "category": "ARCH",
+      "severity": "critical",
+      "evidence": [
+        "No hardcoded secrets in source: pattern search over src/ for (api[_-]?key|password|passwd|secret|token|credential) returns exactly one hit — the word 'credentials' in a CORS comment at src/swisstopo_mcp/server.py:663. Searches for connection strings ((postgres|mysql|mongodb)://) and AWS keys (AKIA[0-9A-Z]{16}) over the whole repo return zero hits.",
+        "No default-value secrets: the only os.environ.get() defaults in the codebase are non-secret ('ZH' at src/swisstopo_mcp/oereb.py:33, 'INFO' at src/swisstopo_mcp/logging_config.py:32). The Settings object (src/swisstopo_mcp/config.py:12-30) declares only http_host, http_port, allowed_origins and log_level — no credential fields.",
+        "The server holds no secrets by design: every upstream is a key-less public API (api3.geo.admin.ch, data.geo.admin.ch, geodesy.geo.admin.ch, geodienste.ch, overpass.osm.ch, openplzapi.org), stated at src/swisstopo_mcp/server.py:9 and .env.example:2-3. SecretStr is therefore not applicable — there is no in-memory secret to wrap.",
+        ".gitignore ignores .env and .env.* while whitelisting the template (.gitignore lines 11-13: `.env`, `.env.*`, `!.env.example`); no real .env file is present in the working tree (ls of repo root shows only .env.example).",
+        ".env.example exists at repo root with placeholder/non-secret values only (SWISSTOPO_OEREB_CANTONS, SWISSTOPO_HTTP_HOST/PORT, SWISSTOPO_ALLOWED_ORIGINS, SWISSTOPO_LOG_LEVEL) and a header stating none of them are secrets; a gitleaks scan runs on every push and PR to master/main via .github/workflows/security.yml:10-21 (gitleaks/gitleaks-action@v3 with fetch-depth: 0 for full-history scanning)."
+      ],
+      "gaps": []
+    },
+    "ARCH-006": {
+      "status": "partial",
+      "category": "ARCH",
+      "severity": "high",
+      "evidence": [
+        "23 tools are exposed, confirmed at runtime via mcp.list_tools() against the instance built at src/swisstopo_mcp/server.py:42. That is in the check's '16–25: ernste Zweifel, ob alle nötig sind' band and roughly double the ideal of <= 12.",
+        "The budget is an explicit, documented decision rather than drift: CHANGELOG.md:24-28 records 'Tool budget raised from 20 to 25 to accommodate the consolidation', docs/roadmap.md:46 records the same under Phase 2.5, and docs/merge-plan-swiss-geodata-mcp.md:182 and :241 record the decision and its date. README.md:198 states the façade is 'kept under the 25-tool budget'.",
+        "Real aggregation exists and is documented: query_geodata fronts three distinct sources behind one tool (src/swisstopo_mcp/geodata.py:236-248 routes strassenverzeichnis / oereb-verfuegbarkeit / geodienste:<topic>:<canton>), explicitly to avoid one tool per source (src/swisstopo_mcp/geodata.py:4-13). Two new convenience tools collapse previously multi-call questions into one call (src/swisstopo_mcp/rest_api.py:405 zoning_at, rest_api.py:435 municipality_at).",
+        "Endpoint-shaped clusters remain and are not argued for in the README: five tools sit on the single api3 MapServer/SearchServer API — swisstopo_search_layers (rest_api.py:288, /SearchServer), swisstopo_layer_info (rest_api.py:470, /MapServer/{layer}), swisstopo_identify_features (rest_api.py:311, /identify), swisstopo_find_features (rest_api.py:339, /find), swisstopo_get_feature (rest_api.py:362, /{layer}/{id}) — a close 1:1 mapping of upstream endpoints. Two further search→detail pairs exist: swisstopo_search_geodata → swisstopo_get_collection and swisstopo_get_egrid → swisstopo_get_oereb_extract.",
+        "Budget figures have drifted out of sync across the repo: src/swisstopo_mcp/geodata.py:5 still says the façade keeps the server 'well under its 18-tool budget' and docs/geodaten-erweiterung-phase1.md:253 still states 'Budget: 18', while README/CHANGELOG/roadmap now say 25."
+      ],
+      "gaps": [
+        "Tool count (23) is nearly double the check's ideal of <= 12 and the README documents the budget number but not why the remaining endpoint-shaped clusters (search_layers/layer_info/identify/find/get_feature; search_geodata→get_collection; get_egrid→get_oereb_extract) cannot be aggregated further.",
+        "Stale budget numbers in src/swisstopo_mcp/geodata.py:5 and docs/geodaten-erweiterung-phase1.md:253 (both say 18) contradict the current documented budget of 25."
+      ]
+    },
+    "ARCH-007": {
+      "status": "partial",
+      "category": "ARCH",
+      "severity": "medium",
+      "evidence": [
+        "The 2026-05-29 remediation ('add a higher-level tool that resolves a common case in one call instead of a discovery chain') IS satisfied for point questions. swisstopo_zoning_at (src/swisstopo_mcp/rest_api.py:405-432) and swisstopo_municipality_at (rest_api.py:435-467) each answer a complete user question from a bare coordinate: they hardcode the layer (rest_api.py:30-32), run the identify internally via the shared helper _identify_lv95 (rest_api.py:381-402) and return a thought-complete record — zone type + code + municipality + BFS number + canton, or municipality + BFS number + canton. No layer-discovery call is required and the descriptions state this explicitly (src/swisstopo_mcp/server.py:361-362).",
+        "Both tools encapsulate non-trivial internal logic rather than exposing it: municipality_at filters the swissBOUNDARIES3D layer's one-polygon-per-historical-year records down to the current year (src/swisstopo_mcp/rest_api.py:442-447), and _as_bfs_number (rest_api.py:126-139) normalises the BFS join key across two upstream layers that disagree on its type. This is exactly the 'composability intern, Atomarität extern' pattern.",
+        "Provenance travels with the aggregate: zoning results carry the ARE non-binding legal caveat on every record, not only in the prose summary (src/swisstopo_mcp/rest_api.py:419-421 with the constant at src/swisstopo_mcp/models.py:30-33), and both tools set an explicit source (rest_api.py:429, rest_api.py:462).",
+        "Pointer-only tools remain, which is the check's named fail pattern. swisstopo_get_egrid returns nothing but a parcel ID whose only use is the follow-up call to swisstopo_get_oereb_extract (src/swisstopo_mcp/server.py:465-471, description literally 'Vorstufe zu swisstopo_get_oereb_extract'). Likewise swisstopo_search_layers returns layer IDs only (src/swisstopo_mcp/rest_api.py:159 '<important_notes>Liefert Layer-IDs, keine Feature-Daten'), swisstopo_search_geodata requires swisstopo_get_collection for the actual download links (server.py:249-250), and list_available_layers returns only keys for query_geodata (server.py:514).",
+        "No internal parallelisation anywhere: asyncio.gather / TaskGroup appear zero times in src/. The clearest missed case is the newly added swisstopo_layer_info, which makes two independent upstream calls sequentially — layer metadata at src/swisstopo_mcp/rest_api.py:474 and the legend at rest_api.py:495-498 — where the check explicitly asks for gather. The second pass criterion is unmet.",
+        "The larger surface created a genuine tool-selection ambiguity that is only half-mitigated. Zoning at a point is now reachable three ways: swisstopo_zoning_at, swisstopo_identify_features with layers='ch.are.bauzonen' (the same layer, src/swisstopo_mcp/rest_api.py:32), and query_geodata with a geodienste:<nutzungsplanung>:<canton> key (src/swisstopo_mcp/geodata.py:406-415). The repo's own merge plan flagged this as a pre-merge blocker requiring 'in `instructions` eine klare Entscheidungsregel' (docs/merge-plan-swiss-geodata-mcp.md:246-251). What landed is a mention, not a rule: src/swisstopo_mcp/server.py:50-52 says the direct tools exist, but states no precedence, and neither swisstopo_identify_features (server.py:174-182) nor query_geodata (server.py:534-544) cross-references swisstopo_zoning_at."
+      ],
+      "gaps": [
+        "Three paths to zoning data with no stated precedence rule — the countermeasure the merge plan itself required (docs/merge-plan-swiss-geodata-mcp.md:250-251) was implemented only as a mention in the instructions string (src/swisstopo_mcp/server.py:50-52), not as an explicit routing rule, and not mirrored into the competing tools' descriptions.",
+        "swisstopo_get_egrid still returns a bare ID that is useless without a second call (src/swisstopo_mcp/server.py:465-471); the ÖREB pair is the one remaining chain where a one-call aggregate (coordinate → ÖREB extract) would be a direct analogue of what zoning_at/municipality_at did for the layer chain.",
+        "No asyncio.gather in the codebase; swisstopo_layer_info's two independent upstream requests (src/swisstopo_mcp/rest_api.py:474 and :495) run sequentially."
+      ]
+    },
+    "ARCH-008": {
+      "status": "pass",
+      "category": "ARCH",
+      "severity": "medium",
+      "evidence": [
+        "Confirmed at runtime that the server is tools-only: against the live FastMCP instance (src/swisstopo_mcp/server.py:42), list_tools() returns 23, while list_resources(), list_resource_templates() and list_prompts() each return 0. A grep for @mcp.resource / @mcp.prompt across src/ likewise returns zero hits.",
+        "The tools-only choice is documented with a reason, satisfying the alternative pass criterion: README.md:364-369 ('MCP Primitives — This server intentionally exposes Tools only (no Resources or Prompts): it is a Phase-1 read-only wrapper, and every result is a live, parameterised API query rather than a static addressable document. Resources/Prompts may be added in a later phase if stable URI schemes emerge.').",
+        "The justification is mirrored in the German documentation at README.de.md:366, keeping the bilingual section inventory in parity.",
+        "The Resources-migration-potential criterion is evidenced as an assessed, tracked item rather than an omission: docs/roadmap.md:34 lists '[ ] Resources for static catalogs (e.g. notable map layers) (ARCH-008)' as an open Phase-2 entry, and README.md:371-383 documents the tool workflows that would feed such a catalog."
+      ],
+      "gaps": [
+        "Still only 1 of 3 primitives in use. The strongest concrete Resource candidate — a static catalog of notable map layers, which would take load off the 23-entry tool manifest (see ARCH-006) — remains unimplemented and open on the roadmap."
+      ]
+    },
+    "ARCH-009": {
+      "status": "pass",
+      "category": "ARCH",
+      "severity": "high",
+      "evidence": [
+        "All 23 tools carry explicit annotations — none rely on SDK defaults. Verified at runtime by dumping tool.annotations for every entry of mcp.list_tools(); each returns {'title': ..., 'readOnlyHint': True, 'destructiveHint': False, 'idempotentHint': True, 'openWorldHint': True}. Registration sites e.g. src/swisstopo_mcp/server.py:89-95, 146-152, 350-356, 424-430, 587-593.",
+        "The three tools added since the last audit are annotated to the same standard, so no drift was introduced: swisstopo_zoning_at (src/swisstopo_mcp/server.py:350-356), swisstopo_municipality_at (server.py:373-379), swisstopo_layer_info (server.py:395-401), plus swisstopo_convert_coordinates (server.py:424-430).",
+        "readOnlyHint is consistent with actual behaviour: every handler issues only GET-style reads through the shared client (src/swisstopo_mcp/api_client.py) and no tool writes, deletes, or sends. No tool name carries a delete_/create_/update_/remove_ prefix — the check's inconsistency grep returns zero hits — and destructiveHint is explicitly False everywhere rather than omitted.",
+        "openWorldHint: True is correct and not blanket-guessed: every one of the 23 tools reaches an external host (api3/data/geodesy.geo.admin.ch, geodienste.ch, overpass.osm.ch, openplzapi.org, cantonal OEREB endpoints), matching the profile's tools_make_external_requests=true. idempotentHint: True is correct for a read-only surface where repeated calls with equal arguments return equal results.",
+        "The annotations policy is documented in both READMEs: README.md:313-317 ('This server is in Phase 1 — Read-only wrapper. All 23 tools are readOnlyHint: true / destructiveHint: false; there are no write or send capabilities') and README.de.md:311-315, with the phase model in docs/roadmap.md:53-57 stating that any write tool would first require a re-run of the Lethal-Trifecta assessment."
+      ],
+      "gaps": [
+        "The README overview states readOnlyHint and destructiveHint only — idempotentHint and openWorldHint appear nowhere in README.md, README.de.md or docs/ (grep: 0 hits), so the documented policy is narrower than the shipped annotations.",
+        "No CI drift test asserts that annotations stay consistent with tool behaviour; tests/ contains no assertion over tool.annotations (the only list_tools() use is tests/test_responses.py:78, which checks output schemas)."
+      ]
+    },
+    "ARCH-011": {
+      "status": "partial",
+      "category": "ARCH",
+      "severity": "medium",
+      "evidence": [
+        "All five mandatory top-level files are present at the repo root: README.md, README.de.md, CHANGELOG.md, LICENSE, pyproject.toml — plus the bilingual extras CONTRIBUTING.md / CONTRIBUTING.de.md and SECURITY.md / SECURITY.de.md.",
+        "All three mandatory directories exist: src/, tests/ and .github/workflows/. tests/ holds 22 test modules and is correctly outside src/.",
+        "The src-layout is correct: src/ contains the package directory src/swisstopo_mcp/ (not loose .py files), and pyproject.toml declares it explicitly — build-backend hatchling with [tool.hatch.build.targets.wheel] packages = [\\\"src/swisstopo_mcp\\\"] (pyproject.toml lines 1-3 and 56-57).",
+        "CI coverage exceeds the minimum: .github/workflows/ci.yml runs pytest -m 'not live' plus ruff across Python 3.11/3.12/3.13 (ci.yml:29-37), .github/workflows/publish.yml publishes on release, and .github/workflows/security.yml runs gitleaks. The 'not live' marker is declared in pyproject.toml under [tool.pytest.ini_options] markers.",
+        "README.de.md is a genuine parallel document, not a stub: 20 top-level sections in README.md vs 19 in README.de.md, mapping 1:1 semantically (Overview/Uebersicht, Available Tools/Verfuegbare Tools, Security & Compliance, MCP Primitives/MCP-Primitive, …). The single difference is the generated uvx install block (README.md:484, between the BEGIN/END GENERATED: install markers), which has no German counterpart.",
+        "Tool bodies are split by domain module — geocoding.py, rest_api.py, height.py, stac.py, wmts.py, oereb.py, geodata.py, overpass.py, openplz.py, coords.py — and src/swisstopo_mcp/server.py contains only registrations that delegate (e.g. server.py:358 `return await zoning_at(params)`). However there is no src/swisstopo_mcp/tools/ directory, and server.py is 701 lines against the check's <200-line guidance for a registry file; the bulk is decorator blocks and docstrings, not logic."
+      ],
+      "gaps": [
+        "No tools/ sub-package despite 23 tools; the equivalent split lives as flat per-domain modules under src/swisstopo_mcp/, and src/swisstopo_mcp/server.py is 701 lines (check guidance: <200 for a registry-only file).",
+        "This deviation is not justified anywhere: README.md:266-305 and README.de.md:266-303 render the layout as a tree but give no rationale, and the check requires deviations from the standard structure to be argued in the README.",
+        "README.de.md lacks the generated uvx '## Installation' section present at README.md:484, so the section inventory is 20 vs 19."
+      ]
+    },
+    "ARCH-012": {
+      "status": "partial",
+      "category": "ARCH",
+      "severity": "medium",
+      "evidence": [
+        "There is no explicit protocolVersion pin in the server code: a case-insensitive grep for protocol.?version over src/ returns zero hits. The FastMCP instance is constructed with name, lifespan and instructions only (src/swisstopo_mcp/server.py:42-76), so the negotiated version is whatever the SDK default is.",
+        "The pin is genuinely not expressible through the SDK's public API, which mitigates the above: inspected mcp 1.28.1 in a clean venv — neither FastMCP.__init__ nor the lowlevel Server.__init__ accepts a protocol_version parameter, and mcp.types.LATEST_PROTOCOL_VERSION is '2025-11-25'. The version is negotiated during initialize and is not author-settable.",
+        "A compensating control is in place and deliberate: pyproject.toml:31-33 pins the SDK to the 1.x major with the inline rationale 'Pinned to the 1.x major so an SDK update cannot silently change the negotiated MCP protocol version (ARCH-012). Dependabot proposes bumps.' — mcp[cli]>=1.28.1,<2.0.0.",
+        "CHANGELOG.md exists in Keep-a-Changelog format with SemVer reference (CHANGELOG.md:1-6), an [Unreleased] section and dated releases ([0.2.0] - 2026-07-20, [0.1.0] - 2026-04-02). It is actively maintained — the three new tools and the 20→25 budget raise are recorded at CHANGELOG.md:11-28 — and the SDK pin decision itself is logged at CHANGELOG.md:206.",
+        "Both READMEs now carry the required section: README.md:340-345 'MCP Protocol Version' and README.de.md:341-347 'MCP-Protokollversion', each explaining the negotiate-plus-major-pin approach and pointing at Dependabot and CHANGELOG.md.",
+        "Automated SDK update PRs are configured: .github/dependabot.yml sets a monthly pip schedule with a dedicated 'mcp-sdk' group matching the mcp package (separated from a catch-all python-deps group), plus a monthly github-actions ecosystem entry."
+      ],
+      "gaps": [
+        "The README 'MCP Protocol Version' section names no concrete spec version — neither README.md:340-345 nor README.de.md:341-347 states which protocol version is actually negotiated (2025-11-25 under the pinned mcp 1.28.1), so the criterion 'README-Sektion mit aktuell unterstützter Version' is unmet and there is no baseline to detect a future silent change against.",
+        "No CHANGELOG entry references a spec version at all: a grep for 2024-11 / 2025-03 / 2025-06 / 2025-11 across CHANGELOG.md returns zero hits. The SDK pin is recorded (CHANGELOG.md:206) but not the protocol version it currently yields, leaving the audit-trail criterion unmet.",
+        "No breaking-change / compatibility-window policy is documented: the README section covers how updates are proposed (Dependabot, monthly) but not what happens when a spec change breaks compatibility — no semver-major trigger rule and no support window for older spec versions."
+      ]
+    },
+    "CH-004": {
+      "status": "partial",
+      "category": "CH",
+      "severity": "medium",
+      "evidence": [
+        "Envelope carries both fields by construction: src/swisstopo_mcp/models.py:70-71 defines `source` (default SWISSTOPO_SOURCE) and `license` (default SWISSTOPO_LICENSE) on every ToolResponse; ToolResponse.ok() takes both as keyword args (models.py:83-84).",
+        "NEW SOURCE ARE — attribution incomplete: src/swisstopo_mcp/rest_api.py:429 passes only `source=ARE_SOURCE` to ToolResponse.ok(); no `license=` is passed, so the ch.are.bauzonen response silently inherits SWISSTOPO_LICENSE. Empirically confirmed with a respx-mocked call: source='ch.are.bauzonen (ARE) / geo.admin.ch', license='Swiss Open Government Data (opendata.swiss)' (== SWISSTOPO_LICENSE default). models.py defines ARE_SOURCE (models.py:25) but there is NO ARE_LICENSE constant.",
+        "Same omission on the other two new sources: src/swisstopo_mcp/rest_api.py:462 (swissBOUNDARIES3D) and src/swisstopo_mcp/coords.py:280,303,306,309 (REFRAME) pass `source=` only. models.py:24,26 define REFRAME_SOURCE and SWISSBOUNDARIES_SOURCE with no matching *_LICENSE constants. For these two the swisstopo fallback is materially correct (both are swisstopo products); for ARE (Bundesamt fuer Raumentwicklung, a different federal office) the licence statement is inherited rather than asserted.",
+        "This breaks the pattern every other non-swisstopo source in the repo follows: OEREB (oereb.py:113-114,132-133,171-172,190-191,255-256), geodienste (geodata.py:454,490-491), OSM/ODbL (overpass.py:211) and OpenPLZ (openplz.py:406-407,438-439,455-456,474-475,496-497,517-518) all pass `source=` AND `license=` explicitly.",
+        "Error envelopes cannot carry a licence at all: src/swisstopo_mcp/models.py:99-100 — `ToolResponse.error()` accepts `source` but not `license`, so every handled error from ARE / OEREB / OSM / OpenPLZ / geodienste reports SWISSTOPO_LICENSE (e.g. rest_api.py:432, coords.py:306,309, overpass.py:214, openplz.py:411).",
+        "Per-record provenance for the ARE legal caveat IS correctly implemented: src/swisstopo_mcp/rest_api.py:421 attaches `legal_note: ARE_ZONING_CAVEAT` to every zoning record (models.py:30-33), not only to the prose summary (rest_api.py:152). Regression-tested at tests/test_places.py:110-115. Verified empirically: results[0]['legal_note'] present.",
+        "README licence documentation is incomplete: README.md:461 / README.de.md:462 name only 'Data provided by swisstopo ... under Open Government Data terms'. There is no 'Data sources & licences' table. The Overview source table (README.md:22-33) lists 9 sources but has no licence column and does not list ARE / ch.are.bauzonen, swissBOUNDARIES3D or the REFRAME service (geodesy.geo.admin.ch) at all. README.md:157-159 mentions swisstopo_zoning_at as '(not legally binding)' but never names ARE as the data producer.",
+        "No test asserts the licence field of the new sources: tests/test_places.py (300 lines, covers zoning/municipality/layer_info) and tests/test_coords.py never assert `out.source` or `out.license`; tests/test_responses.py:18-19,42,66 only assert SWISSTOPO_SOURCE and OEREB_SOURCE."
+      ],
+      "gaps": [
+        "No ARE_LICENSE constant in models.py and no `license=` argument at rest_api.py:429/432 — ch.are.bauzonen data ships under the swisstopo default licence constant rather than an ARE-specific attribution.",
+        "No SWISSBOUNDARIES_LICENSE / REFRAME_LICENSE constants; licence is inherited by omission rather than asserted (correct by accident for these two swisstopo products).",
+        "ToolResponse.error() (models.py:99) has no `license` parameter, so error envelopes for every non-swisstopo source mis-state the licence.",
+        "README.md / README.de.md have no per-source licence table; ARE, swissBOUNDARIES3D and REFRAME are not documented as distinct sources with their licences.",
+        "The ARE non-binding caveat is on every record but not in the ToolResponse-level fields; the empty-result path (rest_api.py:145) returns no record and therefore no caveat.",
+        "No regression test asserts source/license for the three new sources."
+      ]
+    },
+    "OBS-001": {
+      "status": "pass",
+      "category": "OBS",
+      "severity": "high",
+      "evidence": [
+        "All 23 tool handlers wrap their body in try/except and return a structured ToolResponse with is_error=true instead of raising. Verified on the new handlers: src/swisstopo_mcp/rest_api.py:431-432 (zoning_at), rest_api.py:464-467 (municipality_at), rest_api.py:504-505 (layer_info) and src/swisstopo_mcp/coords.py:305-310 (convert_coordinates, which additionally separates ValueError from generic upstream failures).",
+        "The execution-error flag is a first-class field of the envelope: src/swisstopo_mcp/models.py:74 (`is_error: bool`) and models.py:98-100 (`ToolResponse.error()` sets is_error=True, count=0, results=[]). FastMCP emits it as structured content with an output schema (tests/test_responses.py:79-84).",
+        "Protocol errors are deliberately NOT caught: no handler raises McpError or constructs JSON-RPC codes itself (grep for McpError / ErrorData / -32601 / -32602 / -32603 over src/: 0 hits). Unknown tool and schema-violating arguments bubble to the MCP SDK, which maps them to standard JSON-RPC codes.",
+        "Execution-error path is tested: tests/test_places.py:142-147 (upstream 500 on zoning_at -> is_error true, upstream body 'boom' absent from summary), tests/test_places.py:240-246 (layer_info upstream 500), tests/test_places.py:134-140 (empty upstream result is a soft miss with match_type='none', is_error=false — not an error), plus equivalents across tests/test_rest_api.py, tests/test_height.py, tests/test_oereb.py.",
+        "Protocol-error path is tested: tests/test_responses.py:87-103 (TestProtocolErrors) asserts that invalid params (search_text below min_length -> -32602) and an unknown tool name both raise out of mcp.call_tool rather than returning a ToolResponse. The contract is documented in README.md:355-362 and README.de.md:357-364."
+      ],
+      "gaps": [
+        "The envelope field is `is_error` in structured content; the MCP protocol-level `isError` flag on the tool result is left at false. The LLM-visible signal is present and documented, but a client keying purely on the protocol flag would not see handled errors.",
+        "No named error-code constants (INVALID_PARAMS, RATE_LIMIT_EXCEEDED, ...) exist in src/; the -32602 code appears only in a test comment (tests/test_responses.py:96) and in README prose (README.md:361). Protocol codes are entirely delegated to the SDK."
+      ]
+    },
+    "OBS-002": {
+      "status": "pass",
+      "category": "OBS",
+      "severity": "high",
+      "evidence": [
+        "Central masking helper: src/swisstopo_mcp/api_client.py:250-280 (`handle_api_error`). Unexpected exceptions are logged to stderr with type+detail (api_client.py:279) and the caller receives only 'Unerwarteter interner Fehler. Bitte spaeter erneut versuchen.' (api_client.py:280) — the raw exception text never reaches the LLM. Comment at api_client.py:277-278 names OBS-002 explicitly.",
+        "Only intentional, user-facing validation errors keep their text: api_client.py:273-275 special-cases ValueError/PermissionError (the Pydantic/egress-allowlist messages that the LLM is meant to act on), logged at warning level. HTTP status errors are translated to fixed German strings (api_client.py:254-264) that expose nothing beyond the status code.",
+        "No traceback leakage anywhere: grep for traceback / format_exc / sys.exc_info over src/ returns only src/swisstopo_mcp/logging_config.py:43 (structlog format_exc_info processor) and logging_config.py:79 (exc_info=True on the tool_failed log record) — both write to stderr, never into a tool return.",
+        "All three new-source handlers route their generic except through the masking helper: src/swisstopo_mcp/rest_api.py:432 and 466, src/swisstopo_mcp/coords.py:309. Regression-tested at tests/test_places.py:142-147, which asserts the upstream response body ('boom') does not appear in the returned summary.",
+        "`mask_error_details` is not set on the FastMCP constructor (src/swisstopo_mcp/server.py:42-76) because the parameter does not exist in this SDK. Verified against the pinned dependency: mcp 1.28.1, mcp.server.fastmcp.FastMCP.__init__ parameters are name, instructions, website_url, icons, auth_server_provider, token_verifier, event_store, retry_interval, tools, debug, log_level, host, port, mount_path, sse_path, message_path, streamable_http_path, json_response, stateless_http, warn_on_duplicate_*, dependencies, lifespan, auth, transport_security — no mask_error_details (that flag belongs to the third-party fastmcp 2.x package, not mcp[cli] as pinned in pyproject.toml:33)."
+      ],
+      "gaps": [
+        "src/swisstopo_mcp/coords.py:305-306 catches ValueError broadly and returns f'Fehler bei Eingabe: {e}'. That path also catches the _to_float failure at coords.py:242, which embeds the raw upstream REFRAME value via {value!r}. It is upstream public API data rather than server internals, so the disclosure risk is negligible, but the message is not a fixed string.",
+        "Logs are written unredacted to stderr by design; no PII filter or DLP processor in the structlog chain (logging_config.py:37-52). Acceptable here because auth_model=none and no user identity or credential ever enters a log record."
+      ]
+    },
+    "OBS-003": {
+      "status": "pass",
+      "category": "OBS",
+      "severity": "medium",
+      "evidence": [
+        "structlog is a hard runtime dependency, not a dev extra: pyproject.toml:39 ('structlog>=24.1.0' in [project].dependencies).",
+        "JSON output configured centrally: src/swisstopo_mcp/logging_config.py:37-52 — processor chain is merge_contextvars, add_log_level, TimeStamper(fmt='iso'), StackInfoRenderer, format_exc_info, JSONRenderer. configure_logging() is idempotent (logging_config.py:21,26-31,53) and level-configurable via SWISSTOPO_LOG_LEVEL (logging_config.py:32) / settings.log_level (server.py:23).",
+        "Per-tool-call bound context: src/swisstopo_mcp/logging_config.py:63-91 — the @log_tool_call decorator binds `tool` and a `correlation_id` (uuid4 hex, 12 chars) at logging_config.py:70 and emits tool_invoked (:71), tool_completed with duration_ms (:82-86) and tool_failed with duration_ms + exc_info (:76-80).",
+        "Coverage is complete for the grown surface: 23 @log_tool_call decorators for 23 @mcp.tool registrations. The four new handlers are included — rest_api.py:405 (swisstopo_zoning_at), rest_api.py:435 (swisstopo_municipality_at), rest_api.py:470 (swisstopo_layer_info), coords.py:265 (swisstopo_convert_coordinates).",
+        "Four severity levels are actually used, not just info: debug (api_client.py:169 upstream_retry, :193/:205/:220/:228/:244 upstream_request), info (logging_config.py:71,82; server.py:33,39 server_started/server_stopped), warning (api_client.py:274 handled_error), error (api_client.py:279 unexpected_error; logging_config.py:76 tool_failed).",
+        "Regression-tested: tests/test_logging.py:14-16 (idempotency), :19-32 (JSON rendering), :36-51 (tool_invoked/tool_completed at info with correlation_id bound on every record), :53-68 (tool_failed at error level), :70-78 (decorator transparency on a real handler). Runtime probe confirmed the emitted shape: {\\\"k\\\": 1, \\\"event\\\": \\\"probe_event\\\", \\\"level\\\": \\\"info\\\", \\\"timestamp\\\": \\\"2026-07-27T13:01:51Z\\\"}."
+      ],
+      "gaps": [
+        "The correlation_id is generated per tool call inside the decorator (logging_config.py:70); it is not derived from or joined to an inbound MCP session id or a client-supplied trace header, so multi-step workflows cannot be stitched together across tool calls. See OBS-006 for the tracing counterpart."
+      ]
+    },
+    "OBS-004": {
+      "status": "pass",
+      "category": "OBS",
+      "severity": "critical",
+      "evidence": [
+        "Zero print() statements in src/: `grep -rn 'print(' src/ --include='*.py'` returns no hits across all 16 modules (9113 LOC incl. tests). No TypeScript/console.log equivalent applies (sdk_language=Python).",
+        "Logging is pinned to stderr at the factory level: src/swisstopo_mcp/logging_config.py:48 — `logger_factory=structlog.WriteLoggerFactory(file=sys.stderr)`, with the rationale comment naming this check at logging_config.py:47 and in the module docstring (logging_config.py:3-6). There is no logging.basicConfig call and no StreamHandler pointed at stdout anywhere in src/ (grep for stdout/StreamHandler over src/ returns only comments).",
+        "Runtime verification: importing src/swisstopo_mcp/server.py (which executes configure_logging at server.py:23 and registers all 23 tools) and then emitting a log record produced EMPTY stdout (captured value: '') while the JSON record went to stderr: {\\\"k\\\": 1, \\\"event\\\": \\\"probe_event\\\", \\\"level\\\": \\\"info\\\", \\\"timestamp\\\": \\\"2026-07-27T13:01:51.633047Z\\\"}. Import-time side effects therefore do not corrupt the stdio protocol channel.",
+        "The configuration is transport-independent — there is no stdio-vs-HTTP switch in the logging path. server.py:23 calls configure_logging(settings.log_level) unconditionally at module import, before the transport is selected at server.py:686-701 (`--http` -> uvicorn, else mcp.run()). Dual transport therefore shares one stderr-only config, as the criterion requires.",
+        "The four handlers added since the last audit introduce no stdout writes: src/swisstopo_mcp/rest_api.py:405-505 (zoning_at, municipality_at, layer_info) and src/swisstopo_mcp/coords.py:265-310 (convert_coordinates) log exclusively through the @log_tool_call decorator and the module-level structlog logger."
+      ],
+      "gaps": [
+        "No CI guard against regression: .github/workflows/ci.yml runs pytest and `ruff check src/ tests/` but has no explicit 'no print() in src/' step. The ruff lint selection (pyproject.toml:[tool.ruff.lint] select = E,F,W,I,UP) does not include flake8-print (T20), so a re-introduced print() would pass CI.",
+        "No automated MCP Inspector smoke test in CI; the stdout-cleanliness evidence above is a manual runtime probe from this audit run."
+      ]
+    },
+    "OBS-006": {
+      "status": "fail",
+      "category": "OBS",
+      "severity": "medium",
+      "evidence": [
+        "No OpenTelemetry SDK anywhere in the dependency tree: pyproject.toml:31-40 ([project].dependencies = mcp[cli], httpx, pydantic, pydantic-settings, structlog) and pyproject.toml:43-49 ([project.optional-dependencies].dev = pytest, pytest-asyncio, pytest-cov, respx, ruff). No opentelemetry-api / -sdk / -exporter-otlp / -instrumentation-httpx.",
+        "No tracing code in src/: case-insensitive grep for opentelemetry | otel | tracer | start_as_current_span | set_attribute over src/ returns zero tracing hits (the only 'span'-adjacent matches are the word 'lifespan' at api_client.py:80,82,98 and server.py:28,44). There is no observability module and no traced_tool decorator; the only cross-cutting instrumentation is the structlog decorator at logging_config.py:63-91 (OBS-003).",
+        "No auto-instrumentation of the HTTP client, so upstream latency is untraced: src/swisstopo_mcp/api_client.py:88-99 builds the shared httpx.AsyncClient with no HTTPXClientInstrumentor().instrument() call, and the retry wrapper at api_client.py:146-187 records nothing beyond a debug log line (api_client.py:169). Backend hop latency to api3.geo.admin.ch / geodesy.geo.admin.ch / overpass.osm.ch / openplzapi.org is therefore invisible as a child span.",
+        "No OTLP configuration in any deployment artifact: grep for OTEL_EXPORTER_OTLP_ENDPOINT | OTEL_SERVICE_NAME | OTEL_RESOURCE_ATTRIBUTES over deploy/, Dockerfile and docs/ returns zero hits. deploy/kubernetes.yaml:39-44 sets only SWISSTOPO_HTTP_HOST and SWISSTOPO_ALLOWED_ORIGINS; the container has liveness/readiness probes on /healthz (deploy/kubernetes.yaml:50-60) but no telemetry sidecar, collector reference or service-name tag.",
+        "No observability plan in the docs either: grep for observab|metric|prometheus|trace|tracing|monitor over deploy/, docs/, README.md and SECURITY.md returns a single unrelated hit (docs/geodaten-erweiterung-phase1.md:280, about error messages vs stacktraces). docs/roadmap.md lists no tracing item in any phase."
+      ],
+      "gaps": [
+        "OpenTelemetry SDK not installed and TracerProvider/OTLP exporter not initialised.",
+        "No per-tool-call span with mcp.tool.name / mcp.user.id / mcp.tool.result.is_error attributes.",
+        "No HTTPX auto-instrumentation, so the four external upstreams produce no child spans and backend bottlenecks cannot be attributed.",
+        "No OTEL_EXPORTER_OTLP_ENDPOINT / OTEL_SERVICE_NAME env wiring in deploy/kubernetes.yaml or the Dockerfile, despite is_cloud_deployed=true.",
+        "No P99 latency or anomalous-tool-sequence forensics possible; only per-call duration_ms in unaggregated stderr JSON logs (logging_config.py:83)."
+      ]
+    },
+    "OPS-001": {
+      "status": "partial",
+      "category": "OPS",
+      "severity": "high",
+      "evidence": [
+        "Marker registered and CI excludes live tests: pyproject.toml:64-66 ([tool.pytest.ini_options] markers = ['live: live API tests (skipped in CI by default)']) and .github/workflows/ci.yml:26-28 runs `pytest tests/ -m \\\"not live\\\"` across a Python 3.11/3.12/3.13 matrix.",
+        "Large mocked unit suite: 22 test modules, ~464 test functions for 23 tools (tests/test_oereb.py 61, test_stac.py 48, test_height.py 47, test_rest_api.py 40, test_geocoding.py 38, test_places.py 28, test_openplz.py 27, test_wmts.py 26, test_coords.py 24, test_geodata.py 23, plus regression suites test_responses.py, test_logging.py, test_egress_allowlist.py, test_input_validation.py, test_shared_client.py, test_http_app.py, test_retry.py, test_context.py). Well above the '5 unit tests per tool' bar.",
+        "respx HTTP mocking is used where the transport matters: tests/test_places.py:12,96,109,117,128,134,142 (all zoning/municipality/layer_info paths), tests/test_coords.py, tests/test_openplz.py, tests/test_lv95_input.py, tests/test_retry.py. Other modules mock at the function boundary with monkeypatch instead (e.g. tests/test_responses.py:37,49,57).",
+        "The three new tools have proper three-way unit coverage: happy path (tests/test_places.py:96-107), error path (tests/test_places.py:142-147, upstream 500 -> is_error with body suppressed), and edge cases (tests/test_places.py:134-140 empty result as soft miss; :149-151 missing coordinates -> ValidationError; :172-184 historical-only municipality record -> soft miss).",
+        "Live tests exist for the new tools and are correctly marked: tests/test_places.py:282-299 (@pytest.mark.live class TestPlacesLive covering zoning_at, municipality_at, layer_info against Zurich LV95 2683531/1247914) and tests/test_coords.py:205-238 (@pytest.mark.live TestReframeLive with a WGS84->LV95->WGS84 roundtrip and a drift guard asserting the local polynomial stays within 1 m of REFRAME).",
+        "GAP — no nightly or manual live-test workflow: .github/workflows/ contains only ci.yml, publish.yml and security.yml. None has a `schedule:` trigger or a `pytest -m live` step, so the 17 live tests are never executed by automation and schema drift in the upstream APIs would go undetected until someone runs them by hand. This gap was already recorded in the 2026-05-29 run and is unchanged.",
+        "GAP — 5 of 23 tools have no live test: swisstopo_find_features and swisstopo_get_feature (tests/test_rest_api.py:361-378 covers only search_layers and identify_features), swisstopo_get_collection (tests/test_stac.py:386 covers only search_geodata), swisstopo_get_egrid and swisstopo_get_oereb_extract (tests/test_oereb.py: 0 live markers despite 61 tests). tests/test_wmts.py also has 0 live markers, but swisstopo_map_url is a pure URL builder with no network call, so that is correct by design."
+      ],
+      "gaps": [
+        "No separate nightly/manual live-test workflow (`schedule:` + `workflow_dispatch` running `pytest -m live`) — the criterion is unmet and the live suite is effectively dead automation.",
+        "Live-test coverage is 18/23 tools; find_features, get_feature, get_collection, get_egrid and get_oereb_extract have none. The two OEREB tools are the most exposed, since they hit cantonal endpoints (oereb.geo.zh.ch, www.oereb2.apps.be.ch) whose formats the README itself flags as inconsistent (README.md:404).",
+        "tests/test_unit.py and tests/test_live.py as named files do not exist; the repo splits per source module and separates live tests by marker within each file. Functionally equivalent to the check's intent, noted only for layout comparison."
+      ]
+    },
+    "OPS-002": {
+      "status": "pass",
+      "category": "OPS",
+      "severity": "medium",
+      "evidence": [
+        "All eight mandatory README sections are present in README.md: Anchor demo query (:34-36), Installation (:62-81 and the generated uvx block :484-500), Available Tools (:147-221, tables per family), Configuration (:101-145), Security & Compliance (:309-362), Architecture ASCII diagram (:240-262), Known Limitations (:402-407), License (:457-461) and Contributing (:451-455).",
+        "Anchor demo query is concrete and natural-language, not a tool invocation: README.md:34 — 'Which communes are in the Uster district, and what are their BFS numbers for joining with BFS statistics data?' with the join-key rationale at :35 and a pointer to EXAMPLES.md at :36. Mirrored in German at README.de.md:33-35.",
+        "ASCII architecture diagram uses box-drawing characters and shows the data flow across all upstream families: README.md:241-261 (Claude/MCP Host -> swisstopo-mcp with '23 Tools' and 'Stdio | Streamable HTTP' -> Swisstopo REST, Geocoding, STAC, OEREB cantonal, geodienste.ch, overpass.osm.ch (ODbL), OpenPLZ). Present in German at README.de.md:240-262.",
+        "Known Limitations lists 4 explicit limits (README.md:404-407: OEREB canton requirement, STAC v0.9 metadata gaps, Swiss-addresses-only geocoding, Swisstopo rate limits) plus a dated live-probe findings subsection (README.md:409+ 'Known findings — OpenPLZ live probe (2026-07-20)'). German equivalent at README.de.md:405-412.",
+        "Bilingual parity holds: `grep -E '^## '` on both files yields the same 19 top-level sections modulo translation (Overview/Uebersicht, Available Tools/Verfuegbare Tools, Response Format/Antwortformat, Known Limitations/Bekannte Einschraenkungen, Security & Compliance/Sicherheit & Compliance, MCP Primitives/MCP-Primitive, ...). The one difference is the machine-generated uvx install block, which exists only in README.md:483-500 (marked <!-- BEGIN GENERATED: install -->).",
+        "CHANGELOG.md follows Keep a Changelog: header + link at CHANGELOG.md:1-6, [Unreleased] section at :8 with Added (:10-58), Changed (:60-67) and Fixed (:69-77) subsections, dated releases below ([0.2.0] - 2026-07-20 at :79).",
+        "The new surface is documented in the CHANGELOG with the reasoning, not just the fact: CHANGELOG.md:11-27 covers all three ported tools and states the ARE non-binding caveat and that it travels per record; :29-32 explains the bfs_commune_number int normalisation and why the two layers disagree; :44-58 covers the REFRAME tool including the new egress host and the axis-order trap.",
+        "CONTRIBUTING is bilingual (CONTRIBUTING.md + CONTRIBUTING.de.md), as are SECURITY.md/SECURITY.de.md — both referenced from the README (README.md:311, :453)."
+      ],
+      "gaps": [
+        "The architecture diagram (README.md:241-261, README.de.md:240-262) was not updated for the new upstream: geodesy.geo.admin.ch (REFRAME) is absent even though it is a new egress host added this release (api_client.py:17, ALLOWED_HOSTS api_client.py:55).",
+        "The Overview source table (README.md:22-33 / README.de.md:22-32) lists 9 sources but does not name ARE / ch.are.bauzonen or swissBOUNDARIES3D, so the two new data producers are invisible at the overview level. It also has no licence column — see CH-004.",
+        "Known Limitations was not extended for the new tools: the ARE non-binding caveat and the municipality-on-a-boundary empty-result case are documented only in the tool descriptions (server.py:363-366, :386-388) and the CHANGELOG, not in the README's limits list.",
+        "README.de.md has no equivalent of the generated uvx Installation block (README.md:483-500), so a German-only reader gets the clone-and-install path only."
+      ]
+    },
+    "OPS-003": {
+      "status": "partial",
+      "category": "OPS",
+      "severity": "high",
+      "evidence": [
+        "A phase IS declared in the README: README.md:313-317 ('### Phase — This server is in **Phase 1 — Read-only wrapper**. All 23 tools are readOnlyHint: true / destructiveHint: false; there are no write or send capabilities.'), mirrored at README.de.md:311-316.",
+        "The declared phase is consistent with the actual tool annotations: 23 of 23 @mcp.tool registrations in src/swisstopo_mcp/server.py carry readOnlyHint: True (e.g. server.py:91, 148, 168, 352, 375, 397, 426) and `grep -rn 'destructiveHint.*True' src/` returns zero hits. No write, send, mail or webhook tool exists.",
+        "A roadmap file exists with phase-specific tasks: docs/roadmap.md — Phase 1 Read-only wrapper (:6-19, marked done, 7 checked items incl. the audit run against mcp-audit-skill), Phase 2 Semantic/richer responses (:21-30), Phase 2.5 Consolidation of swiss-geodata-mcp (:32-49), Phase 3 Write operations (:51-55, 'not planned', with an explicit requirement to re-run the Lethal-Trifecta assessment and a security review before any write tool).",
+        "CONTRADICTION — the README's phase declaration is stale relative to the roadmap. README.md:315 says the server is in Phase 1, but docs/roadmap.md:6 marks Phase 1 '(✅ done)', docs/roadmap.md:21 marks Phase 2 '(✅ largely done)' with structured returns, structlog and match_type checked off (:23-27), and docs/roadmap.md:32 declares Phase 2.5 '(🔄 in progress)'. The three tools audited in this run were delivered under Phase 2.5 (docs/roadmap.md:45-47) and server.py:494 labels the geodata facade '(Phase-2 Geodaten-Erweiterung)'. A reader consulting the README gets a different phase than a reader consulting the roadmap.",
+        "MISSING Phase 1 -> 2 prerequisites. The check requires the transition to be gated on a completed audit run, an ISDS classification and a DSG-Verarbeitungsverzeichnis. Only the audit run exists (docs/roadmap.md:18, audits/ with four run directories). `grep -rni 'isds|verarbeitungsverzeichnis|dsg|datenschutz'` over README.md, README.de.md, docs/ and SECURITY.md returns ZERO hits — neither artefact exists, yet the roadmap already reports Phase 2 as largely done and Phase 2.5 in progress.",
+        "Phase transitions are not tracked in the CHANGELOG as the criterion asks: `grep -in 'phase' CHANGELOG.md` returns only four hits, all incidental (:133-134 and :151 referencing docs/geodaten-erweiterung-phase1.md and its live probe; :186 mentioning that a roadmap and a README security section were added). No entry records the Phase 1 -> Phase 2 or Phase 2 -> Phase 2.5 transition or its sign-off."
+      ],
+      "gaps": [
+        "README declares Phase 1 while docs/roadmap.md declares Phase 2 largely done and Phase 2.5 in progress — the single authoritative phase statement the check requires does not exist.",
+        "No ISDS classification document (docs/isds-klassifikation.md or equivalent) anywhere in the repo.",
+        "No DSG-Verarbeitungsverzeichnis (docs/dsg-processing-record.md or equivalent) anywhere in the repo.",
+        "No phase-transition entries in CHANGELOG.md; the Phase 1 -> 2 gate was passed without a recorded decision or sign-off.",
+        "docs/roadmap.md:49 lists 'Re-run the audit against the changed surface' as an open Phase-2.5 item — i.e. the roadmap itself acknowledges the current run was still outstanding."
+      ]
+    },
+    "SCALE-001": {
+      "status": "partial",
+      "category": "SCALE",
+      "severity": "high",
+      "evidence": [
+        "Transport is selectable, not hardcoded to stdio: `--http` switches to Streamable HTTP served by uvicorn, otherwise mcp.run() (stdio) — src/swisstopo_mcp/server.py:686-701. Host and port come from pydantic-settings env vars SWISSTOPO_HTTP_HOST / SWISSTOPO_HTTP_PORT (src/swisstopo_mcp/config.py:22-24), with --port as an override (src/swisstopo_mcp/server.py:693-694)",
+        "The container/cloud path selects HTTP explicitly in the image manifest: CMD [\\\"python\\\", \\\"-m\\\", \\\"swisstopo_mcp.server\\\", \\\"--http\\\", \\\"--port\\\", \\\"8000\\\"] (Dockerfile:38) with SWISSTOPO_HTTP_HOST=0.0.0.0 set only in the container (Dockerfile:24-26); deploy/kubernetes.yaml:38-45 exposes containerPort 8000 and re-sets the env var — no stdio in the cloud path",
+        "No legacy WebSocket transport anywhere: grep for websocket/ws:///wss:// across src/ returns nothing; the app is built from mcp.streamable_http_app() (src/swisstopo_mcp/server.py:674)",
+        "RUNTIME (Modus 2) — the HTTP endpoint works when reached with a localhost Host header: POST /mcp initialize returns HTTP 200 with a full capabilities/serverInfo response (serverInfo swisstopo_mcp, protocolVersion 2025-06-18) and an mcp-session-id header; GET /healthz returns 200 {\\\"status\\\":\\\"ok\\\"} (src/swisstopo_mcp/server.py:671-675)",
+        "RUNTIME DEFECT — with a realistic ingress Host header the same request fails: started with SWISSTOPO_HTTP_HOST=0.0.0.0 and called as POST /mcp with `Host: swisstopo-mcp.example.com`, the server returns HTTP 421 'Invalid Host header', while GET /healthz with the same Host still returns HTTP 200. Cause is the same unconfigured transport-security layer as SDK-004: FastMCP auto-pins allowed_hosts to [127.0.0.1:*, localhost:*, [::1]:*] because its internal host stays 127.0.0.1 (mcp 1.28.1 mcp/server/fastmcp/server.py:177-183) and src/swisstopo_mcp/server.py:42-44 never passes transport_security"
+      ],
+      "gaps": [
+        "As shipped, deploy/kubernetes.yaml + deploy/ingress-sticky-sessions.yaml would route MCP traffic with Host: swisstopo-mcp.example.com and every request would get HTTP 421 — while liveness/readiness probes (deploy/kubernetes.yaml:49-60, path /healthz) stay green, because /healthz is mounted outside the MCP app and is not host-validated. That is a silent-failure deployment, precisely the failure mode SCALE-001 warns about ('Server startet, Health-Check gruen, aber Client-Verbindungen schlagen fehl').",
+        "Transport selection is by CLI flag (--http), not by an env var such as MCP_TRANSPORT; acceptable since the deployment manifest (Dockerfile:38) sets it explicitly, but it means the transport cannot be switched by env alone in a K8s Deployment without overriding the command.",
+        "No deployment-level smoke test asserts that initialize returns 200 through the public hostname."
+      ]
+    },
+    "SCALE-002": {
+      "status": "pass",
+      "category": "SCALE",
+      "severity": "high",
+      "evidence": [
+        "The stateful-session hazard is structurally prevented in the shipped manifest: replicas: 1 with an inline rationale naming the check and the two legitimate scale-out routes — deploy/kubernetes.yaml:13-18. With a single pod there is no unaffined fan-out for a session to be lost to",
+        "A ready sticky-session manifest ships alongside it: deploy/ingress-sticky-sessions.yaml — Option A HAProxy `stick on req.hdr(Mcp-Session-Id)` with `stick-table type string len 64 size 100k expire 1h` (deploy/ingress-sticky-sessions.yaml:16-17), Option B NGINX Ingress cookie affinity with affinity-mode persistent and session-cookie-max-age 3600 (deploy/ingress-sticky-sessions.yaml:32-36)",
+        "Session lifetime is explicit in both variants (stick-table expire 1h; cookie max-age 3600s), satisfying the TTL criterion",
+        "The scale-out procedure is documented, not just implied: docs/deployment.md:50-62 ('Scaling out (SCALE-002)') states that session state is per-pod, lists affinity-on-Mcp-Session-Id and a shared session store as the two prerequisites, and only then permits raising replicas"
+      ],
+      "gaps": [
+        "Neither affinity manifest is applied by default — deploy/ingress-sticky-sessions.yaml is an example file ('Apply ONE of these ... after raising replicas', deploy/ingress-sticky-sessions.yaml:8). The guarantee therefore rests on the replicas: 1 discipline holding at operate time.",
+        "No shared session store is implemented (Option C at deploy/ingress-sticky-sessions.yaml:50-55 is explicitly out of scope), so a pod restart drops all in-flight sessions; FastMCP's default in-memory session manager has no server-side TTL of its own.",
+        "The Modus-3 failover test (same pod across five requests with a session id) has not been run and no test stands in for it."
+      ]
+    },
+    "SCALE-003": {
+      "status": "partial",
+      "category": "SCALE",
+      "severity": "high",
+      "evidence": [
+        "Header-based routing is specified with the right primitives: HAProxy backend with `stick on req.hdr(Mcp-Session-Id)` over a `stick-table type string len 64 size 100k expire 1h` — deploy/ingress-sticky-sessions.yaml:11-18. Capacity (100k sessions) and TTL (1h) both meet the pass criteria",
+        "GAP — that HAProxy block is a YAML comment, not deployable configuration: lines deploy/ingress-sticky-sessions.yaml:11-18 are all `#`-prefixed. No haproxy.cfg or nginx.conf exists in the repo (searched for haproxy.cfg / nginx.conf / ingress*.yaml — only deploy/ingress-sticky-sessions.yaml is present)",
+        "GAP — the only executable manifest in the file is Option B, NGINX Ingress cookie affinity (deploy/ingress-sticky-sessions.yaml:28-49). It does not read Mcp-Session-Id at all; the file itself states 'NGINX cannot stick on an arbitrary request header, so it pins clients with an affinity cookie instead' (deploy/ingress-sticky-sessions.yaml:23-25). It also omits nginx.ingress.kubernetes.io/upstream-hash-by: \\\"$http_mcp_session_id\\\", which the check's own remediation snippet prescribes",
+        "GAP — nothing in the repo applies any of it by default: deploy/kubernetes.yaml ships replicas: 1 (deploy/kubernetes.yaml:18) and a plain ClusterIP Service with no sessionAffinity (deploy/kubernetes.yaml:76-86); the ingress file is explicitly conditional ('Apply ONE of these alongside deploy/kubernetes.yaml after raising replicas', deploy/ingress-sticky-sessions.yaml:8)"
+      ],
+      "gaps": [
+        "The edge LB does not read the Mcp-Session-Id header in any applicable configuration: header-based sticking exists only as commented HAProxy pseudo-config, and the deployable NGINX path is cookie-based. A non-browser MCP client (no cookie jar) scaled beyond one replica would therefore break — the NAT/cookie caveat the check calls out.",
+        "Service in deploy/kubernetes.yaml:76-86 sets no sessionAffinity: ClientIP either, so there is no fallback affinity at the Service layer.",
+        "No failover behaviour has been tested or documented (Modus 2 not run; nothing in tests/ or docs/deployment.md covers it)."
+      ]
+    },
+    "SCALE-004": {
+      "status": "pass",
+      "category": "SCALE",
+      "severity": "medium",
+      "evidence": [
+        "Multi-stage build with named stages: FROM python:3.11-slim AS builder (Dockerfile:6) and FROM python:3.11-slim AS runtime (Dockerfile:13) — two FROM statements, both on a -slim base",
+        "Build artefacts only are carried over: the builder installs into an isolated prefix (RUN pip install --no-cache-dir --prefix=/install ., Dockerfile:11) and the runtime stage copies just that prefix (COPY --from=builder /install /usr/local, Dockerfile:18). No compiler/apt build-essential is installed in either stage, so no build toolchain survives into the runtime image",
+        "Non-root execution: a fixed high UID/GID account is created (RUN useradd --uid 10001 --user-group --create-home --shell /usr/sbin/nologin mcp, Dockerfile:16) and USER 10001 is set before CMD (Dockerfile:20); matched at the orchestrator layer by runAsNonRoot/runAsUser 10001 (deploy/kubernetes.yaml:28-31)",
+        "HEALTHCHECK directive present with sane timings and no extra tooling: --interval=30s --timeout=3s --start-period=5s --retries=3 using stdlib urllib against /healthz (Dockerfile:32-33); the route it probes exists (src/swisstopo_mcp/server.py:671-675) and was verified live to return 200 {\\\"status\\\":\\\"ok\\\"}",
+        "EXPOSE 8000 (Dockerfile:29) matches the K8s containerPort and probe port (deploy/kubernetes.yaml:39-40, :49-60), and .dockerignore exists to keep build context lean"
+      ],
+      "gaps": [
+        "Final image size (< 200 MB criterion) could NOT be measured: no Docker daemon is reachable in this audit environment (docker build failed with 'failed to connect to the docker API at unix:///var/run/docker.sock'). python:3.11-slim (~130 MB) plus mcp/httpx/pydantic/pydantic-settings/structlog/uvicorn puts the expected result close to the 200 MB line — recommend recording `docker images` output in CI so the criterion is measured rather than assumed.",
+        "Minor: the HEALTHCHECK URL hardcodes 127.0.0.1:8000 (Dockerfile:33) while the port is overridable via --port / SWISSTOPO_HTTP_PORT — running the image on a different port silently yields a permanently unhealthy container."
+      ]
+    },
+    "SCALE-006": {
+      "status": "pass",
+      "category": "SCALE",
+      "severity": "medium",
+      "evidence": [
+        "Memory and CPU limits are both explicitly set on the container: limits cpu \\\"500m\\\" / memory \\\"256Mi\\\" — deploy/kubernetes.yaml:65-67",
+        "Requests are set and strictly smaller than the limits, leaving burst headroom: requests cpu \\\"50m\\\" / memory \\\"128Mi\\\" (deploy/kubernetes.yaml:62-64) vs the limits above — 10x CPU burst, 2x memory burst",
+        "Ephemeral storage is capped too, so a runaway temp write cannot fill the node: the only writable mount is an emptyDir with sizeLimit: 64Mi (deploy/kubernetes.yaml:71-74) on a read-only root filesystem (deploy/kubernetes.yaml:46-48)",
+        "The limits are plausible for this workload rather than arbitrary: a single shared httpx.AsyncClient with httpx default pool caps (src/swisstopo_mcp/api_client.py:88-99), no local data cache or dump storage anywhere in src/, so the 256Mi/500m envelope matches the check's 256 MB-1 GB / 0.5-1 CPU rule of thumb for a stateless API-facade server"
+      ],
+      "gaps": [
+        "No explicit FD/ulimit configuration exists (no ulimits: nofile in any manifest; Kubernetes cannot set it per-container anyway, so the container inherits the runtime default). Acceptable here — the server holds one pooled client with httpx default max_connections, far below 1024 — but it is unverified rather than deliberately chosen.",
+        "OOM behaviour has not been exercised: no load or stress test in tests/ or docs/, so 256Mi is an estimate that has never been validated against a large response (e.g. a full-canton find_commune listing up to OPENPLZ_MAX_RECORDS=2000 records, src/swisstopo_mcp/openplz.py:49).",
+        "restartPolicy is not stated explicitly in deploy/kubernetes.yaml; it relies on the Deployment default (Always), which is correct but implicit."
+      ]
+    },
+    "SDK-001": {
+      "status": "pass",
+      "category": "SDK",
+      "severity": "high",
+      "evidence": [
+        "Lifespan is a @asynccontextmanager coroutine taking the FastMCP server: src/swisstopo_mcp/server.py:27-39",
+        "FastMCP constructor receives it explicitly: mcp = FastMCP(\\\"swisstopo_mcp\\\", lifespan=lifespan, ...) at src/swisstopo_mcp/server.py:42-44",
+        "Cleanup runs in a finally block (await client.aclose(); set_shared_client(None)): src/swisstopo_mcp/server.py:34-39",
+        "One shared httpx.AsyncClient is built once (timeout=30s, fixed User-Agent, follow_redirects=False) and reused; _NonClosingClient adapts it to the `async with await _get_client()` convention without closing it per call: src/swisstopo_mcp/api_client.py:85-127, used by every upstream call at src/swisstopo_mcp/api_client.py:171",
+        "Repo-wide grep for httpx.AsyncClient( finds exactly one construction site (src/swisstopo_mcp/api_client.py:90); no tool module, including the new src/swisstopo_mcp/coords.py, creates a client per call — coords.py routes through reframe_request -> request_with_retry (src/swisstopo_mcp/coords.py:269, src/swisstopo_mcp/api_client.py:210-222)",
+        "Regression test asserts the lifespan registers/reuses/closes the shared client: tests/test_shared_client.py:1-30 (479 tests pass in this environment)"
+      ],
+      "gaps": [
+        "None. AsyncExitStack criterion is not applicable: a single FastMCP instance is mounted, no multi-server ASGI composition (src/swisstopo_mcp/server.py:657-683 builds one app from mcp.streamable_http_app()).",
+        "Minor, non-blocking: outside the lifespan (unit tests, direct handler calls) _get_client() falls back to an ephemeral per-call client (src/swisstopo_mcp/api_client.py:122-127). This is documented and does not apply to the served paths."
+      ]
+    },
+    "SDK-002": {
+      "status": "partial",
+      "category": "SDK",
+      "severity": "medium",
+      "evidence": [
+        "All 23 registered tools annotate -> ToolResponse, including the three new REST tools (src/swisstopo_mcp/server.py:358 zoning_at, :381 municipality_at, :403 layer_info) and the new coords tool (src/swisstopo_mcp/server.py:432 convert_coordinates)",
+        "Runtime verification against the live server object: mcp.list_tools() returns 23 tools and every single one carries a non-null outputSchema; the schema is the ToolResponse envelope (summary/results/count/match_type/source/license/provenance/retrieved_at/is_error) — no tool falls back to an unschema'd dict",
+        "The envelope satisfies the structural criteria: Literal types for enumerables (Provenance/MatchType at src/swisstopo_mcp/models.py:15-16), Field(default_factory=list) for results (src/swisstopo_mcp/models.py:63-65), extra=\\\"forbid\\\" (src/swisstopo_mcp/models.py:60), and ok()/error() constructors that always set count consistently (src/swisstopo_mcp/models.py:76-100)",
+        "Pydantic >= 2 is a hard dependency (pyproject.toml:38 \\\"pydantic>=2.0.0\\\") and v2-only APIs are used throughout (ConfigDict, model_validator(mode=\\\"after\\\") — e.g. src/swisstopo_mcp/coords.py:19, :110, :202); no v1 syntax (.parse_obj / class Config) anywhere in src/",
+        "DEFECT — four inner handlers in src/swisstopo_mcp/rest_api.py declare `-> str` but return ToolResponse objects on every path: search_layers (src/swisstopo_mcp/rest_api.py:289, returns ToolResponse at :302 and :308), identify_features (:312, returns at :330/:336), find_features (:340, returns at :353/:359), get_feature (:363, returns at :372/:378). The new handlers in the same file are correct (zoning_at src/swisstopo_mcp/rest_api.py:406, municipality_at :436, layer_info :471 all -> ToolResponse), so the file is internally inconsistent"
+      ],
+      "gaps": [
+        "The four `-> str` annotations at src/swisstopo_mcp/rest_api.py:289,312,340,363 disagree with the actual return type. Client-facing schema is unaffected because FastMCP derives the outputSchema from the decorated wrappers in server.py (verified at runtime), but the annotations are wrong, would fail any mypy/pyright gate, and would let a future `return \\\"...\\\"` in these handlers pass review while silently breaking the envelope contract for that tool.",
+        "No static type checker is configured to catch this class of drift: pyproject.toml:65-78 enables ruff with select = [E, F, W, I, UP] only — no mypy/pyright in dependencies or in .github/workflows/ci.yml."
+      ]
+    },
+    "SDK-003": {
+      "status": "partial",
+      "category": "SDK",
+      "severity": "medium",
+      "evidence": [
+        "Context injection is wired for two tools: swisstopo_elevation_profile (src/swisstopo_mcp/server.py:337 declares ctx: Context and forwards it at :345) and swisstopo_get_oereb_extract (src/swisstopo_mcp/server.py:484, forwards at :491)",
+        "Those handlers actually use the context rather than merely accepting it: ctx.info() at src/swisstopo_mcp/height.py:179 and src/swisstopo_mcp/oereb.py:147, ctx.report_progress() at src/swisstopo_mcp/height.py:204 — this closes the gap the 2026-05-29 audit recorded as SDK-003 open ('No tool injects ctx: Context')",
+        "No print() anywhere in src/, and structlog is bound to stderr explicitly so stdout stays reserved for the stdio protocol: src/swisstopo_mcp/logging_config.py:47-48 (WriteLoggerFactory(file=sys.stderr))",
+        "GAP — find_commune can issue up to 40 sequential upstream requests without any ctx: _list_by_canton / _list_by_district (src/swisstopo_mcp/openplz.py:479, :501) call _fetch_all_pages (src/swisstopo_mcp/openplz.py:152-185), which loops pageSize=50 up to OPENPLZ_MAX_RECORDS=2000 (src/swisstopo_mcp/openplz.py:48-49). The tool wrapper takes no Context (src/swisstopo_mcp/server.py:618), so a multi-second canton listing reports nothing to the client",
+        "GAP — query_osm_features runs against Overpass with a 30s client timeout and 25s server-side timeout hint (src/swisstopo_mcp/overpass.py:39-40, request at :164) and also takes no Context (src/swisstopo_mcp/server.py:561); this is the single slowest tool in the surface and the most likely to hit a client-side timeout with no progress signal"
+      ],
+      "gaps": [
+        "find_commune (canton/district modes) and query_osm_features exceed the 2s threshold in the check yet declare no ctx: Context and emit no progress — src/swisstopo_mcp/server.py:618, :561.",
+        "elevation_profile reports progress only once, after the upstream call has already returned (progress=1, total=1 at src/swisstopo_mcp/height.py:204). This is a completion marker, not the '1-2s cadence' the pass criteria ask for; the actual wait (the profile request) is unreported.",
+        "A swallowed upstream failure is not surfaced via ctx.warning(): layer_info catches the legend fetch exception bare and sets legend=None (src/swisstopo_mcp/rest_api.py:494-501). The null is visible in the result, but the reason for it never reaches the client.",
+        "New tools added since the last audit (convert_coordinates, zoning_at, municipality_at) take no ctx — acceptable, each is a single fast upstream call (src/swisstopo_mcp/coords.py:269, src/swisstopo_mcp/rest_api.py:387)."
+      ]
+    },
+    "SDK-004": {
+      "status": "partial",
+      "category": "SDK",
+      "severity": "high",
+      "evidence": [
+        "CORS middleware is configured on the Streamable-HTTP app with the critical header exposed: expose_headers=[\\\"Mcp-Session-Id\\\"] and allow_headers including \\\"Mcp-Session-Id\\\" — src/swisstopo_mcp/server.py:676-682",
+        "Origins are never wildcarded: allow_origins=allowed_origins or [] (src/swisstopo_mcp/server.py:678), fed from the SWISSTOPO_ALLOWED_ORIGINS env var via pydantic-settings (src/swisstopo_mcp/config.py:25-31, passed at src/swisstopo_mcp/server.py:696). Default is the empty list, i.e. no cross-origin access unless configured",
+        "allow_credentials is not enabled (absent at src/swisstopo_mcp/server.py:676-682), which is correct for auth_model=none and avoids the wildcard+credentials CORS violation",
+        "Regression tests assert the config: tests/test_http_app.py:19-33 check expose_headers, allow_headers and the explicit origin list, plus the no-origins default",
+        "RUNTIME (Modus 2) — preflight is correct: OPTIONS /mcp with Origin: https://client.example.com returns HTTP 200 with access-control-allow-origin: https://client.example.com, access-control-allow-methods: GET, POST, OPTIONS and access-control-allow-headers including Mcp-Session-Id. A POST without Origin returns HTTP 200 and an mcp-session-id header, so the session mechanism itself works",
+        "RUNTIME DEFECT — the actual cross-origin POST from the explicitly allowed origin is rejected: POST /mcp with Origin: https://client.example.com returns HTTP 403 'Invalid Origin header' (response still carries access-control-expose-headers: Mcp-Session-Id, so CORS is fine — the request is killed one layer earlier). Cause: FastMCP auto-enables DNS-rebinding protection with a localhost-only origin allow-list when its internal host is 127.0.0.1 (mcp 1.28.1, mcp/server/fastmcp/server.py:177-183), and the server never passes transport_security= (src/swisstopo_mcp/server.py:42-44) nor mirrors settings.allowed_origins into it — grep for transport_security/TransportSecuritySettings across src/, tests/ and docs/ returns nothing"
+      ],
+      "gaps": [
+        "SWISSTOPO_ALLOWED_ORIGINS reaches CORSMiddleware only. The MCP SDK's TransportSecurityMiddleware keeps its auto-derived allowed_origins = [http://127.0.0.1:*, http://localhost:*, http://[::1]:*], so every configured browser origin is 403'd before the handler runs — the exact 'CORS looks right, browser client still breaks' symptom SDK-004 exists to prevent, only moved one layer down.",
+        "No test covers a real cross-origin POST; tests/test_http_app.py inspects middleware kwargs only, which is why the 403 was invisible to CI.",
+        "Remediation: pass transport_security=TransportSecuritySettings(enable_dns_rebinding_protection=True, allowed_origins=settings.origins_list, allowed_hosts=[...]) to FastMCP (or configure it before building the HTTP app) and add an end-to-end cross-origin request test. See SCALE-001 for the matching Host-header failure."
+      ]
+    },
+    "SEC-004": {
+      "status": "partial",
+      "category": "SEC",
+      "severity": "critical",
+      "evidence": [
+        "Code-layer host allow-list is a frozenset of 10 hosts and is checked before every retried request: src/swisstopo_mcp/api_client.py:51-64 (ALLOWED_HOSTS), api_client.py:67-74 (assert_host_allowed), api_client.py:162-163 (called in request_with_retry before the first attempt).",
+        "No tool accepts a user-supplied URL. Every upstream base is a module constant (src/swisstopo_mcp/api_client.py:16-22) or a fixed cantonal registry entry (src/swisstopo_mcp/oereb.py:25-28); the direct client calls that bypass request_with_retry still call assert_host_allowed first (src/swisstopo_mcp/oereb.py:98 and src/swisstopo_mcp/oereb.py:161).",
+        "Redirect-based SSRF is closed: the shared httpx client sets follow_redirects=False (src/swisstopo_mcp/api_client.py:90-94).",
+        "Network-layer blocklist for the container deployment covers RFC1918 plus link-local 169.254.0.0/16 (i.e. the cloud metadata IP) and permits only TCP/443 outbound: deploy/kubernetes.yaml:100-111.",
+        "GAP — no HTTPS scheme enforcement: assert_host_allowed inspects only urlparse(url).hostname (src/swisstopo_mcp/api_client.py:69). An http:// URL to an allow-listed host passes. This is reachable in practice: src/swisstopo_mcp/geodata.py:447 builds coll_url from `ogc_base`, a value read out of the upstream geodienste.ch catalogue response (src/swisstopo_mcp/geodata.py:96-104, 113), and src/swisstopo_mcp/geodata.py:464 does the same for items_url — the scheme of those URLs is attacker-influenced by the upstream, not fixed by this repo.",
+        "GAP — no resolved-IP blocklist anywhere in the code layer: grep for getaddrinfo|ipaddress|socket\\\\.|proxy over src/ returns zero hits. There is no DNS resolution + ip_network membership check and no egress proxy (Smokescreen or equivalent).",
+        "GAP — IPv6 is not covered by the network-layer control: the NetworkPolicy `except` list in deploy/kubernetes.yaml:104-108 contains only IPv4 CIDRs; ::1/128 and fe80::/10 are not excluded, and there is no ipBlock rule for IPv6."
+      ],
+      "gaps": [
+        "HTTPS scheme is never validated before an outbound request (api_client.py:67-74).",
+        "No resolved-IP blocklist / getaddrinfo range check at the code layer; the 169.254.169.254 defence exists only in the K8s NetworkPolicy, not for local-stdio or plain-Docker runs.",
+        "IPv6 loopback (::1) and link-local (fe80::/10) are not blocked at any layer.",
+        "No egress proxy as defence-in-depth."
+      ]
+    },
+    "SEC-005": {
+      "status": "partial",
+      "category": "SEC",
+      "severity": "high",
+      "evidence": [
+        "GAP — no DNS pinning of any kind. grep -rE 'getaddrinfo|gethostbyname|dns\\\\.resolve|sni_hostname|SSLContext' over src/ returns zero hits. Requests are issued with the hostname URL (src/swisstopo_mcp/api_client.py:171-175), so httpx performs its own resolution at connect time; there is no single-resolution-then-pin path.",
+        "GAP — no custom transport and no egress proxy. The client is built with only timeout, User-Agent and follow_redirects (src/swisstopo_mcp/api_client.py:88-94); no PinnedTransport subclass, no `proxy=` argument, and no Smokescreen sidecar in Dockerfile or deploy/kubernetes.yaml.",
+        "GAP — no test asserts a single DNS lookup per request. tests/ contains no mocked resolver; the network tests use respx transport mocking (e.g. tests/test_coords.py:116, tests/test_lv95_input.py), which never exercises resolution.",
+        "MISLABELLED CONTROL — SECURITY.md:25 claims `follow_redirects=False ... (SEC-005)`. Redirect suppression (src/swisstopo_mcp/api_client.py:93) prevents redirect-based host switching, which is a SEC-004 concern; it provides no protection against a TOCTOU rebind of an already-allowed hostname.",
+        "COMPENSATING CONTROL — for the containerised deployment a rebind to the canonical payload target is dropped at the network layer: deploy/kubernetes.yaml:100-111 permits egress only on TCP/443 and excludes 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 and 169.254.0.0/16. TLS certificate verification is left at the httpx default (no verify=False anywhere in src/), so a rebound connection would also fail hostname validation for an attacker without a valid cert."
+      ],
+      "gaps": [
+        "DNS resolution is not performed once and pinned; the connect-time lookup is httpx's own.",
+        "Original hostname is not carried via an explicit Host header / SNI extension because no pinning exists to require it.",
+        "No regression test proving one resolution per request.",
+        "Compensating network-layer control is absent for the local-stdio and plain-`docker run` deployment modes."
+      ]
+    },
+    "SEC-006": {
+      "status": "pass",
+      "category": "SEC",
+      "severity": "high",
+      "evidence": [
+        "Default transport is stdio: the entrypoint calls mcp.run() with no transport argument unless `--http` is present on argv (src/swisstopo_mcp/server.py:686-701); the HTTP branch at server.py:689-699 is the only path that starts uvicorn.",
+        "No network binding can occur by default — the HTTP host/port only take effect inside the `--http` branch (src/swisstopo_mcp/server.py:696-698) and the configured default host is 127.0.0.1 (src/swisstopo_mcp/config.py:22), asserted by tests/test_config.py:9-10.",
+        "The published package manifest declares stdio as the transport for the registry entry: server.json:15-18 (`\\\"transport\\\": {\\\"type\\\": \\\"stdio\\\"}`, runtimeHint uvx).",
+        "README documents the local stdio use-case first: README.md:86 (`python -m swisstopo_mcp.server` for Claude Desktop) and the claude_desktop_config.json snippets at README.md:105-130.",
+        "Cloud/HTTP deployment is a separate, explicitly-marked section with its own hardening notes: README.md:135+ ('Cloud Deployment') pointing at docs/deployment.md, which restates that the server is 'local-first (stdio)' (docs/deployment.md:2-6) and that 0.0.0.0 is container-only (docs/deployment.md:36)."
+      ],
+      "gaps": []
+    },
+    "SEC-007": {
+      "status": "pass",
+      "category": "SEC",
+      "severity": "high",
+      "evidence": [
+        "Dockerfile drops to a fixed non-root UID above 10000: useradd --uid 10001 at Dockerfile:16 and `USER 10001` at Dockerfile:20, on a multi-stage python:3.11-slim build (Dockerfile:6, 13) that copies only the installed prefix (Dockerfile:18).",
+        "Kubernetes pod securityContext sets runAsNonRoot: true, runAsUser/runAsGroup/fsGroup 10001 and seccompProfile type RuntimeDefault: deploy/kubernetes.yaml:27-33.",
+        "Container securityContext sets allowPrivilegeEscalation: false, readOnlyRootFilesystem: true and capabilities.drop: [\\\"ALL\\\"]: deploy/kubernetes.yaml:44-48.",
+        "Read-only root filesystem is made workable by a size-limited tmpfs for /tmp: volumeMounts at deploy/kubernetes.yaml:68-70 and the emptyDir with sizeLimit 64Mi at deploy/kubernetes.yaml:71-74; the Dockerfile documents the equivalent `docker run --read-only --tmpfs /tmp --cap-drop ALL --security-opt no-new-privileges` invocation at Dockerfile:35-37.",
+        "No filesystem tools are exposed and no host paths are mounted, so the Modus-3 volume-scoping criterion is vacuously satisfied — stated at docs/deployment.md:38 and confirmed by the absence of any path/open/pathlib usage in src/ (grep for os.path/pathlib/open( in tool handlers returns nothing).",
+        "Resource limits are set (deploy/kubernetes.yaml:61-67) and liveness/readiness probes hit the /healthz route added in src/swisstopo_mcp/server.py:671-675."
+      ],
+      "gaps": [
+        "No container image vulnerability scan in CI — .github/workflows/security.yml only runs gitleaks; there is no Trivy/Snyk step (remediation Schritt 4, not a Pass-Criterion).",
+        "The runtime_test mode (docker exec id / touch /etc/test / CapEff) was not executed in this audit; verdict rests on manifest and Dockerfile review."
+      ]
+    },
+    "SEC-008": {
+      "status": "pass",
+      "category": "SEC",
+      "severity": "medium",
+      "evidence": [
+        "No install-time code execution: pyproject.toml uses the hatchling backend with no custom build hooks (pyproject.toml:1-3), and the only entry point is a plain console script (pyproject.toml:47-48, `swisstopo-mcp = \\\"swisstopo_mcp.server:mcp.run\\\"`). There is no setup.py, no package.json, and therefore no pre/postinstall hook — confirmed by the repo root listing.",
+        "README shows the unabbreviated installation command with no wrapper script: `uvx swisstopo-mcp` at README.md:78 and the full claude_desktop_config.json JSON block at README.md:118-127, plus the pip/uv variants at README.md:64-72.",
+        "PyPI publishing uses an OIDC Trusted Publisher, so releases carry Sigstore attestations: .github/workflows/publish.yml declares `environment: name: pypi`, `permissions: id-token: write` and calls pypa/gh-action-pypi-publish@release/v1 with no API token (.github/workflows/publish.yml, publish job).",
+        "MCP Registry publication also uses GitHub OIDC rather than a stored credential (.github/workflows/publish.yml, publish-mcp job: `id-token: write` + `mcp-publisher login github-oidc`).",
+        "Build process is documented for independent verification: CONTRIBUTING.md and CONTRIBUTING.de.md exist at the repo root; the CI workflow that gates every push runs the same `pip install -e \\\".[dev]\\\"` + pytest + ruff sequence (.github/workflows/ci.yml)."
+      ],
+      "gaps": [
+        "The publish-mcp job downloads the mcp-publisher binary at release time via `curl ... /releases/latest/download/... | tar xz` with no checksum or version pin (.github/workflows/publish.yml, 'Install mcp-publisher' step). This is a CI supply-chain exposure, not an end-user install hook, so it does not affect the Pass-Criteria.",
+        "README does not state the Sigstore verification command for users who want to check the signature themselves (Remediation Schritt 4)."
+      ]
+    },
+    "SEC-009": {
+      "status": "pass",
+      "category": "SEC",
+      "severity": "critical",
+      "evidence": [
+        "The server implements no session handling of its own: grep for `session_id|sessionId|mcp_session|SessionStore|validate_session` over src/ returns no generation, storage or validation code. Session identity is delegated entirely to the FastMCP SDK's Streamable-HTTP implementation, which the app is built from at src/swisstopo_mcp/server.py:674 (`mcp.streamable_http_app()`).",
+        "There is consequently no weak-PRNG failure mode to find: grep for `random\\\\.|time\\\\.time\\\\(\\\\)|hashlib` in an ID-generation context over src/ returns nothing; the only randomness-adjacent import in the package is asyncio (src/swisstopo_mcp/api_client.py:4).",
+        "There is no per-user or per-session server state to hijack. Every tool handler is a pure request/response function over public data (e.g. src/swisstopo_mcp/coords.py:266, src/swisstopo_mcp/oereb.py:82); the only process-wide state is the shared httpx client created in the lifespan (src/swisstopo_mcp/server.py:27-39), which carries no caller identity.",
+        "The unauthenticated-by-design decision and the conditional obligation are documented in both places a maintainer would look: README.md:347-353 and SECURITY.md:44-50 ('Sessions & authentication'), which state that if an authenticated deployment is ever introduced, session IDs must be bound to the validated user identity (SEC-009). SECURITY.md:68-73 lists that as an explicit re-evaluation trigger."
+      ],
+      "gaps": [
+        "The Mcp-Session-Id entropy therefore depends on the pinned `mcp[cli]>=1.28.1,<2.0.0` SDK (pyproject.toml:31) and is not independently asserted by a test in this repo."
+      ]
+    },
+    "SEC-013": {
+      "status": "pass",
+      "category": "SEC",
+      "severity": "high",
+      "evidence": [
+        "The server holds no secrets at all. Every environment read in the package is non-sensitive: src/swisstopo_mcp/config.py:12-26 (http_host, http_port, allowed_origins, log_level), src/swisstopo_mcp/logging_config.py:32 (SWISSTOPO_LOG_LEVEL) and src/swisstopo_mcp/oereb.py:33 (SWISSTOPO_OEREB_CANTONS). grep over src/ for KEY|SECRET|TOKEN|PASSWORD in an os.environ context returns zero hits.",
+        "All 10 upstream hosts are keyless public APIs (src/swisstopo_mcp/api_client.py:51-64), and the module docstring states this explicitly (src/swisstopo_mcp/server.py:9: 'Alle Endpunkte sind offen (kein API-Schluessel erforderlich)').",
+        "The Stufe-1 (plain env-var) posture is documented with its justification: .env.example:2-3 states 'None of these are secrets — the server uses only key-less public APIs', and SECURITY.md:28 records the control row ('Env-vars only; .gitignore guards .env; no hardcoded secrets').",
+        "Container image carries no secrets in any layer: the only ENV directives are PYTHONUNBUFFERED, PYTHONDONTWRITEBYTECODE, SWISSTOPO_HTTP_HOST and SWISSTOPO_LOG_LEVEL (Dockerfile:22-27); deploy/kubernetes.yaml:39-43 sets only SWISSTOPO_HTTP_HOST and SWISSTOPO_ALLOWED_ORIGINS with no secretKeyRef and no ExternalSecret.",
+        "Regression control against accidental secret introduction: gitleaks runs on every push and PR with full history (.github/workflows/security.yml), and .gitignore covers .env."
+      ],
+      "gaps": [
+        "There is no dedicated docs/secret-management.md; the Stufe-1 justification lives in SECURITY.md:28 and .env.example:2-3 instead of the file named in the Pass-Criteria.",
+        "No rotation procedure is documented — vacuous today (no secret exists) but would need writing the moment a keyed upstream is added."
+      ]
+    },
+    "SEC-014": {
+      "status": "partial",
+      "category": "SEC",
+      "severity": "medium",
+      "evidence": [
+        "No tool allow-list configuration exists in the repo: `find . -iname '*allowlist*' -o -iname '*tool-policy*' -o -iname '*gateway-config*'` returns nothing, and grep for `allowed_tools|tool_allowlist|whitelist` over deploy/ and src/ returns no match. All 23 tools registered in src/swisstopo_mcp/server.py:87-654 are exposed unconditionally to every caller.",
+        "No server-side defence-in-depth role/group check: grep for `group|role|team` combined with check/validate/require over src/ returns nothing. There is no require_group decorator and no ctx.user_claims usage — consistent with auth_model=none, which leaves no claims to check against.",
+        "DOCUMENTED DEFERRAL — SECURITY.md:52-61 records tool allow-listing as a portfolio/gateway-layer control with an explicit rationale ('belongs to the MCP host/gateway that aggregates multiple servers, not to an individual server exposing a fixed, read-only tool set') and states the residual risk is bounded by the egress allow-list and the read-only tool surface. SECURITY.md:68-73 names the re-evaluation trigger ('is aggregated behind a shared MCP gateway').",
+        "The risk-bounding claims are verifiable: every one of the 23 tools carries readOnlyHint: true / destructiveHint: false in its annotations (e.g. src/swisstopo_mcp/server.py:89-95, 349-357, 636-643), and outbound reach is capped by the frozenset at src/swisstopo_mcp/api_client.py:51-64."
+      ],
+      "gaps": [
+        "No per-team/per-role allow-list is documented anywhere (Pass-Criterion 1).",
+        "No default-deny tool exposure — tools/list returns the full 23-tool manifest to every caller (Pass-Criterion 2 and 5).",
+        "No server-side group/role check as defence-in-depth (Pass-Criterion 3).",
+        "No audit logging of denied tool calls, because no call can be denied (Pass-Criterion 4)."
+      ]
+    },
+    "SEC-015": {
+      "status": "partial",
+      "category": "SEC",
+      "severity": "medium",
+      "evidence": [
+        "No pre-flight detection layer exists: grep for `tool.poisoning|prompt.injection|sanitize.*description|INJECTION_PATTERNS|zero-width|\\\\\\\\u200B` over src/ and deploy/ returns zero hits. No scan_tool_definition / filter_tool_list equivalent is present.",
+        "No detection tests and no SIEM alerting: tests/ contains no poisoning-detection test file, and .github/workflows/security.yml runs only gitleaks — there is no rule or alert threshold for tool_poisoning_detected / tool_poisoning_warning events anywhere in deploy/ or docs/.",
+        "DOCUMENTED DEFERRAL with a structural argument — SECURITY.md:62-64 records cross-server tool-poisoning detection as a host/gateway responsibility and notes that 'this server's tool definitions are version-controlled and shipped from this repository; there is no dynamic or remote tool registration'. SECURITY.md:68-73 lists dynamic/remote tool registration as an explicit re-evaluation trigger.",
+        "That argument is verifiable in code: all 23 tool names, descriptions and annotations are static literals in src/swisstopo_mcp/server.py:87-654; there is no registration path that reads a tool definition from a network response or a config file (no mcp.add_tool / dynamic registration call anywhere in src/)."
+      ],
+      "gaps": [
+        "No detection layer, so none of the four required pattern classes (system prompts, override phrases, invisible characters, homoglyphs) are covered (Pass-Criteria 1-2).",
+        "No default-deny filtering of high-risk definitions and no logging of medium-risk ones (Pass-Criteria 3-4).",
+        "No audit events to a SIEM and no alerting threshold (Pass-Criterion 5).",
+        "No tests for standard attack patterns (Pass-Criterion 6).",
+        "The German/French injection-pattern extension raised in Remediation Schritt 3 is unaddressed — relevant for this portfolio since tool descriptions here are German."
+      ]
+    },
+    "SEC-016": {
+      "status": "pass",
+      "category": "SEC",
+      "severity": "critical",
+      "evidence": [
+        "No 0.0.0.0 binding is hardcoded in the code. The configured default host is 127.0.0.1 with an inline rationale naming this check: src/swisstopo_mcp/config.py:20-22 ('Default host stays 127.0.0.1 — a container sets SWISSTOPO_HTTP_HOST=0.0.0.0 itself (SEC-016)'). The uvicorn call reads that setting rather than a literal: src/swisstopo_mcp/server.py:695-699.",
+        "grep -rE 'host\\\\s*=\\\\s*[\\\"\\\\x27]0\\\\.0\\\\.0\\\\.0' over src/ returns no match; the only occurrences of 0.0.0.0 in the repo are the two deliberate container overrides (Dockerfile:26, deploy/kubernetes.yaml:41) and documentation lines.",
+        "The container override is set only in the image/manifest, with an explanatory comment: Dockerfile:24-26 ('In a container we must bind all interfaces — set ONLY here, never as a code default (SEC-016). The code default stays 127.0.0.1') and deploy/kubernetes.yaml:39-41.",
+        "A regression test pins the default: tests/test_config.py:9-10 asserts `Settings(_env_file=None).http_host == '127.0.0.1'`, and tests/test_config.py:16-23 asserts the env override path works.",
+        "The local-vs-container differentiation is documented: docs/deployment.md:36 ('`0.0.0.0` only in container, never a code default | `SWISSTOPO_HTTP_HOST` env (code default stays `127.0.0.1`, SEC-016)') and .env.example:9-11."
+      ],
+      "gaps": [
+        "README.md itself does not explain the local/container binding distinction; it delegates via the 'Container deployment' section (README.md:334-338) to docs/deployment.md. A reader who never opens that file will not see the NeighborJack rationale.",
+        "The optional warn-on-dangerous-binding heuristic (log a WARNING when binding 0.0.0.0 without /.dockerenv or KUBERNETES_SERVICE_HOST) is not implemented — Pass-Criterion 5, marked optional.",
+        "docs/deployment.md:19 documents `docker run ... -p 8000:8000` without a 127.0.0.1 bind prefix, which publishes the container port on all host interfaces."
+      ]
+    },
+    "SEC-018": {
+      "status": "partial",
+      "category": "SEC",
+      "severity": "high",
+      "evidence": [
+        "Every tool-boundary model declares strict mode explicitly. All 23 tools take a single Pydantic model parameter, and each of those models carries `model_config = ConfigDict(str_strip_whitespace=True, extra=\\\"forbid\\\", strict=True)` — geocoding.py:19 and :41, rest_api.py:40, :54, :75, :84, :92, :96, :100, stac.py:19 and :32, wmts.py:29, height.py:28 and :42, oereb.py:49 and :61, coords.py:181, geodata.py:158 and :199, openplz.py:247, :257, :304.",
+        "Runtime-verified (python -c against the installed package): HeightInput(lat=47.0, lon=8.0, evil='x') → rejected; HeightInput(lat='47.0', lon='8.0') → rejected; IdentifyInput(..., evil=1) → rejected; ConvertCoordinatesInput(easting='8.5', northing='47.4') → rejected. Effective model_config for HeightInput and ConvertCoordinatesInput both resolve to {'str_strip_whitespace': True, 'extra': 'forbid', 'strict': True}.",
+        "Whitelist (not blacklist) patterns are centralised and applied to free-text arguments: src/swisstopo_mcp/api_client.py:39-43 defines TEXT_PATTERN, ID_PATTERN, COORDS_PATTERN, LANG_PATTERN, CANTON_PATTERN, all anchored ^...$ positive character classes. Applied e.g. at geocoding.py:21-27, rest_api.py:42-48, rest_api.py:78-81, oereb.py:63-73, height.py:44-52.",
+        "The new ConvertCoordinatesInput is bounded: strict/extra=forbid at coords.py:181, plus a model_validator (coords.py:202-227) that range-checks against the direction — 5.9–10.5 / 45.8–47.9 degrees for wgs84_to_lv95 and LV95_E_MIN..LV95_E_MAX / LV95_N_MIN..LV95_N_MAX (coords.py:48-49) for lv95_to_wgs84 — and rejects swapped axes rather than returning a wrong point.",
+        "GAP — the new shared SwissPointInput base model declares NO model_config (src/swisstopo_mcp/coords.py:77-108). Runtime-verified: SwissPointInput(lat=47.0, lon=8.0, evil='x') is ACCEPTED, and SwissPointInput(lat='47.0', lon='8.0') coerces the strings to floats; SwissPointInput.model_config == {}. The tool surface is safe today only because all five subclasses re-declare the config (height.py:28, rest_api.py:54, :92, :96, oereb.py:49). A future point-based tool that inherits SwissPointInput and forgets that line silently gets extra='ignore' and coercion.",
+        "GAP — three tool arguments are unbounded integers forwarded straight into upstream query params. `sr: int = Field(default=4326, ...)` with no ge/le, no Literal and no validator at geocoding.py:36 (GeocodeInput), geocoding.py:46 (ReverseGeocodeInput) and rest_api.py:89 (GetFeatureInput); the values reach the upstream request at geocoding.py:95, geocoding.py:132 and rest_api.py:368. The helper written for exactly this, `validate_sr()` at api_client.py:345-352, is dead code — grep shows no call site anywhere in src/. By contrast HeightInput, ElevationProfileInput and IdentifyInput do guard `sr` via check_deprecated_sr (height.py:37, height.py:71, rest_api.py:70).",
+        "GAP — IdentifyInput.layers (rest_api.py:56-61) and FindFeaturesInput.layer / search_field (rest_api.py:78, :80) have min_length and a pattern but no max_length, so an arbitrarily long comma-separated layer string passes validation into the upstream query string."
+      ],
+      "gaps": [
+        "SwissPointInput (coords.py:77) omits strict=True / extra='forbid'; protection depends entirely on each subclass repeating it.",
+        "GeocodeInput.sr, ReverseGeocodeInput.sr and GetFeatureInput.sr are unconstrained ints passed to the upstream API; validate_sr() exists but is never called.",
+        "Several string fields lack max_length (rest_api.py:56, :78, :80).",
+        "tests/test_input_validation.py covers patterns, strict mode and extra-field rejection for GeocodeInput / GetFeatureInput / GetOerebExtractInput but has no case asserting SwissPointInput's own config, which is why the omission survived."
+      ]
+    },
+    "SEC-019": {
+      "status": "pass",
+      "category": "SEC",
+      "severity": "critical",
+      "evidence": [
+        "A Lethal-Trifecta assessment table is documented with a score: README.md:319-327 rates 'Access to private data' ❌ No (Public Open Data only), 'Exposure to untrusted content' ⚠️ Limited (fixed allow-list of trusted geo.admin / OEREB hosts), 'External communication (write/send)' ❌ No, concluding 'at most 1 of 3 — safe by design'. Mirrored in the posture table at SECURITY.md:32.",
+        "Leg 1 (private data) verified absent: all upstreams are keyless public open-data endpoints (src/swisstopo_mcp/api_client.py:51-64), there is no database, no filesystem tool and no PII field in any model; data_class is Public Open Data per the profile.",
+        "Leg 3 (external send) verified absent: grep -rE 'send_mail|smtplib|slack|webhook' over src/ returns zero hits. The only non-GET outbound call is the Overpass POST at src/swisstopo_mcp/overpass.py:159-165, whose target is the fixed OVERPASS_INTERPRETER constant on an allow-listed host — it carries a generated query, not caller-supplied data to a caller-chosen recipient.",
+        "Write capability is structurally absent and asserted per tool: all 23 registrations carry readOnlyHint: true and destructiveHint: false (e.g. src/swisstopo_mcp/server.py:89-95, :350-357, :553-560, :637-643). The read-only phase is stated at README.md:313-316 and SECURITY.md:38-42.",
+        "The residual leg-2 exposure is bounded by the same frozenset the check's Modus-3 pattern asks for: assert_host_allowed (src/swisstopo_mcp/api_client.py:67-74) is a hard-coded frozenset, not env-configurable, and is enforced before every retried request (api_client.py:162-163) — matching the 'Allow-List als FrozenSet im Code, nicht config-mutierbar' criterion."
+      ],
+      "gaps": [
+        "SECURITY.md:18 and :40 still say 'All 13 tools' while the server now exposes 23 (src/swisstopo_mcp/server.py:4, README.md:314). The trifecta claim is unchanged in substance but the document is stale against the current surface.",
+        "The trifecta table does not mention that geodata.py consumes URLs out of an upstream catalogue response (src/swisstopo_mcp/geodata.py:96-104, :447, :464) — still allow-list-bounded, but a slightly wider leg-2 surface than 'reads only from a fixed allow-list' suggests."
+      ]
+    },
+    "SEC-020": {
+      "status": "pass",
+      "category": "SEC",
+      "severity": "critical",
+      "evidence": [
+        "Zero forbidden patterns in the codebase: `grep -rnE 'os\\\\.system\\\\(|shell\\\\s*=\\\\s*True|\\\\beval\\\\(|\\\\bexec\\\\(|os\\\\.popen\\\\(|subprocess|pickle\\\\.|__import__' src/ tests/` returns no matches at all. There is no subprocess site to audit.",
+        "No shell-out is needed by design — every capability is an HTTP call through the single httpx client (src/swisstopo_mcp/api_client.py:88-94, :146-187); the check's 'library instead of CLI' criterion is satisfied trivially (httpx rather than curl, no image/PDF/git tooling).",
+        "No filesystem or path handling exists, so the pathlib/base-dir criterion is vacuous: grep over src/ finds no `open(`, no `os.path`, no `pathlib` and no file-serving tool. The only I/O is network I/O and stderr logging (src/swisstopo_mcp/logging_config.py).",
+        "Timeouts are set on every outbound call, covering the resource-exhaustion criterion: REQUEST_TIMEOUT = 30.0 applied at client construction (src/swisstopo_mcp/api_client.py:24, :91), with a per-call override honoured at api_client.py:173-174 and used for the slower Overpass endpoint (src/swisstopo_mcp/overpass.py:164).",
+        "User input that flows outward is whitelist-validated at the Pydantic boundary, not sanitised by blacklist: the anchored positive patterns at src/swisstopo_mcp/api_client.py:39-43 are applied to every free-text field, and tests/test_input_validation.py:14-31 asserts rejection of null bytes, angle brackets, double quotes and backticks — the same metacharacter class the check's injection suite uses."
+      ],
+      "gaps": [
+        "No CI guard against regression: .github/workflows/ci.yml runs pytest and `ruff check` with select = ['E','F','W','I','UP'] (pyproject.toml:71) — no bandit, no semgrep, and no grep-based step for os.system / shell=True / eval / exec as suggested in Remediation Schritt 4. Nothing would fail the build if such a call were introduced.",
+        "The parametrised injection suite from Modus 3 does not exist as such; coverage comes indirectly from the pattern tests in tests/test_input_validation.py."
+      ]
+    },
+    "SEC-021": {
+      "status": "partial",
+      "category": "SEC",
+      "severity": "high",
+      "evidence": [
+        "Code-layer allow-list is a frozenset, not env-derived: src/swisstopo_mcp/api_client.py:51-64 declares ALLOWED_HOSTS with an inline comment stating it is deliberately not loaded from env so it cannot be silently widened at runtime. The new REFRAME host is present: api_client.py:56 (`\\\"geodesy.geo.admin.ch\\\",  # REFRAME — official coordinate transformation`).",
+        "Pre-request check is enforced centrally: assert_host_allowed at src/swisstopo_mcp/api_client.py:67-74, called before the first attempt in request_with_retry (api_client.py:162-163), which is the path used by geo_admin_request (:194), geo_admin_request_text (:206), reframe_request (:221), stac_request (:229), openplz_request (:245), geodata.py:113/:449/:464 and overpass.py:159. The two handlers that call the client directly still assert first: src/swisstopo_mcp/oereb.py:98 and src/swisstopo_mcp/oereb.py:161. No call site passes check_host=False (grep: the parameter appears only at api_client.py:154 and :162).",
+        "The new host is documented in docs/network-egress.md:13 — the table row `geodesy.geo.admin.ch | REFRAME — official LV95<->WGS84 coordinate transformation | convert_coordinates` — and the CHANGELOG records the addition at CHANGELOG.md:50 ('New egress host `geodesy.geo.admin.ch` (SEC-021 allow-list + docs)').",
+        "Update procedure is documented as a 5-step checklist including the network-layer rule and a PR justification: docs/network-egress.md:40-49.",
+        "Network-layer egress control exists for the containerised deployment: deploy/kubernetes.yaml:90-118 defines NetworkPolicy `swisstopo-mcp-egress` (policyTypes: Egress) permitting TCP/443 to 0.0.0.0/0 except RFC1918 and 169.254.0.0/16, with DNS explicitly allowed via UDP/53 to kube-system (deploy/kubernetes.yaml:112-118) — the DNS-path criterion is met.",
+        "Regression tests exist and cover the new host: tests/test_egress_allowlist.py:23-25 parametrises over every member of ALLOWED_HOSTS, :27-38 asserts rejection of evil.example.com, 169.254.169.254, the suffix-trick host api3.geo.admin.ch.evil.com and localhost, and :41-48 asserts every OEREB_ENDPOINTS host is on the list. tests/test_coords.py:190-197 adds a REFRAME-specific pair (geodesy.geo.admin.ch allowed; geodesy.geo.admin.ch.evil.com raises PermissionError).",
+        "GAP — docs/network-egress.md:34-38 is factually wrong and contradicts the shipped manifest. It states: 'the server runs locally over stdio today and is not cloud-deployed, so no Kubernetes NetworkPolicy / security-group egress rule is shipped. If/when the server is containerised, add a network-layer egress allow-list'. deploy/kubernetes.yaml:87-118 does ship exactly that policy, docs/deployment.md:5-6 references it as 'the network-layer half of SEC-021', and the audit profile records is_cloud_deployed=true. A reader following the Update-procedure at docs/network-egress.md:48 ('only relevant for cloud deployment') would skip updating a policy that exists.",
+        "GAP — the network layer is a CIDR/port policy, not a host allow-list. deploy/kubernetes.yaml:101-108 permits TCP/443 to the whole public internet minus private ranges; it does not restrict egress to the 10 hosts in ALLOWED_HOSTS. A compromised image that bypassed the code check could still reach any public HTTPS endpoint — which is the precise failure mode ('Bei kompromittiertem Code-Image keine Defense') the two-layer requirement exists to prevent."
+      ],
+      "gaps": [
+        "docs/network-egress.md:34-38 claims no NetworkPolicy is shipped while deploy/kubernetes.yaml:90-118 ships one — stale text contradicting the manifest and the is_cloud_deployed=true profile.",
+        "Network-layer control is CIDR-based, not host-based; it does not mirror ALLOWED_HOSTS as the check's documentation pattern (`NetworkPolicy egress` per host) requires.",
+        "SECURITY.md:24 describes the allow-list as 'restricted to *.geo.admin.ch and the cantonal OEREB endpoints' — stale since geodienste.ch, overpass.osm.ch and openplzapi.org were added (api_client.py:60-62).",
+        "assert_host_allowed checks only the hostname, never the scheme (api_client.py:69), so http:// to an allow-listed host passes — relevant because geodata.py:447 and :464 build URLs from an upstream catalogue value (geodata.py:96-104)."
+      ]
+    },
+    "SEC-022": {
+      "status": "fail",
+      "category": "SEC",
+      "severity": "high",
+      "evidence": [
+        "Namespace prefixing is inconsistent across the 23-tool surface: 17 tools carry the `swisstopo_` server prefix (src/swisstopo_mcp/server.py:88, 108, 145, 165, 186, 207, 235, 256, 279, 307, 328, 349, 372, 394, 423, 456, 475) while 6 do not — `list_available_layers` (server.py:504), `query_geodata` (server.py:525), `query_osm_features` (server.py:552), `lookup_postal_code` (server.py:586), `find_commune` (server.py:609) and `search_address` (server.py:636).",
+        "Those 6 unprefixed names are precisely the collision-prone generic form the check's Fail-Pattern describes. `search_address`, `find_commune`, `query_geodata` and `lookup_postal_code` are names any other Swiss-data MCP server in this portfolio could plausibly register — and the server's own instructions text tells the model these join to swiss-statistics-mcp and zurich-opendata-mcp (src/swisstopo_mcp/server.py:70-74), i.e. exactly the multi-server aggregation scenario where shadowing bites.",
+        "The unprefixed set grew in the two most recent feature releases rather than shrinking: the geodata façade tools were added at CHANGELOG.md:131-152 and the three OpenPLZ tools at CHANGELOG.md:80-107, both without a namespace prefix, while every tool added in the same period under the swisstopo API families kept the prefix (CHANGELOG.md:11-23).",
+        "No tool-definition hash snapshot exists: `tool-hashes.json` is absent from the repo root, and neither .github/workflows/publish.yml nor .github/workflows/ci.yml contains a hash/sha256/tool-snapshot step (grep over .github/workflows/ returns no match). Rug-pull detection by a host is therefore not possible against a published baseline.",
+        "PARTIAL CREDIT — CHANGELOG.md does name tool-definition changes explicitly and in detail: new tools with rationale (CHANGELOG.md:11-23, :33-44, :45-57), a Changed entry explaining what was deliberately not altered (:59-66), and a Fixed entry describing the `sr` input-contract change that alters existing tool schemas (:68-75).",
+        "PARTIAL CREDIT — versioning is coherent: pyproject.toml:8 and server.json:5 both read 0.2.0 (the mismatch is recorded as fixed at CHANGELOG.md:76-77), and tool additions were shipped as minor bumps."
+      ],
+      "gaps": [
+        "6 of 23 tools have no server-identity prefix (server.py:504, 525, 552, 586, 609, 636) — Pass-Criteria 1 and 2 unmet.",
+        "No hash snapshot of tool definitions is generated at release and none is stored in the repo — Pass-Criterion 3 unmet.",
+        "CHANGELOG entries carry no per-tool hashes and no 'Re-approval needed in Claude Desktop' note for the `sr` contract change — Pass-Criterion 5 unmet.",
+        "The `sr=2056` fix (CHANGELOG.md:68-75) narrows an accepted input value on three existing tools, which is a breaking change to the tool contract, yet shipped inside a minor/unreleased bump rather than a major — Pass-Criterion 6 arguably unmet."
+      ]
+    }
+  }
+}

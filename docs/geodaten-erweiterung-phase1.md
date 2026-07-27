@@ -3,8 +3,8 @@
 **Datum der Probe:** 2026-07-19
 **Methodik:** [`mcp-data-source-probe`](../README.de.md) — Schritt 1 (Live-Probe vor Design).
 **Status:** Phase 1 abgeschlossen; **Phase 2 umgesetzt** (Freigabe: OEREB nur
-Verfügbarkeits-Layer, geodienste in `query_geodata` integriert). Die 3 neuen
-Tools (`query_geodata`, `list_available_layers`, `query_osm_features`) sind in
+Verfügbarkeits-Layer, geodienste in `swisstopo_query_geodata` integriert). Die 3 neuen
+Tools (`swisstopo_query_geodata`, `swisstopo_list_available_layers`, `swisstopo_query_osm_features`) sind in
 `geodata.py` / `overpass.py` implementiert — siehe CHANGELOG und READMEs.
 
 Alle Ergebnisse unten sind empirisch (`curl` gegen die Live-Endpoints), nicht
@@ -224,7 +224,7 @@ in einer anderen Sprache (XML) als die Speisekarte (JSON), die du bestellt hast.
 
 ### Architektur-Entscheid: **A (Live-API-only) mit hartem Client-Timeout + Ergebnis-Limit**
 Kein Dump (OSM-Planet wäre absurd gross). Stattdessen: eigenes, separates Tool
-`query_osm_features` mit **hartem client-seitigem Timeout** (kürzer als der
+`swisstopo_query_osm_features` mit **hartem client-seitigem Timeout** (kürzer als der
 Server-`[timeout:]`), **Ergebnis-Limit** (`out … ;` + Client-Cap), Retry mit
 Backoff **nur** auf 429/5xx/Netzfehler, und Body-Inspektion vor JSON-Parse.
 
@@ -256,9 +256,9 @@ Quelle) → 17–21 Tools = **Budget-Sprengung-Risiko**. Deshalb **Fassaden-Must
 
 | # | Neues Tool | Deckt ab | Begründung |
 |---|---|---|---|
-| 14 | `query_geodata(layer, bbox\|point\|commune, format)` | A (Strassenverz.), B (geodienste OGC API), C (ÖREB-Verfügbarkeit) | **Fassade** über alle karten-/layer-basierten Quellen |
-| 15 | `list_available_layers(source?, canton?, free_only?)` | Discovery über A + B-Katalog + C | Discovery-Tool statt N Einzel-Tools |
-| 16 | `query_osm_features(feature_type, area, radius_m)` | D (Overpass) | **Separat** (hartes Timeout/Limit, andere Fehler-Semantik, ODbL statt OGD) |
+| 14 | `swisstopo_query_geodata(layer, bbox\|point\|commune, format)` | A (Strassenverz.), B (geodienste OGC API), C (ÖREB-Verfügbarkeit) | **Fassade** über alle karten-/layer-basierten Quellen |
+| 15 | `swisstopo_list_available_layers(source?, canton?, free_only?)` | Discovery über A + B-Katalog + C | Discovery-Tool statt N Einzel-Tools |
+| 16 | `swisstopo_query_osm_features(feature_type, area, radius_m)` | D (Overpass) | **Separat** (hartes Timeout/Limit, andere Fehler-Semantik, ODbL statt OGD) |
 
 **Netto: 13 → 16 Tools. Unter Budget (18).** Die bestehenden ÖREB-Extract-Tools
 (`swisstopo_get_egrid`, `swisstopo_get_oereb_extract`) bleiben unverändert.
@@ -284,6 +284,6 @@ Quelle) → 17–21 Tools = **Budget-Sprengung-Risiko**. Deshalb **Fassaden-Must
 - **C (ÖREB):** Nur bundesweiten Verfügbarkeits-Baustein neu bauen (empfohlen),
   oder auch cantonalen Extract ausbauen (bräuchte Egress-Freigabe + Live-Probe
   je Kanton, in dieser Session nicht möglich)?
-- **Fassaden-Zuschnitt:** `query_geodata` als ein Tool über A+B+C — oder B
+- **Fassaden-Zuschnitt:** `swisstopo_query_geodata` als ein Tool über A+B+C — oder B
   (geodienste) wegen anderer Lizenz/Kanton-Semantik als eigenes Tool? (Der Skill
   favorisiert Konsolidierung; Budget erlaubt beides.)

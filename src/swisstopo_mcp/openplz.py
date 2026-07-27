@@ -392,7 +392,7 @@ def _format_addresses(query: str, records: list[dict[str, Any]], total: int) -> 
 # --- Handlers -----------------------------------------------------------------
 
 
-@log_tool_call("lookup_postal_code")
+@log_tool_call("swisstopo_lookup_postal_code")
 async def lookup_postal_code(params: LookupPostalCodeInput) -> ToolResponse:
     """Resolve a Swiss postal code to locality, commune (+BFS number), district, canton."""
     try:
@@ -519,7 +519,7 @@ async def _list_by_district(district: str) -> ToolResponse:
     )
 
 
-@log_tool_call("find_commune")
+@log_tool_call("swisstopo_find_commune")
 async def find_commune(params: FindCommuneInput) -> ToolResponse:
     """Resolve a commune both directions (name↔BFS number) or list a unit's communes."""
     try:
@@ -534,7 +534,7 @@ async def find_commune(params: FindCommuneInput) -> ToolResponse:
         return ToolResponse.error(handle_api_error(e, "Gemeinde-Auflösung"), source=OPENPLZ_SOURCE)
 
 
-@log_tool_call("search_address")
+@log_tool_call("swisstopo_search_address")
 async def search_address(params: SearchAddressInput) -> ToolResponse:
     """Full-text search over Swiss streets and localities (OpenPLZ FullTextSearch)."""
     try:

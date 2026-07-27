@@ -246,7 +246,7 @@ alle Ports sind additiv.
 1. **Tool-Budget-Inflation.** 23 Tools in einem Server erhöhen die
    Auswahllast für das Modell. Falls die Tool-Beschreibungen nicht scharf
    getrennt sind, sinkt die Trefferquote — gerade weil dann *zwei* Wege zu
-   Bauzonen führen (`swisstopo_zoning_at` und `query_geodata`). Gegenmassnahme:
+   Bauzonen führen (`swisstopo_zoning_at` und `swisstopo_query_geodata`). Gegenmassnahme:
    `<use_case>`-Tags konsequent, und in `instructions` eine klare
    Entscheidungsregel. **Vor** PR 3 zu klären.
 2. **Nutzerbasis von B unbekannt.** Entscheidet zwischen PR 5 (Archiv) und der

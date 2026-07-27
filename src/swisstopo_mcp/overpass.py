@@ -147,7 +147,7 @@ def _extract_error(text: str) -> str | None:
     return None
 
 
-@log_tool_call("query_osm_features")
+@log_tool_call("swisstopo_query_osm_features")
 async def query_osm_features(params: QueryOsmFeaturesInput) -> ToolResponse:
     """Query OpenStreetMap POIs around a point via Overpass (ODbL)."""
     try:

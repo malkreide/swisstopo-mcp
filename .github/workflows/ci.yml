@@ -36,3 +36,9 @@ jobs:
       # returning ToolResponse and nothing caught it.
       - name: Type check
         run: mypy src/
+
+      # SEC-022: a tool's name, description and input schema are what the client
+      # approved. If any changes, tool-hashes.json goes stale and this fails, so
+      # the change cannot reach a release without surfacing in review.
+      - name: Tool-definition snapshot
+        run: python scripts/snapshot_tool_hashes.py --check

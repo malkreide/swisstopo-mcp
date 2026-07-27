@@ -76,12 +76,12 @@ mcp = FastMCP(
         "swisstopo_map_url generates shareable map links. "
         "ÖREB tools (swisstopo_get_egrid, swisstopo_get_oereb_extract) require a canton parameter. "
         "For interkantonale/OSM data use the consolidated façade: "
-        "list_available_layers → query_geodata (strassenverzeichnis, "
+        "swisstopo_list_available_layers → swisstopo_query_geodata (strassenverzeichnis, "
         "geodienste:<topic>:<canton>, oereb-verfuegbarkeit). "
-        "query_osm_features returns OpenStreetMap POIs (schools, playgrounds, …) "
+        "swisstopo_query_osm_features returns OpenStreetMap POIs (schools, playgrounds, …) "
         "around a point via Overpass (ODbL, separate rate-limited source). "
         "For the administrative address level (PLZ → Gemeinde → Bezirk → Kanton) "
-        "use lookup_postal_code, find_commune and search_address (OpenPLZ, "
+        "use swisstopo_lookup_postal_code, swisstopo_find_commune and swisstopo_search_address (OpenPLZ, "
         "separate BFS/swisstopo OGD source). These return the amtliche "
         "BFS-Gemeindenummer (bfs_commune_number) — the join key to BFS statistics "
         "(swiss-statistics-mcp) and zurich-opendata-mcp."
@@ -514,7 +514,7 @@ from swisstopo_mcp.geodata import (  # noqa: E402
 
 
 @mcp.tool(
-    name="list_available_layers",
+    name="swisstopo_list_available_layers",
     annotations=ToolAnnotations(
         title="Verfügbare Geodaten-Layer auflisten",
         readOnlyHint=True,
@@ -524,9 +524,9 @@ from swisstopo_mcp.geodata import (  # noqa: E402
     ),
 )
 async def list_available_layers_tool(params: ListLayersInput) -> ToolResponse:
-    """Discovery-Tool: listet die Layer-Kennungen, die query_geodata akzeptiert.
+    """Discovery-Tool: listet die Layer-Kennungen, die swisstopo_query_geodata akzeptiert.
 
-    <use_case>Erster Schritt vor query_geodata: herausfinden, welche Datensätze
+    <use_case>Erster Schritt vor swisstopo_query_geodata: herausfinden, welche Datensätze
     (Strassenverzeichnis, ÖREB-Verfügbarkeit, interkantonale geodienste.ch-Topics)
     verfügbar und ohne Vertrag frei nutzbar sind. Für konkrete
     geodienste-Kennungen einen Kanton angeben (z.B. canton='ZH').</use_case>
@@ -535,7 +535,7 @@ async def list_available_layers_tool(params: ListLayersInput) -> ToolResponse:
 
 
 @mcp.tool(
-    name="query_geodata",
+    name="swisstopo_query_geodata",
     annotations=ToolAnnotations(
         title="Geodaten abfragen (Fassade)",
         readOnlyHint=True,
@@ -551,7 +551,7 @@ async def query_geodata_tool(params: QueryGeodataInput) -> ToolResponse:
     Punkt), 'oereb-verfuegbarkeit' (ÖREB-Status/Zuständigkeit an einem Punkt) und
     'geodienste:&lt;topic&gt;:&lt;KANTON&gt;' (interkantonale Basisgeodaten via OGC API
     Features). Genau eine Ortsangabe (point | bbox | commune) übergeben.</use_case>
-    <important_notes>Gültige Layer-Kennungen via list_available_layers.
+    <important_notes>Gültige Layer-Kennungen via swisstopo_list_available_layers.
     geodienste-Layer erfordern bbox oder point (mit radius_m).</important_notes>
     """
     return await query_geodata(params)
@@ -562,7 +562,7 @@ from swisstopo_mcp.overpass import QueryOsmFeaturesInput, query_osm_features  # 
 
 
 @mcp.tool(
-    name="query_osm_features",
+    name="swisstopo_query_osm_features",
     annotations=ToolAnnotations(
         title="OpenStreetMap-POIs abfragen (Overpass)",
         readOnlyHint=True,
@@ -596,7 +596,7 @@ from swisstopo_mcp.openplz import (  # noqa: E402
 
 
 @mcp.tool(
-    name="lookup_postal_code",
+    name="swisstopo_lookup_postal_code",
     annotations=ToolAnnotations(
         title="PLZ zu Gemeinde/BFS-Nummer auflösen",
         readOnlyHint=True,
@@ -619,7 +619,7 @@ async def lookup_postal_code_tool(params: LookupPostalCodeInput) -> ToolResponse
 
 
 @mcp.tool(
-    name="find_commune",
+    name="swisstopo_find_commune",
     annotations=ToolAnnotations(
         title="Gemeinde auflösen (Name ↔ BFS-Nummer, Kanton/Bezirk)",
         readOnlyHint=True,
@@ -646,7 +646,7 @@ async def find_commune_tool(params: FindCommuneInput) -> ToolResponse:
 
 
 @mcp.tool(
-    name="search_address",
+    name="swisstopo_search_address",
     annotations=ToolAnnotations(
         title="Adressen/Orte per Volltext suchen",
         readOnlyHint=True,
@@ -662,7 +662,7 @@ async def search_address_tool(params: SearchAddressInput) -> ToolResponse:
     Treffer Gemeinde und BFS-Nummer, wenn vorhanden.</use_case>
     <important_notes>Quelle OpenPLZ (BFS/swisstopo OGD). Ergebnisse sind paginiert
     (max. 50/Abfrage); die Gesamttrefferzahl wird ausgewiesen. Für die exakte
-    PLZ→Gemeinde-Auflösung ist lookup_postal_code präziser.</important_notes>
+    PLZ→Gemeinde-Auflösung ist swisstopo_lookup_postal_code präziser.</important_notes>
     """
     return await search_address(params)
 

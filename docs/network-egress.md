@@ -9,16 +9,16 @@ allow-list (audit check **SEC-021**) and complements the SSRF hardening from
 
 | Host | Purpose | Tools |
 |---|---|---|
-| `api3.geo.admin.ch` | REST (SearchServer/MapServer), Geocoding, Height | search_layers, identify_features, find_features, get_feature, geocode, reverse_geocode, get_height, elevation_profile |
-| `geodesy.geo.admin.ch` | REFRAME — official LV95<->WGS84 coordinate transformation | convert_coordinates |
-| `data.geo.admin.ch` | STAC catalog | search_geodata, get_collection |
+| `api3.geo.admin.ch` | REST (SearchServer/MapServer), Geocoding, Height | swisstopo_search_layers, swisstopo_identify_features, swisstopo_find_features, swisstopo_get_feature, swisstopo_geocode, swisstopo_reverse_geocode, swisstopo_get_height, swisstopo_elevation_profile |
+| `geodesy.geo.admin.ch` | REFRAME — official LV95<->WGS84 coordinate transformation | swisstopo_convert_coordinates |
+| `data.geo.admin.ch` | STAC catalog | swisstopo_search_geodata, swisstopo_get_collection |
 | `wmts.geo.admin.ch` | WMTS tiles | (map references) |
-| `map.geo.admin.ch` | Shareable map viewer URLs | map_url |
-| `oereb.geo.zh.ch` | OEREB cadastre — canton ZH | get_egrid, get_oereb_extract |
-| `www.oereb2.apps.be.ch` | OEREB cadastre — canton BE | get_egrid, get_oereb_extract |
-| `geodienste.ch` | Interkantonale Basisgeodaten (services catalogue + WMS/WFS/OGC API Features) | list_available_layers, query_geodata |
-| `overpass.osm.ch` | OpenStreetMap Overpass API (Swiss instance) — POI queries (ODbL) | query_osm_features |
-| `openplzapi.org` | OpenPLZ API — administrative address level (BFS + swisstopo OGD) | lookup_postal_code, find_commune, search_address |
+| `map.geo.admin.ch` | Shareable map viewer URLs | swisstopo_map_url |
+| `oereb.geo.zh.ch` | OEREB cadastre — canton ZH | swisstopo_get_egrid, swisstopo_get_oereb_extract |
+| `www.oereb2.apps.be.ch` | OEREB cadastre — canton BE | swisstopo_get_egrid, swisstopo_get_oereb_extract |
+| `geodienste.ch` | Interkantonale Basisgeodaten (services catalogue + WMS/WFS/OGC API Features) | swisstopo_list_available_layers, swisstopo_query_geodata |
+| `overpass.osm.ch` | OpenStreetMap Overpass API (Swiss instance) — POI queries (ODbL) | swisstopo_query_osm_features |
+| `openplzapi.org` | OpenPLZ API — administrative address level (BFS + swisstopo OGD) | swisstopo_lookup_postal_code, swisstopo_find_commune, swisstopo_search_address |
 
 ## Enforcement
 

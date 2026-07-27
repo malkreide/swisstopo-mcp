@@ -1,7 +1,7 @@
 ## Finding: ARCH-004 — Inversion of Control: Transport-agnostische Server-Logik
 
 **Severity:** high
-**Status:** open
+**Status:** closed
 **Server:** swisstopo-mcp
 **Check-Reference:** ARCH-004
 **PDF-Reference:** Sec 2.1
@@ -88,3 +88,18 @@ A typo'd canton then fails at startup with a clear message instead of producing 
 
 ### Effort Estimate
 S (<1d)
+
+---
+
+### Remediation Status (2026-07-27, follow-up PR)
+
+**Closed.** `transport` and `oereb_cantons` are now `Settings` fields.
+`--http` still wins on the command line so existing invocations keep working,
+but `SWISSTOPO_TRANSPORT=streamable-http` is the deployment path. `oereb.py`
+no longer reads `os.environ` directly — the contradiction with `config.py`'s
+own docstring is gone.
+
+**Behavioural note:** the OEREB canton list is now read once at startup rather
+than on every call. That is what the check asks for, but it means a change
+requires a restart. Six tests that monkeypatched the env var at call time were
+updated to set the setting instead.

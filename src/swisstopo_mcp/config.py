@@ -6,6 +6,8 @@ prefix and may also be supplied via a local `.env` file (see `.env.example`).
 """
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -16,6 +18,16 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         extra="ignore",
     )
+
+    # Transport selection. `--http` on the command line still works and wins,
+    # but a deployment configures this like every other setting instead of
+    # having to inject a CLI flag (ARCH-004).
+    transport: Literal["stdio", "streamable-http"] = "stdio"
+
+    # Cantonal OEREB endpoints to enable. Read here rather than via a call-time
+    # os.environ lookup in oereb.py, so the value is validated once at startup
+    # and the config object stays the single source (ARCH-004).
+    oereb_cantons: str = "ZH"
 
     # HTTP transport (used with `--http`). Default host stays 127.0.0.1 — a
     # container sets SWISSTOPO_HTTP_HOST=0.0.0.0 itself (SEC-016).
@@ -36,6 +48,10 @@ class Settings(BaseSettings):
     # runtime, which would lock the developer out of their own server.
     _LOCAL_ORIGINS = ("http://localhost", "http://localhost:*", "http://127.0.0.1", "http://127.0.0.1:*")
     _LOCAL_HOSTS = ("localhost", "localhost:*", "127.0.0.1", "127.0.0.1:*")
+
+    @property
+    def oereb_cantons_list(self) -> list[str]:
+        return [c.strip().upper() for c in self.oereb_cantons.split(",") if c.strip()]
 
     @staticmethod
     def _split(value: str) -> list[str]:

@@ -1,7 +1,7 @@
 ## Finding: SEC-004 — SSRF-Prevention: HTTPS-Enforcement + IP-Blocklisting
 
 **Severity:** critical
-**Status:** open
+**Status:** closed
 **Server:** swisstopo-mcp
 **Check-Reference:** SEC-004
 **PDF-Reference:** Sec 4.4
@@ -84,3 +84,15 @@ Note that step 2 alone does not close the TOCTOU window — that is tracked sepa
 
 ### Effort Estimate
 S (<1d)
+
+---
+
+### Remediation Status (2026-07-27, follow-up PR)
+
+**Closed.** `assert_host_allowed` now validates the scheme before the host, so an
+allow-listed host reached over cleartext `http://` is rejected. A resolved-IP
+guard (`assert_resolved_ip_public`) blocks any allow-listed name that answers
+with a private or link-local address, covering the two direct-client call sites
+in `oereb.py` because it hangs off the same function. Resolution is cached per
+host; a resolution *failure* is deliberately non-fatal, so httpx surfaces the
+real connection error instead of a masked PermissionError. 12 tests added.

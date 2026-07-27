@@ -4,9 +4,14 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from swisstopo_mcp.api_client import TEXT_PATTERN, geo_admin_request, handle_api_error
+from swisstopo_mcp.api_client import (
+    TEXT_PATTERN,
+    geo_admin_request,
+    handle_api_error,
+    validate_sr,
+)
 from swisstopo_mcp.logging_config import log_tool_call
 from swisstopo_mcp.models import ToolResponse
 
@@ -34,6 +39,14 @@ class GeocodeInput(BaseModel):
         ),
     )
     sr: int = Field(default=4326, description="Koordinatensystem (EPSG-Code)")
+
+    @field_validator("sr")
+    @classmethod
+    def _validate_sr(cls, v: int) -> int:
+        # Wires up validate_sr(), which existed but was never called — an
+        # arbitrary int used to be forwarded straight upstream (SEC-018).
+        return validate_sr(v)
+
     limit: int = Field(default=10, ge=1, le=50, description="Maximale Trefferanzahl")
 
 
@@ -44,6 +57,14 @@ class ReverseGeocodeInput(BaseModel):
     lon: float = Field(..., ge=5.9, le=10.5, description="Längengrad (WGS84)")
     limit: int = Field(default=5, ge=1, le=10, description="Maximale Trefferanzahl")
     sr: int = Field(default=4326, description="Koordinatensystem (EPSG-Code)")
+
+    @field_validator("sr")
+    @classmethod
+    def _validate_sr(cls, v: int) -> int:
+        # Wires up validate_sr(), which existed but was never called — an
+        # arbitrary int used to be forwarded straight upstream (SEC-018).
+        return validate_sr(v)
+
 
 
 # ---------------------------------------------------------------------------

@@ -1,7 +1,7 @@
 ## Finding: ARCH-012 — protocolVersion-Pinning + CHANGELOG + SDK-Update-Disziplin
 
 **Severity:** medium
-**Status:** open
+**Status:** closed
 **Server:** swisstopo-mcp
 **Check-Reference:** ARCH-012
 **PDF-Reference:** Anhang A9
@@ -90,3 +90,14 @@ This turns a silent SDK-side change into a red CI run on the Dependabot PR, whic
 
 ### Effort Estimate
 S (<1d)
+
+---
+
+### Remediation Status (2026-07-27, follow-up PR)
+
+**Closed** to the extent the SDK allows. A code-level `protocolVersion` pin is
+still not expressible in mcp 1.28.1 — verified again in a clean venv. What the
+finding asked for beyond that is now present: both READMEs name the concrete
+negotiated version (**2025-11-25**, `mcp.types.LATEST_PROTOCOL_VERSION`) and
+state an update policy, and `tests/test_protocol_version.py` fails if a
+Dependabot bump moves it — a tripwire rather than a documentation convention.

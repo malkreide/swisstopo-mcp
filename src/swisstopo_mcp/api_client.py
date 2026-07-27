@@ -2,6 +2,9 @@
 from __future__ import annotations
 
 import asyncio
+import ipaddress
+import socket
+from functools import lru_cache
 from typing import Any
 from urllib.parse import urlparse
 
@@ -64,14 +67,73 @@ ALLOWED_HOSTS: frozenset[str] = frozenset(
 )
 
 
+# Private / link-local ranges an upstream host must never resolve into. A name
+# on ALLOWED_HOSTS that suddenly answers with 127.0.0.1 or 169.254.169.254 is
+# DNS rebinding, not a legitimate move (SEC-004).
+_BLOCKED_NETS = [
+    ipaddress.ip_network(n)
+    for n in (
+        "10.0.0.0/8",
+        "172.16.0.0/12",
+        "192.168.0.0/16",
+        "127.0.0.0/8",
+        "169.254.0.0/16",
+        "0.0.0.0/8",
+        "::1/128",
+        "fe80::/10",
+        "fc00::/7",
+    )
+]
+
+
+@lru_cache(maxsize=64)
+def _resolve(hostname: str) -> tuple[str, ...]:
+    """Resolve a hostname to its IPs.
+
+    Cached for the process lifetime: this runs on every outbound request, and
+    the allow-list is a fixed frozenset of a handful of federal hosts.
+    """
+    infos = socket.getaddrinfo(hostname, 443, proto=socket.IPPROTO_TCP)
+    return tuple(str(info[4][0]) for info in infos)
+
+
+def assert_resolved_ip_public(hostname: str) -> None:
+    """Raise PermissionError if a host resolves into a private/link-local range.
+
+    Resolution failures are deliberately *not* fatal — the caller is about to
+    make the request anyway, and httpx will surface a connection error with a
+    better message than a masked PermissionError would.
+    """
+    try:
+        addresses = _resolve(hostname)
+    except socket.gaierror:
+        return
+    for address in addresses:
+        ip = ipaddress.ip_address(address)
+        if any(ip in net for net in _BLOCKED_NETS):
+            raise PermissionError(
+                f"Host {hostname!r} löst auf eine interne Adresse auf ({address}). "
+                "Blockiert (SSRF/DNS-Rebinding-Schutz)."
+            )
+
+
 def assert_host_allowed(url: str) -> None:
-    """Raise PermissionError if the URL's host is not on the egress allow-list."""
-    host = urlparse(url).hostname or ""
+    """Raise PermissionError unless the URL is HTTPS, allow-listed and public."""
+    parsed = urlparse(url)
+    # Scheme first: an allow-listed host reached over http:// is still a
+    # cleartext egress and was previously accepted.
+    if parsed.scheme != "https":
+        raise PermissionError(
+            f"Nicht-HTTPS-Egress blockiert: {parsed.scheme!r}. "
+            f"Nur https:// ist erlaubt (Egress-Allow-List)."
+        )
+    host = parsed.hostname or ""
     if host not in ALLOWED_HOSTS:
         raise PermissionError(
             f"Host nicht auf der Egress-Allow-List: {host!r}. "
             f"Erlaubt: {sorted(ALLOWED_HOSTS)}"
         )
+    assert_resolved_ip_public(host)
 
 
 # --- HTTP Client ---
@@ -192,7 +254,8 @@ async def geo_admin_request(path: str, params: dict[str, Any] | None = None) -> 
     url = f"{GEO_ADMIN_BASE}{path}"
     _log.debug("upstream_request", host="api3.geo.admin.ch", path=path)
     response = await request_with_retry("GET", url, params=params or {})
-    return response.json()
+    payload: dict[str, Any] = response.json()
+    return payload
 
 
 async def geo_admin_request_text(path: str, params: dict[str, Any] | None = None) -> str:
@@ -219,7 +282,8 @@ async def reframe_request(path: str, params: dict[str, Any] | None = None) -> di
     url = f"{REFRAME_BASE}{path}"
     _log.debug("upstream_request", host="geodesy.geo.admin.ch", path=path)
     response = await request_with_retry("GET", url, params=params or {})
-    return response.json()
+    payload: dict[str, Any] = response.json()
+    return payload
 
 
 async def stac_request(path: str, params: dict[str, Any] | None = None) -> Any:
@@ -227,7 +291,8 @@ async def stac_request(path: str, params: dict[str, Any] | None = None) -> Any:
     url = f"{STAC_BASE}{path}"
     _log.debug("upstream_request", host="data.geo.admin.ch", path=path)
     response = await request_with_retry("GET", url, params=params or {})
-    return response.json()
+    payload: dict[str, Any] = response.json()
+    return payload
 
 
 async def openplz_request(

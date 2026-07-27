@@ -98,7 +98,8 @@ def _has_ogc_api(entry: dict[str, Any]) -> str | None:
     """Return the entry's OGC API Features base URL, or None."""
     urls = entry.get("ogc_api_features")
     if isinstance(urls, list) and urls:
-        return urls[0]
+        first = urls[0]
+        return str(first) if first else None
     if isinstance(urls, str) and urls:
         return urls
     return None
@@ -266,7 +267,7 @@ async def _query_streets(params: QueryGeodataInput) -> ToolResponse:
             },
         )
         results = data.get("results", [])
-        records = [
+        name_hits: list[dict[str, Any]] = [
             {
                 "label": _strip_html(r.get("attrs", {}).get("label", "")),
                 "feature_id": r.get("attrs", {}).get("featureId") or r.get("id"),
@@ -274,10 +275,10 @@ async def _query_streets(params: QueryGeodataInput) -> ToolResponse:
             for r in results
         ]
         summary = _format_records(
-            f"Strassenverzeichnis — Treffer für '{params.commune}'", records, params.format
+            f"Strassenverzeichnis — Treffer für '{params.commune}'", name_hits, params.format
         )
         return ToolResponse.ok(
-            summary, records, match_type="exact" if records else "none",
+            summary, name_hits, match_type="exact" if name_hits else "none",
             source=SWISSTOPO_SOURCE, license=SWISSTOPO_LICENSE,
         )
 

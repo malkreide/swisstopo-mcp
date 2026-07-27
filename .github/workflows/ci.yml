@@ -31,3 +31,8 @@ jobs:
 
       - name: Lint
         run: ruff check src/ tests/
+
+      # Type gate for SDK-002: four handlers were annotated `-> str` while
+      # returning ToolResponse and nothing caught it.
+      - name: Type check
+        run: mypy src/

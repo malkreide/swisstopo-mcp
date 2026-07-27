@@ -138,7 +138,9 @@ class SwissPointInput(BaseModel):
             )
 
         if has_lv95:
-            e, n = self.easting, self.northing
+            assert self.easting is not None and self.northing is not None
+            e: float = self.easting
+            n: float = self.northing
             # Degrees in the LV95 fields is the likely mistake, so name it.
             if abs(e) <= 180 and abs(n) <= 180:
                 raise ValueError(

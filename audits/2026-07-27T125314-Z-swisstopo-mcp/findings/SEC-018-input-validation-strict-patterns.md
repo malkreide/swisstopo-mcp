@@ -1,7 +1,7 @@
 ## Finding: SEC-018 — Input-Validation an Tool-Boundaries (Pydantic strict / Zod)
 
 **Severity:** high
-**Status:** open
+**Status:** in-remediation
 **Server:** swisstopo-mcp
 **Check-Reference:** SEC-018
 **PDF-Reference:** Sec 3 / Sec 4 (Defense-in-Depth)
@@ -78,3 +78,17 @@ All four items are one-line-to-few-line changes in files that already have the s
 
 ### Effort Estimate
 S (<1d)
+
+---
+
+### Remediation Status (2026-07-27, same PR as the audit)
+
+**Partially closed.** The missing `model_config` on `SwissPointInput` was added
+(`src/swisstopo_mcp/coords.py`), so the base class now enforces
+`extra="forbid"` + `strict=True` instead of relying on every subclass to
+re-declare it. Three regression tests cover it, including a subclass that
+declares no config of its own.
+
+**Still open:** `sr` remains an unbounded `int` on three models, and
+`validate_sr()` in `api_client.py` remains dead code. Those predate this
+change and are left for a dedicated remediation pass.

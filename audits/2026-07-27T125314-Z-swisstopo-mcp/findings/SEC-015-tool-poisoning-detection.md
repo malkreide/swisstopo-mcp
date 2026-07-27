@@ -7,7 +7,7 @@
 **PDF-Reference:** Sec 5.3
 
 ### Observed Behavior
-No pre-flight detection layer exists. Grep for `tool.poisoning|prompt.injection|sanitize.*description|INJECTION_PATTERNS|zero-width|​` over `src/` and `deploy/` returns zero hits; there is no `scan_tool_definition` / `filter_tool_list` equivalent. There are no detection tests — `tests/` contains no poisoning-detection module — and no SIEM alerting: `.github/workflows/security.yml` runs only gitleaks, and no rule or alert threshold for `tool_poisoning_detected` / `tool_poisoning_warning` events exists anywhere in `deploy/` or `docs/`.
+No pre-flight detection layer exists. Grep for `tool.poisoning|prompt.injection|sanitize.*description|INJECTION_PATTERNS|zero-width|\u200B` over `src/` and `deploy/` returns zero hits; there is no `scan_tool_definition` / `filter_tool_list` equivalent. There are no detection tests — `tests/` contains no poisoning-detection module — and no SIEM alerting: `.github/workflows/security.yml` runs only gitleaks, and no rule or alert threshold for `tool_poisoning_detected` / `tool_poisoning_warning` events exists anywhere in `deploy/` or `docs/`.
 
 As with SEC-014 this is a documented deferral, and here the structural argument is stronger. `SECURITY.md:62-64` records cross-server tool-poisoning detection as a host/gateway responsibility and notes that "this server's tool definitions are version-controlled and shipped from this repository; there is no dynamic or remote tool registration". `SECURITY.md:68-73` lists dynamic/remote tool registration as an explicit re-evaluation trigger.
 
@@ -22,7 +22,7 @@ That argument is verifiable in code: all 23 tool names, descriptions and annotat
 - Tests verifying detection for standard attack patterns
 
 ### Evidence
-- No detection layer: grep for `tool.poisoning|prompt.injection|sanitize.*description|INJECTION_PATTERNS|zero-width|​` over `src/` and `deploy/` returns zero hits
+- No detection layer: grep for `tool.poisoning|prompt.injection|sanitize.*description|INJECTION_PATTERNS|zero-width|\u200B` over `src/` and `deploy/` returns zero hits
 - No detection tests in `tests/`; `.github/workflows/security.yml` runs gitleaks only; no alert rule in `deploy/` or `docs/`
 - Documented deferral with structural justification: `SECURITY.md:62-64`; re-evaluation trigger: `SECURITY.md:68-73`
 - The justification is verifiable: all 23 tool names, descriptions and annotations are static literals at `src/swisstopo_mcp/server.py:87-654`; no dynamic or remote registration path exists in `src/`
@@ -49,7 +49,7 @@ The detection layer itself belongs to whatever gateway fronts the portfolio and 
 1. **Add a self-scan to CI**, not as a gateway substitute but as a guard on this server's own definitions. A test in `tests/` that pulls the registered tool manifest and asserts no description contains invisible characters, homoglyph-substituted ASCII, or override phrases:
 
 ```python
-INVISIBLE = re.compile(r"[​-‏‪-‮⁠-⁤﻿]")
+INVISIBLE = re.compile(r"[\u200b-\u200f\u202a-\u202e\u2060-\u2064\ufeff]")
 OVERRIDE_DE = re.compile(
     r"(ignoriere|missachte|vergiss)\s+(alle\s+)?(vorherigen|bisherigen|obigen)"
     r"|system\s*[-_ ]?prompt|du\s+bist\s+jetzt", re.I)

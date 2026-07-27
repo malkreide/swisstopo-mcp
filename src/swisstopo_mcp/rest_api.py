@@ -19,8 +19,10 @@ from swisstopo_mcp.api_client import (
 from swisstopo_mcp.coords import SwissPointInput, check_deprecated_sr
 from swisstopo_mcp.logging_config import log_tool_call
 from swisstopo_mcp.models import (
+    ARE_LICENSE,
     ARE_SOURCE,
     ARE_ZONING_CAVEAT,
+    SWISSBOUNDARIES_LICENSE,
     SWISSBOUNDARIES_SOURCE,
     ToolResponse,
 )
@@ -427,9 +429,12 @@ async def zoning_at(params: ZoningAtInput) -> ToolResponse:
             zones,
             match_type="exact" if zones else "none",
             source=ARE_SOURCE,
+            license=ARE_LICENSE,
         )
     except Exception as e:
-        return ToolResponse.error(handle_api_error(e, "Bauzonen-Abfrage"), source=ARE_SOURCE)
+        return ToolResponse.error(
+            handle_api_error(e, "Bauzonen-Abfrage"), source=ARE_SOURCE, license=ARE_LICENSE
+        )
 
 
 @log_tool_call("swisstopo_municipality_at")
@@ -460,10 +465,13 @@ async def municipality_at(params: MunicipalityAtInput) -> ToolResponse:
             records,
             match_type="exact" if records else "none",
             source=SWISSBOUNDARIES_SOURCE,
+            license=SWISSBOUNDARIES_LICENSE,
         )
     except Exception as e:
         return ToolResponse.error(
-            handle_api_error(e, "Gemeinde-Abfrage"), source=SWISSBOUNDARIES_SOURCE
+            handle_api_error(e, "Gemeinde-Abfrage"),
+            source=SWISSBOUNDARIES_SOURCE,
+            license=SWISSBOUNDARIES_LICENSE,
         )
 
 

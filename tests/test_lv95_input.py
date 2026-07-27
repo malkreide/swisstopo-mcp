@@ -167,3 +167,26 @@ class TestHandlersUseLv95:
         lon_str, lat_str = params["geometry"].split(",")
         assert float(lat_str) == pytest.approx(LAT, abs=1e-3)
         assert float(lon_str) == pytest.approx(LON, abs=1e-3)
+
+
+class TestBaseModelConfigIsStrict:
+    """Regression for audit SEC-018: the base class carried an empty config.
+
+    Every concrete subclass re-declared it, so nothing shipped was permissive —
+    but a subclass that forgot would have silently accepted extra fields.
+    """
+
+    def test_base_rejects_extra_fields(self):
+        with pytest.raises(ValidationError):
+            SwissPointInput(lat=LAT, lon=LON, bogus="x")
+
+    def test_base_rejects_string_coercion(self):
+        with pytest.raises(ValidationError):
+            SwissPointInput(lat="47.0", lon="8.5")
+
+    def test_subclass_without_own_config_stays_strict(self):
+        class Derived(SwissPointInput):
+            pass
+
+        with pytest.raises(ValidationError):
+            Derived(lat=LAT, lon=LON, bogus="x")

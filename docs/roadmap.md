@@ -46,7 +46,9 @@ server as the base.
       `swisstopo_layer_info`; tool budget raised 20 → 25.
 - [ ] Deprecate and archive `swiss-geodata-mcp` (no external users, so no
       alias-shim period is needed — plan §7.2).
-- [ ] Re-run the audit against the changed surface.
+- [x] Re-run the audit against the changed surface — run
+      `2026-07-27T125314-Z`, 22 pass / 20 partial / 2 fail. Not
+      production-ready; see that run's `audit-report.md`.
 
 ## Phase 3 — Write operations (not planned)
 

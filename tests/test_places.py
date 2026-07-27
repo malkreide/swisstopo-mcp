@@ -297,3 +297,39 @@ class TestPlacesLive:
         out = await layer_info(LayerInfoInput(layer="ch.are.bauzonen"))
         assert out.is_error is False
         assert out.results[0]["fields"]
+
+
+# ---------------------------------------------------------------------------
+# Attribution (audit CH-004)
+# ---------------------------------------------------------------------------
+
+
+class TestLicenceAttribution:
+    @respx.mock
+    async def test_zoning_asserts_are_licence(self):
+        """ARE is a different federal office; its licence must not be inherited."""
+        from swisstopo_mcp.models import ARE_LICENSE
+
+        respx.get(IDENTIFY_URL).mock(return_value=httpx.Response(200, json=ZONING_PAYLOAD))
+        out = await zoning_at(ZoningAtInput(easting=EAST, northing=NORTH))
+        assert out.license == ARE_LICENSE
+
+    @respx.mock
+    async def test_zoning_error_keeps_attribution(self):
+        from swisstopo_mcp.models import ARE_LICENSE, ARE_SOURCE
+
+        respx.get(IDENTIFY_URL).mock(return_value=httpx.Response(500, text="boom"))
+        out = await zoning_at(ZoningAtInput(easting=EAST, northing=NORTH))
+        assert out.is_error is True
+        assert out.source == ARE_SOURCE
+        assert out.license == ARE_LICENSE
+
+    @respx.mock
+    async def test_municipality_carries_licence(self):
+        from swisstopo_mcp.models import SWISSBOUNDARIES_LICENSE
+
+        respx.get(IDENTIFY_URL).mock(
+            return_value=httpx.Response(200, json=MUNICIPALITY_PAYLOAD)
+        )
+        out = await municipality_at(MunicipalityAtInput(easting=EAST, northing=NORTH))
+        assert out.license == SWISSBOUNDARIES_LICENSE

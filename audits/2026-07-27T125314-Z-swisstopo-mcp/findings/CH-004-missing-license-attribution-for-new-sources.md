@@ -1,7 +1,7 @@
 ## Finding: CH-004 — OGD-CH Lizenz-Compliance: CC BY 4.0 Attribution
 
 **Severity:** medium
-**Status:** open
+**Status:** in-remediation
 **Server:** swisstopo-mcp
 **Check-Reference:** CH-004
 **PDF-Reference:** Custom (OGD-CH-Richtlinien)
@@ -76,3 +76,19 @@ The emitted text ("Swiss Open Government Data (opendata.swiss)") happens to be g
 ### Effort Estimate
 
 S (<1d) — three constants, eight call sites, one signature change, a README table and two test additions.
+
+---
+
+### Remediation Status (2026-07-27, same PR as the audit)
+
+**Partially closed.** `ARE_LICENSE`, `SWISSBOUNDARIES_LICENSE` and
+`REFRAME_LICENSE` were added to `src/swisstopo_mcp/models.py` and are now
+passed by the zoning, municipality and conversion handlers on both the success
+and the error path. `ToolResponse.error()` gained the `license` parameter it
+was missing, so an error envelope attributes the same source it would on
+success. ARE no longer inherits `SWISSTOPO_LICENSE` by accident — it is a
+different federal office, so its licence is now asserted. Three regression
+tests cover this.
+
+**Still open:** neither README documents per-source licences, and the overview
+source table still omits ARE, swissBOUNDARIES3D and REFRAME.

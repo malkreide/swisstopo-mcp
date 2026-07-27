@@ -2,7 +2,7 @@
 """Consolidated geodata facade (Phase-2 Geodaten-Erweiterung).
 
 One façade tool — ``query_geodata`` — fronts three map/layer-style sources to
-keep the server well under its 18-tool budget:
+keep the server well under its 25-tool budget:
 
 * **A** ``strassenverzeichnis`` — amtliches Strassenverzeichnis (api3 MapServer)
 * **B** ``geodienste:<topic>:<canton>`` — interkantonale Basisgeodaten via the

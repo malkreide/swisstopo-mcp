@@ -250,7 +250,7 @@ Alle vier Quellen tragen zur selben Frage bei — die Komplementarität ist real
 
 ### Tool-Inventar & Budget
 
-Bestehend: **13 Tools**. Budget: **18**. Naive Erweiterung (je 1–2 Tools pro
+Bestehend: **13 Tools**. Budget: **18** (per 2026-07-27 auf **25** angehoben, siehe CHANGELOG). Naive Erweiterung (je 1–2 Tools pro
 Quelle) → 17–21 Tools = **Budget-Sprengung-Risiko**. Deshalb **Fassaden-Muster**
 (wie im Auftrag verlangt):
 

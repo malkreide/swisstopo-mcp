@@ -1,16 +1,17 @@
 {
   "audit_meta": {
-    "audit_meta": {
-      "server_name": "swisstopo-mcp",
-      "run_id": "2026-07-27T125314-Z-swisstopo-mcp",
-      "started_at": "2026-07-27T12:53:14.045286+00:00",
-      "timezone_offset": "Z",
-      "skill_version": "1.0.0",
-      "output_dir": "/home/user/swisstopo-mcp/audits/2026-07-27T125314-Z-swisstopo-mcp",
-      "catalog_hash": "091f446b27965044ce658a1d5f4b2cabe2b0ab5661dcc1a53b6be8f1f2e093c0",
-      "catalog_dir": "/root/.claude/skills/mcp-audit/checks"
-    },
-    "agent_runs": []
+    "server_name": "swisstopo-mcp",
+    "run_id": "2026-07-27T125314-Z-swisstopo-mcp",
+    "started_at": "2026-07-27T12:53:14.045286+00:00",
+    "timezone_offset": "Z",
+    "skill_version": "1.0.0",
+    "output_dir": "/home/user/swisstopo-mcp/audits/2026-07-27T125314-Z-swisstopo-mcp",
+    "catalog_hash": "091f446b27965044ce658a1d5f4b2cabe2b0ab5661dcc1a53b6be8f1f2e093c0",
+    "catalog_dir": "/root/.claude/skills/mcp-audit/checks",
+    "agent_runs": [],
+    "audit_date": "2026-07-27",
+    "catalog_version": "sha256:091f446b2796",
+    "policy": "fail-or-partial"
   },
   "totals": {
     "checks_evaluated": 44,

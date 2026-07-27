@@ -57,3 +57,15 @@ Items 1 and 2 are the ones required to move this check; item 3 is the one that r
 
 ### Effort Estimate
 M (1-3d) for items 1, 2 and 4. Item 3 (merging the three feature-retrieval tools) is a breaking tool-surface change and should ride the same major release as the SEC-022 renames — L (1-2w) if taken together.
+
+---
+
+### Remediation Status (2026-07-27, same PR as the audit)
+
+**Documentation drift fixed only.** The stale `18-tool budget` references in
+`src/swisstopo_mcp/geodata.py` and `docs/geodaten-erweiterung-phase1.md` were
+corrected to the current budget of 25.
+
+**The finding itself stands.** 23 tools against the check's ideal of <=12 is
+unchanged, and the README still argues the number rather than why the
+remaining endpoint-shaped clusters resist aggregation.

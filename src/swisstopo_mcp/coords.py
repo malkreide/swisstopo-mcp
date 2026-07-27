@@ -29,7 +29,7 @@ from swisstopo_mcp.api_client import (
     wgs84_to_lv95,
 )
 from swisstopo_mcp.logging_config import log_tool_call
-from swisstopo_mcp.models import REFRAME_SOURCE, ToolResponse
+from swisstopo_mcp.models import REFRAME_LICENSE, REFRAME_SOURCE, ToolResponse
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -82,6 +82,12 @@ class SwissPointInput(BaseModel):
     tools emit it, while LV95 is what Swiss cadastral and planning data arrive
     in.
     """
+
+    # Declared on the base, not only on the subclasses (audit SEC-018). Every
+    # concrete subclass re-declares the same config today, so nothing shipped
+    # was permissive — but a future subclass that forgets would silently accept
+    # extra fields and coerce "47.0" to a float.
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid", strict=True)
 
     lat: float | None = Field(
         default=None,
@@ -278,6 +284,7 @@ async def convert_coordinates(params: ConvertCoordinatesInput) -> ToolResponse:
             return ToolResponse.error(
                 "Fehler bei Koordinatenumrechnung: REFRAME lieferte keine Koordinaten zurück.",
                 source=REFRAME_SOURCE,
+                license=REFRAME_LICENSE,
             )
 
         easting = _to_float(data["easting"])
@@ -301,10 +308,15 @@ async def convert_coordinates(params: ConvertCoordinatesInput) -> ToolResponse:
             [record],
             match_type="exact",
             source=REFRAME_SOURCE,
+            license=REFRAME_LICENSE,
         )
     except ValueError as e:
-        return ToolResponse.error(f"Fehler bei Eingabe: {e}", source=REFRAME_SOURCE)
+        return ToolResponse.error(
+            f"Fehler bei Eingabe: {e}", source=REFRAME_SOURCE, license=REFRAME_LICENSE
+        )
     except Exception as e:
         return ToolResponse.error(
-            handle_api_error(e, "Koordinatenumrechnung"), source=REFRAME_SOURCE
+            handle_api_error(e, "Koordinatenumrechnung"),
+            source=REFRAME_SOURCE,
+            license=REFRAME_LICENSE,
         )

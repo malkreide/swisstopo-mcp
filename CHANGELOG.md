@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+- **Re-audit run `2026-07-27T125314-Z` against the 68-check catalogue**
+  (`audits/`). 44 checks applicable, 22 pass / 20 partial / 2 fail;
+  `production_ready: false`, blocked on SEC-022. This is **not** comparable to
+  the previous run's 36/36: the old profile still said `is_cloud_deployed:
+  false` although the Dockerfile and `deploy/kubernetes.yaml` had been added as
+  remediation for SEC-007/SCALE-002, so 8 checks — most of SCALE among them —
+  had never been evaluated. The checks were also re-verified from source rather
+  than inherited.
+- **Highest-impact open finding (SDK-004 / SCALE-001, pre-existing):**
+  `transport_security` is never passed to `FastMCP()`, so the SDK keeps its
+  localhost-only allow-list. Reproduced against a running instance: `POST /mcp`
+  returns **403** for an origin configured via `SWISSTOPO_ALLOWED_ORIGINS` and
+  **421** for the `Host` the shipped Ingress forwards, while `/healthz` returns
+  200. The HTTP transport is unusable in any non-localhost deployment and the
+  Kubernetes probe masks it.
+- Fixed, in this release, the three findings this consolidation itself caused:
+  - `SwissPointInput` carried an empty `model_config`, so the base class
+    accepted extra fields and coerced strings. Every shipped subclass
+    re-declared the strict config, so no tool was permissive — but the base was
+    a trap (SEC-018).
+  - The ARE, swissBOUNDARIES3D and REFRAME sources set `source` but never
+    `license`, so ARE data silently inherited `SWISSTOPO_LICENSE` despite coming
+    from a different federal office. Added the missing licence constants and the
+    `license` parameter that `ToolResponse.error()` lacked entirely (CH-004).
+  - Stale `18-tool budget` references survived the raise to 25 in
+    `geodata.py` and `docs/geodaten-erweiterung-phase1.md` (ARCH-006).
+
 ### Added
 - **Three convenience tools ported from `swiss-geodata-mcp`** (20 → 23 tools),
   completing PR 3 of `docs/merge-plan-swiss-geodata-mcp.md`:

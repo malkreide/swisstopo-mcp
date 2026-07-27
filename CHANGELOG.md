@@ -8,6 +8,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **DNS-pinning transport, opt-in (SEC-005).** `SWISSTOPO_PIN_DNS=true` makes
+  the client connect to the address the SSRF guard already vetted, closing the
+  rebinding window between check and connect. SNI and the `Host` header stay on
+  the hostname, so certificate validation is unaffected.
+  - **Off by default**, because it rewrites the target of every outbound
+    request. It is also automatically inert behind a forward proxy, where the
+    proxy resolves the name and pinning would only break CONNECT.
+  - **The handshake is verified.** Against `api3.geo.admin.ch` and
+    `geodesy.geo.admin.ch`: connecting to the IP with the hostname as SNI
+    completes a TLSv1.3 handshake with a matching SAN, while the same
+    connection presenting the IP as the server name fails with
+    `CERTIFICATE_VERIFY_FAILED: IP address mismatch` — the failure mode the SNI
+    preservation exists to avoid. `live`-marked tests cover both, plus the
+    httpx→httpcore chain that carries the extension, so an SDK upgrade that
+    drops it fails the nightly run rather than silently disabling the control.
+- **Egress-proxy ACL (SEC-021).** `deploy/smokescreen-acl.yaml` carries the same
+  ten hosts as `ALLOWED_HOSTS` and is *generated* from it by
+  `scripts/render_egress_acl.py`, with a CI gate. A Kubernetes NetworkPolicy
+  cannot match on hostname, so this is what a real per-host network-layer
+  control needs.
+- **Egress-proxy deployment manifest (SEC-021).** `deploy/egress-proxy.yaml`
+  adds the Smokescreen sidecar, the `HTTPS_PROXY` wiring and a NetworkPolicy
+  permitting DNS plus proxied HTTPS only, replacing the permissive one.
+  Applying it stays a deliberate operator step — it changes how every request
+  leaves the pod — and the apply order is documented in the file.
+  Note the interaction: the proxy and DNS pinning are mutually exclusive by
+  design, since behind a proxy the proxy resolves the name and pinning goes
+  inert. Proxy for a cluster deployment, pinning for direct egress.
 - **`swisstopo_oereb_at` — ÖREB restrictions at a coordinate in one call**
   (23 → 24 tools, ARCH-007). It resolves the EGRID internally: that identifier
   is an upstream artefact, not something a caller asked for, so requiring a
@@ -22,30 +50,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   are **not** merged: their argument shapes are disjoint, so a discriminated
   union would relocate the same decision rather than remove it. That remains an
   open candidate for a future major release, and the README says so.
-
-### Fixed
-- The last stale tool-budget number (`docs/geodaten-erweiterung-phase1.md`) now
-  points at the README instead of carrying a figure of its own, so it cannot go
-  stale again.
-
-### Security
-- **SEC-014 and SEC-015 closed as enforced deferrals.** Both concern controls
-  that belong to an MCP gateway aggregating the portfolio — no single server can
-  allow-list or detect poisoning across a set it cannot see. That reasoning was
-  already in `SECURITY.md`; what was missing is that its premises were only
-  asserted. They are now checked:
-  - `tests/test_tool_hygiene.py` fails if any tool stops being read-only or
-    becomes destructive. SEC-014's risk-bounding argument depends on that and
-    can no longer go stale unnoticed.
-  - The same file scans this server's own tool descriptions for invisible
-    characters and override phrasing in **German, French and English**. The
-    descriptions here are German; an English-only pattern list would miss them.
-    This is a self-scan, not cross-server detection, and says so.
-  - `SECURITY.md` no longer implies nothing applies until a gateway exists, and
-    gains re-evaluation triggers for a non-read-only tool and for
-    config-driven or remotely-sourced descriptions.
-
-### Added
 - **Audit remediation batch 2 — six findings closed, two partially** (ARCH-003,
   ARCH-011, OPS-001, OPS-003, SCALE-003, CH-004; SEC-005 and SEC-021 partially).
   - **ARCH-003:** `ToolResponse` gained a `note` field, and searches that find
@@ -66,23 +70,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **ARCH-011:** the flat module layout is now argued in both READMEs rather
     than restructured — each module maps to one upstream API family, which is
     the axis this code varies along.
-
-### Fixed
-- **Two security documents overstated the posture.**
-  - `SECURITY.md` credited `follow_redirects=False` to SEC-005 (DNS rebinding),
-    which it does not address. It belongs to SEC-004 and is listed there now.
-    An honest row states that **DNS pinning is not implemented**, names the
-    residual rebinding window, and notes the network-layer compensation applies
-    to the Kubernetes deployment only.
-  - `docs/network-egress.md` claimed no NetworkPolicy was shipped while
-    `deploy/kubernetes.yaml` contains one. It now states precisely what that
-    policy does (CIDR and port restriction) and does not do (per-host matching —
-    a NetworkPolicy cannot match on hostname).
-  - A parametrised test asserts every `ALLOWED_HOSTS` member appears in the
-    documentation table and that the table lists no host the code does not know,
-    so this particular drift is a CI failure rather than a review item.
-
-### Added
 - **OpenTelemetry tracing (OBS-006).** `structlog` already reported a
   `duration_ms` per tool call; tracing adds the causal view, so a slow tool call
   can be attributed to the upstream request inside it.
@@ -104,27 +91,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     `.env.example`, `docs/deployment.md` and `deploy/kubernetes.yaml`) rather
     than a `SWISSTOPO_`-prefixed setting, so existing OTel tooling works
     unchanged.
-
-### Security
-- **Audit remediation batch 1 — five findings closed** (SEC-004, SEC-018,
-  SDK-002, ARCH-004, ARCH-012). No breaking changes for clients.
-  - **SEC-004 (critical):** `assert_host_allowed` only ever checked the
-    hostname, so an allow-listed host over cleartext `http://` passed. It now
-    validates the scheme first and adds a resolved-IP guard that blocks any
-    allow-listed name answering with a private or link-local address. The guard
-    hangs off the same function, so it also covers the two direct-client call
-    sites in `oereb.py`. Resolution is cached per host; a resolution *failure*
-    is deliberately non-fatal so httpx surfaces the real connection error.
-  - **SEC-018:** `validate_sr()` existed but was never called — an arbitrary
-    `sr` int was forwarded straight upstream. It is now wired into the three
-    `sr` fields, and length bounds were added to the identifier fields.
-  - **ARCH-004:** `transport` and `oereb_cantons` became `Settings` fields.
-    `--http` still wins on the command line, but `SWISSTOPO_TRANSPORT` is the
-    deployment path, and `oereb.py` no longer reads `os.environ` directly —
-    which had contradicted `config.py`'s own docstring.
-  - **ARCH-012:** both READMEs now name the concrete negotiated protocol
-    version (2025-11-25) and an update policy, and
-    `tests/test_protocol_version.py` fails if an SDK bump moves it.
+- **Three convenience tools ported from `swiss-geodata-mcp`** (20 → 23 tools),
+  completing PR 3 of `docs/merge-plan-swiss-geodata-mcp.md`:
+  - `swisstopo_zoning_at` — harmonised building zone at a point
+    (`ch.are.bauzonen`) in one call, without a preceding layer lookup. The ARE
+    layer is a federal synthesis and **not legally binding**; that caveat is
+    carried on every result record, not just in the prose summary, so a client
+    reading `results` cannot lose it.
+  - `swisstopo_municipality_at` — municipality, canton and official BFS commune
+    number at a point (swissBOUNDARIES3D). The layer carries one polygon per
+    historical year, so the current-year record is selected.
+  - `swisstopo_layer_info` — a layer's queryable fields plus its legend,
+    revealing which `search_field` values `swisstopo_find_features` accepts. A
+    missing legend is not fatal: the fields are still returned.
+- **Tool budget raised from 20 to 25** to accommodate the consolidation. The
+  README stated 18 while the CHANGELOG stated 20; both now say 25.
+  These three tools also address the open remediation on audit finding
+  ARCH-007, which asks for higher-level tools that resolve a common case in a
+  single call instead of a discovery chain.
+- `bfs_commune_number` is normalised to an integer across tools. The upstream
+  layers disagree — `ch.are.bauzonen` serves it as a string, swissBOUNDARIES3D
+  as an int — and it is the join key to `swiss-statistics-mcp` and
+  `zurich-opendata-mcp`, so it must not depend on which tool produced it.
+- **LV95 coordinate input on the point-based tools** (`swisstopo_get_height`,
+  `swisstopo_identify_features`, `swisstopo_get_egrid`). Each now takes *either*
+  `lat`/`lon` (WGS84) *or* `easting`/`northing` (LV95, EPSG:2056) via the shared
+  `SwissPointInput` contract; supplying both, neither, or half a pair is a
+  validation error. `swisstopo_elevation_profile` gains
+  `coordinate_system="lv95"` for LV95 support points.
+  This is PR 2 of `docs/merge-plan-swiss-geodata-mcp.md` and the prerequisite
+  for migrating LV95-native clients off `swiss-geodata-mcp`.
+  - Passing WGS84 degrees in the LV95 fields is rejected with a message naming
+    the mistake, rather than being converted into a point in the wrong place.
+  - Height results now carry both `lat`/`lon` and `easting`/`northing`.
+  - Existing `lat`/`lon` callers are unaffected.
+- **`swisstopo_convert_coordinates` — official LV95<->WGS84 transformation via
+  the swisstopo REFRAME service** (19 → 20 tools, exactly at the 20-tool
+  budget). This is the first step of the `swiss-geodata-mcp` consolidation
+  described in `docs/merge-plan-swiss-geodata-mcp.md`, and the one capability
+  that server had which this one lacked.
+  - New egress host `geodesy.geo.admin.ch` (SEC-021 allow-list + docs).
+  - The input validator rejects swapped axes and out-of-system magnitudes
+    instead of silently returning a point in the wrong place — REFRAME labels
+    both inputs `easting`/`northing`, so for `wgs84_to_lv95` the easting
+    carries the *longitude*, reversing the `lat`/`lon` order used elsewhere.
+  - `lv95_to_wgs84` results additionally carry `lat`/`lon` so they can be passed
+    straight to the other tools.
 
 ### Changed
 - **The OEREB canton list is read once at startup instead of on every call.**
@@ -177,56 +189,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     `license` parameter that `ToolResponse.error()` lacked entirely (CH-004).
   - Stale `18-tool budget` references survived the raise to 25 in
     `geodata.py` and `docs/geodaten-erweiterung-phase1.md` (ARCH-006).
-
-### Added
-- **Three convenience tools ported from `swiss-geodata-mcp`** (20 → 23 tools),
-  completing PR 3 of `docs/merge-plan-swiss-geodata-mcp.md`:
-  - `swisstopo_zoning_at` — harmonised building zone at a point
-    (`ch.are.bauzonen`) in one call, without a preceding layer lookup. The ARE
-    layer is a federal synthesis and **not legally binding**; that caveat is
-    carried on every result record, not just in the prose summary, so a client
-    reading `results` cannot lose it.
-  - `swisstopo_municipality_at` — municipality, canton and official BFS commune
-    number at a point (swissBOUNDARIES3D). The layer carries one polygon per
-    historical year, so the current-year record is selected.
-  - `swisstopo_layer_info` — a layer's queryable fields plus its legend,
-    revealing which `search_field` values `swisstopo_find_features` accepts. A
-    missing legend is not fatal: the fields are still returned.
-- **Tool budget raised from 20 to 25** to accommodate the consolidation. The
-  README stated 18 while the CHANGELOG stated 20; both now say 25.
-  These three tools also address the open remediation on audit finding
-  ARCH-007, which asks for higher-level tools that resolve a common case in a
-  single call instead of a discovery chain.
-- `bfs_commune_number` is normalised to an integer across tools. The upstream
-  layers disagree — `ch.are.bauzonen` serves it as a string, swissBOUNDARIES3D
-  as an int — and it is the join key to `swiss-statistics-mcp` and
-  `zurich-opendata-mcp`, so it must not depend on which tool produced it.
-- **LV95 coordinate input on the point-based tools** (`swisstopo_get_height`,
-  `swisstopo_identify_features`, `swisstopo_get_egrid`). Each now takes *either*
-  `lat`/`lon` (WGS84) *or* `easting`/`northing` (LV95, EPSG:2056) via the shared
-  `SwissPointInput` contract; supplying both, neither, or half a pair is a
-  validation error. `swisstopo_elevation_profile` gains
-  `coordinate_system="lv95"` for LV95 support points.
-  This is PR 2 of `docs/merge-plan-swiss-geodata-mcp.md` and the prerequisite
-  for migrating LV95-native clients off `swiss-geodata-mcp`.
-  - Passing WGS84 degrees in the LV95 fields is rejected with a message naming
-    the mistake, rather than being converted into a point in the wrong place.
-  - Height results now carry both `lat`/`lon` and `easting`/`northing`.
-  - Existing `lat`/`lon` callers are unaffected.
-- **`swisstopo_convert_coordinates` — official LV95<->WGS84 transformation via
-  the swisstopo REFRAME service** (19 → 20 tools, exactly at the 20-tool
-  budget). This is the first step of the `swiss-geodata-mcp` consolidation
-  described in `docs/merge-plan-swiss-geodata-mcp.md`, and the one capability
-  that server had which this one lacked.
-  - New egress host `geodesy.geo.admin.ch` (SEC-021 allow-list + docs).
-  - The input validator rejects swapped axes and out-of-system magnitudes
-    instead of silently returning a point in the wrong place — REFRAME labels
-    both inputs `easting`/`northing`, so for `wgs84_to_lv95` the easting
-    carries the *longitude*, reversing the `lat`/`lon` order used elsewhere.
-  - `lv95_to_wgs84` results additionally carry `lat`/`lon` so they can be passed
-    straight to the other tools.
-
-### Changed
 - The local polynomial helpers (`wgs84_to_lv95` / `lv95_to_wgs84`) remain the
   internal fast path for every height/profile/identify call and were **not**
   replaced by REFRAME. Measured against the official service at four points
@@ -236,6 +198,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   assumption by failing if the deviation ever exceeds one metre.
 
 ### Fixed
+- The last stale tool-budget number (`docs/geodaten-erweiterung-phase1.md`) now
+  points at the README instead of carrying a figure of its own, so it cannot go
+  stale again.
+- **Two security documents overstated the posture.**
+  - `SECURITY.md` credited `follow_redirects=False` to SEC-005 (DNS rebinding),
+    which it does not address. It belongs to SEC-004 and is listed there now.
+    An honest row states that **DNS pinning is not implemented**, names the
+    residual rebinding window, and notes the network-layer compensation applies
+    to the Kubernetes deployment only.
+  - `docs/network-egress.md` claimed no NetworkPolicy was shipped while
+    `deploy/kubernetes.yaml` contains one. It now states precisely what that
+    policy does (CIDR and port restriction) and does not do (per-host matching —
+    a NetworkPolicy cannot match on hostname).
+  - A parametrised test asserts every `ALLOWED_HOSTS` member appears in the
+    documentation table and that the table lists no host the code does not know,
+    so this particular drift is a CI failure rather than a review item.
 - **`sr=2056` produced silently wrong height, profile and identify results.**
   The parameter was meant to select the input coordinate system, but the WGS84
   field bounds rejected LV95 magnitudes, so the only way to reach the branch was
@@ -246,6 +224,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   rule now recorded in `CONTRIBUTING.md`; clients should re-approve.
 - `server.json` declared version `0.1.3` while the package was at `0.2.0`, which
   would have published a wrong version to the MCP Registry.
+
+### Security
+- **SEC-014 and SEC-015 closed as enforced deferrals.** Both concern controls
+  that belong to an MCP gateway aggregating the portfolio — no single server can
+  allow-list or detect poisoning across a set it cannot see. That reasoning was
+  already in `SECURITY.md`; what was missing is that its premises were only
+  asserted. They are now checked:
+  - `tests/test_tool_hygiene.py` fails if any tool stops being read-only or
+    becomes destructive. SEC-014's risk-bounding argument depends on that and
+    can no longer go stale unnoticed.
+  - The same file scans this server's own tool descriptions for invisible
+    characters and override phrasing in **German, French and English**. The
+    descriptions here are German; an English-only pattern list would miss them.
+    This is a self-scan, not cross-server detection, and says so.
+  - `SECURITY.md` no longer implies nothing applies until a gateway exists, and
+    gains re-evaluation triggers for a non-read-only tool and for
+    config-driven or remotely-sourced descriptions.
+- **Audit remediation batch 1 — five findings closed** (SEC-004, SEC-018,
+  SDK-002, ARCH-004, ARCH-012). No breaking changes for clients.
+  - **SEC-004 (critical):** `assert_host_allowed` only ever checked the
+    hostname, so an allow-listed host over cleartext `http://` passed. It now
+    validates the scheme first and adds a resolved-IP guard that blocks any
+    allow-listed name answering with a private or link-local address. The guard
+    hangs off the same function, so it also covers the two direct-client call
+    sites in `oereb.py`. Resolution is cached per host; a resolution *failure*
+    is deliberately non-fatal so httpx surfaces the real connection error.
+  - **SEC-018:** `validate_sr()` existed but was never called — an arbitrary
+    `sr` int was forwarded straight upstream. It is now wired into the three
+    `sr` fields, and length bounds were added to the identifier fields.
+  - **ARCH-004:** `transport` and `oereb_cantons` became `Settings` fields.
+    `--http` still wins on the command line, but `SWISSTOPO_TRANSPORT` is the
+    deployment path, and `oereb.py` no longer reads `os.environ` directly —
+    which had contradicted `config.py`'s own docstring.
+  - **ARCH-012:** both READMEs now name the concrete negotiated protocol
+    version (2025-11-25) and an update policy, and
+    `tests/test_protocol_version.py` fails if an SDK bump moves it.
 
 ## [0.3.0] - 2026-07-27
 

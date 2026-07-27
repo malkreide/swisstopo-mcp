@@ -42,3 +42,8 @@ jobs:
       # the change cannot reach a release without surfacing in review.
       - name: Tool-definition snapshot
         run: python scripts/snapshot_tool_hashes.py --check
+
+      # SEC-021: the egress-proxy ACL is generated from ALLOWED_HOSTS, so the
+      # network layer cannot drift from the code layer unnoticed.
+      - name: Egress ACL snapshot
+        run: python scripts/render_egress_acl.py --check

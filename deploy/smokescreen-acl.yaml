@@ -1,0 +1,37 @@
+# Egress-proxy ACL for swisstopo-mcp (audit SEC-021).
+#
+# A Kubernetes NetworkPolicy cannot match on hostname, so the shipped policy is
+# a CIDR and port restriction — it cannot mirror the code-layer host list. This
+# ACL closes that gap: run Smokescreen (or an equivalent egress proxy) as a
+# sidecar with this file, and restrict the NetworkPolicy so the pod's only
+# permitted egress is the proxy.
+#
+# The host list below is generated from ALLOWED_HOSTS in
+# src/swisstopo_mcp/api_client.py and must stay in sync with it and with
+# docs/network-egress.md. A test asserts code and documentation agree; this file
+# is checked by the same list.
+#
+# Regenerate with:
+#   python scripts/render_egress_acl.py
+
+version: v1
+services:
+  - name: swisstopo-mcp
+    project: swiss-public-data-mcp
+    action: enforce          # deny anything not listed
+    allowed_domains:
+  - api3.geo.admin.ch
+  - data.geo.admin.ch
+  - geodesy.geo.admin.ch
+  - geodienste.ch
+  - map.geo.admin.ch
+  - oereb.geo.zh.ch
+  - openplzapi.org
+  - overpass.osm.ch
+  - wmts.geo.admin.ch
+  - www.oereb2.apps.be.ch
+
+default:
+  name: default
+  action: enforce
+  allowed_domains: []

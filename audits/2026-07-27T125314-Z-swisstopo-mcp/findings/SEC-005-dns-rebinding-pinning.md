@@ -1,7 +1,7 @@
 ## Finding: SEC-005 — DNS-Rebinding-Prevention: DNS-Pinning gegen TOCTOU
 
 **Severity:** high
-**Status:** in-remediation
+**Status:** closed
 **Server:** swisstopo-mcp
 **Check-Reference:** SEC-005
 **PDF-Reference:** Sec 4.4
@@ -79,3 +79,58 @@ Kubernetes deployment only.
 resolves once and reuses the address while preserving SNI and the `Host` header
 touches every outbound request; it deserves its own change and its own
 verification against real TLS, not a corner of a documentation batch.
+
+---
+
+### Remediation Status (2026-07-27, batch 5)
+
+**Implemented, opt-in, not yet verified end-to-end.**
+
+`PinnedTransport` in `api_client.py` connects to the address the SEC-004 guard
+already vetted, keeping SNI and the `Host` header on the hostname so
+certificate validation is unaffected. 20 tests cover the mechanics: URL host
+rewritten to the IP, `Host` and `sni_hostname` preserved, path and query
+intact, private addresses refused, IP literals left alone.
+
+Two deliberate limits:
+- **Off by default** (`SWISSTOPO_PIN_DNS`). It rewrites the target of every
+  outbound request; a default-on control that breaks egress would be worse
+  than the narrow window it closes.
+- **Automatically inert behind a forward proxy**, since the proxy resolves the
+  name itself and pinning would only break CONNECT.
+
+**Why this stays in-remediation:** the development sandbox forces all HTTPS
+through a forward proxy (`HTTPS_PROXY`), which refuses CONNECT to a bare IP.
+A direct-connection probe was attempted and failed for that reason, so the TLS
+handshake against a real endpoint with a pinned IP is **untested**. The
+mechanics are verified; the handshake is not. Before enabling this in a
+deployment, run one request against `api3.geo.admin.ch` with
+`SWISSTOPO_PIN_DNS=true` from a host with direct egress and confirm a 200.
+Claiming closure on unit tests alone would misrepresent what was checked.
+
+---
+
+### Remediation Status (2026-07-27, batch 6 — final)
+
+**Now closed — the handshake is verified.** The previous entry left this open
+because the sandbox forces HTTPS through a forward proxy that refuses CONNECT
+to a bare IP. Raw TCP egress does work, so the property could be verified
+directly with the `ssl` module against two real upstreams:
+
+| Connection | Result |
+|---|---|
+| IP + `server_hostname=api3.geo.admin.ch` | handshake OK, TLSv1.3, SAN matches |
+| IP + `server_hostname=geodesy.geo.admin.ch` | handshake OK, TLSv1.3, SAN matches |
+| IP + `server_hostname=<the IP>` | `CERTIFICATE_VERIFY_FAILED: IP address mismatch` |
+
+The third row is the point: it is the failure mode the SNI preservation exists
+to avoid, so the control is doing real work rather than being decorative.
+
+The chain that carries the extension was also verified rather than assumed:
+httpx forwards `request.extensions` to httpcore, and httpcore reads
+`sni_hostname` in `_connect`. Both are asserted by `live`-marked tests, so an
+httpx or httpcore upgrade that drops the extension fails the nightly run
+instead of silently disabling the control.
+
+Remains **off by default** — it rewrites the target of every outbound request,
+and is inert behind a forward proxy by design.

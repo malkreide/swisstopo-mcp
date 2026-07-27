@@ -37,11 +37,31 @@ allow-list (audit check **SEC-021**) and complements the SSRF hardening from
   It is a **CIDR and port restriction, not a per-host allow-list** — a
   NetworkPolicy cannot match on hostname, so it cannot mirror the table above.
 
-  Closing that gap needs an egress proxy (Smokescreen or equivalent) configured
-  with the same host list, with the NetworkPolicy permitting egress only to the
-  proxy. That is deliberately not shipped: it is infrastructure this repository
-  does not own. Until it exists, the code-layer list is the only per-host
-  control, and it protects the process — not a compromised image.
+  Closing that gap needs an egress proxy. The **ACL is now shipped** —
+  [`deploy/smokescreen-acl.yaml`](../deploy/smokescreen-acl.yaml), generated from
+  `ALLOWED_HOSTS` by `scripts/render_egress_acl.py` and checked in CI, so the
+  network layer cannot drift from the code layer.
+
+  The **deployment manifest is shipped too**:
+  [`deploy/egress-proxy.yaml`](../deploy/egress-proxy.yaml) adds the Smokescreen
+  sidecar, points the server at it via `HTTPS_PROXY`, and replaces the permissive
+  NetworkPolicy with one that permits DNS plus proxied HTTPS only. Applying it is
+  a deliberate operator step — see the apply order in that file's header — because
+  it changes how every request leaves the pod.
+
+  Until it is applied, the code-layer list remains the only per-host control, and
+  it protects the process, not a compromised image.
+
+- **DNS pinning (SEC-005):** available, off by default. `SWISSTOPO_PIN_DNS=true`
+  makes the client connect to the address the SSRF guard vetted, keeping SNI and
+  the Host header on the hostname so certificate validation is unaffected —
+  verified against `api3.geo.admin.ch` and `geodesy.geo.admin.ch`, where the same
+  connection *without* SNI fails with `IP address mismatch`.
+
+  It is automatically inert behind a forward proxy, since the proxy resolves the
+  name itself. Note that this makes pinning and the egress proxy above mutually
+  exclusive by design: pick the proxy for a cluster deployment, pinning for a
+  direct-egress one.
 
 ## Update procedure
 

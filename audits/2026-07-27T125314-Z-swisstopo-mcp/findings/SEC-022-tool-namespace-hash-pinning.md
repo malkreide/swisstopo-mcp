@@ -1,7 +1,7 @@
 ## Finding: SEC-022 — Tool-Hash-Pinning + Namespace-Präfix gegen Rug Pull
 
 **Severity:** high
-**Status:** open
+**Status:** closed
 **Server:** swisstopo-mcp
 **Check-Reference:** SEC-022
 **PDF-Reference:** Anhang B4
@@ -80,3 +80,24 @@ Rename and hash-snapshot should ride the same major release so users re-approve 
 
 ### Effort Estimate
 M (1-3d)
+
+---
+
+### Remediation Status (2026-07-27, follow-up PR)
+
+**Closed.** All six unprefixed tools were renamed to `swisstopo_*`, shipped as
+a breaking `0.3.0` with the old → new table and a re-approval note in the
+CHANGELOG. All 23 tools now carry the prefix; a test asserts it and asserts the
+old names are gone, so a 0.3.0 client cannot silently reach one.
+
+The hash snapshot is in place: `scripts/snapshot_tool_hashes.py` writes a
+SHA-256 per tool over name + description + input schema to `tool-hashes.json`,
+and a CI step runs it with `--check` so a stale snapshot fails the build.
+
+The semver rule is recorded in `CONTRIBUTING.md` / `CONTRIBUTING.de.md`, citing
+the `sr` narrowing and these renames as precedent; the `sr` CHANGELOG entry was
+retroactively given its re-approval note.
+
+The misnomer objection the finding anticipated is accepted rather than dodged:
+the façade and OpenPLZ tools serve non-swisstopo data, but a mixed surface is
+worse than a consistent, imprecise one. Recorded in the CHANGELOG.

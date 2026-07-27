@@ -200,9 +200,9 @@ One façade over several map/layer sources, kept under the 25-tool budget (see
 
 | Tool | Description |
 |------|-------------|
-| `list_available_layers` | Discover layer keys for `query_geodata` (`strassenverzeichnis`, `oereb-verfuegbarkeit`, `geodienste:<topic>:<canton>`); filters to contract-free geodienste datasets |
-| `query_geodata` | Query a chosen layer by `point` / `bbox` / `commune` — amtliches Strassenverzeichnis, interkantonale geodienste.ch data (OGC API Features), or ÖREB availability |
-| `query_osm_features` | OpenStreetMap POIs (schools, playgrounds, pharmacies, …) around a point via Overpass — separate source, ODbL (© OpenStreetMap contributors) |
+| `swisstopo_list_available_layers` | Discover layer keys for `swisstopo_query_geodata` (`strassenverzeichnis`, `oereb-verfuegbarkeit`, `geodienste:<topic>:<canton>`); filters to contract-free geodienste datasets |
+| `swisstopo_query_geodata` | Query a chosen layer by `point` / `bbox` / `commune` — amtliches Strassenverzeichnis, interkantonale geodienste.ch data (OGC API Features), or ÖREB availability |
+| `swisstopo_query_osm_features` | OpenStreetMap POIs (schools, playgrounds, pharmacies, …) around a point via Overpass — separate source, ODbL (© OpenStreetMap contributors) |
 
 ### Administrative Address Level (OpenPLZ)
 
@@ -215,9 +215,9 @@ BFS statistics (`swiss-statistics-mcp`) and `zurich-opendata-mcp`.
 
 | Tool | Description |
 |------|-------------|
-| `lookup_postal_code` | Resolve a Swiss postal code → locality, commune (+**BFS number**), district, canton |
-| `find_commune` | Resolve a commune both directions (`name` ↔ `bfs_number`) or list all communes of a `canton` / `district`. Accepts canton abbreviation (`ZH`) or key (`1`); resolution happens server-side |
-| `search_address` | Full-text search over Swiss streets and localities, returning commune + BFS number per hit |
+| `swisstopo_lookup_postal_code` | Resolve a Swiss postal code → locality, commune (+**BFS number**), district, canton |
+| `swisstopo_find_commune` | Resolve a commune both directions (`name` ↔ `bfs_number`) or list all communes of a `canton` / `district`. Accepts canton abbreviation (`ZH`) or key (`1`); resolution happens server-side |
+| `swisstopo_search_address` | Full-text search over Swiss streets and localities, returning commune + BFS number per hit |
 
 ### Example Use Cases
 
@@ -229,11 +229,11 @@ BFS statistics (`swiss-statistics-mcp`) and `zurich-opendata-mcp`.
 | *"Find orthophoto datasets for download"* | `swisstopo_search_geodata` |
 | *"Show me a map of Bern at zoom level 10"* | `swisstopo_map_url` |
 | *"What restrictions apply to parcel at Musterstrasse 5?"* | `swisstopo_get_egrid` + `swisstopo_get_oereb_extract` |
-| *"Which schools are within 500 m of Bederstrasse 109, 8002 Zürich, and which streets lead there?"* | `query_osm_features` + `query_geodata` (`strassenverzeichnis`) |
-| *"Which contaminated-sites data is free for canton ZH?"* | `list_available_layers` + `query_geodata` (`geodienste:kataster_belasteter_standorte:ZH`) |
-| *"Which communes are in the Uster district and what are their BFS numbers?"* | `find_commune` (`district=109`) |
-| *"Which commune and canton does postal code 8001 belong to?"* | `lookup_postal_code` |
-| *"What is the BFS number of Winterthur (to join with BFS statistics)?"* | `find_commune` (`name=Winterthur`) |
+| *"Which schools are within 500 m of Bederstrasse 109, 8002 Zürich, and which streets lead there?"* | `swisstopo_query_osm_features` + `swisstopo_query_geodata` (`strassenverzeichnis`) |
+| *"Which contaminated-sites data is free for canton ZH?"* | `swisstopo_list_available_layers` + `swisstopo_query_geodata` (`geodienste:kataster_belasteter_standorte:ZH`) |
+| *"Which communes are in the Uster district and what are their BFS numbers?"* | `swisstopo_find_commune` (`district=109`) |
+| *"Which commune and canton does postal code 8001 belong to?"* | `swisstopo_lookup_postal_code` |
+| *"What is the BFS number of Winterthur (to join with BFS statistics)?"* | `swisstopo_find_commune` (`name=Winterthur`) |
 
 ---
 
@@ -277,9 +277,9 @@ swisstopo-mcp/
 │   ├── stac.py                  # swisstopo_search_geodata, swisstopo_get_collection
 │   ├── wmts.py                  # swisstopo_map_url
 │   ├── oereb.py                 # swisstopo_get_egrid, swisstopo_get_oereb_extract
-│   ├── geodata.py               # query_geodata + list_available_layers (façade)
-│   ├── overpass.py              # query_osm_features (OpenStreetMap / Overpass)
-│   └── openplz.py               # lookup_postal_code, find_commune, search_address (OpenPLZ)
+│   ├── geodata.py               # swisstopo_query_geodata + swisstopo_list_available_layers (façade)
+│   ├── overpass.py              # swisstopo_query_osm_features (OpenStreetMap / Overpass)
+│   └── openplz.py               # swisstopo_lookup_postal_code, swisstopo_find_commune, swisstopo_search_address (OpenPLZ)
 ├── tests/
 │   ├── test_api_client.py
 │   ├── test_geocoding.py

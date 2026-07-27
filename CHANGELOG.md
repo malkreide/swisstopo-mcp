@@ -144,8 +144,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   to pass WGS84 degrees *with* `sr=2056` — which sent those degrees upstream
   labelled as LV95 metres. `sr` now accepts `4326` only and points at the new
   `easting`/`northing` fields, turning a wrong answer into an explicit error.
+  This narrowed an input schema, so it is a breaking change under the semver
+  rule now recorded in `CONTRIBUTING.md`; clients should re-approve.
 - `server.json` declared version `0.1.3` while the package was at `0.2.0`, which
   would have published a wrong version to the MCP Registry.
+
+## [0.3.0] - 2026-07-27
+
+### ⚠️ BREAKING — six tools renamed (SEC-022)
+
+Six tools shipped without the server prefix. The prefix denotes the **server**
+identity, not the data source — which is what makes it a defence against name
+shadowing between MCP servers. This server's own instructions advertise joins
+to sibling servers (`swiss-statistics-mcp`, `zurich-opendata-mcp`), so generic
+names like `find_commune` were exactly the collision-prone case.
+
+| old | new |
+|---|---|
+  | `list_available_layers` | `swisstopo_list_available_layers` |
+  | `query_geodata` | `swisstopo_query_geodata` |
+  | `query_osm_features` | `swisstopo_query_osm_features` |
+  | `lookup_postal_code` | `swisstopo_lookup_postal_code` |
+  | `find_commune` | `swisstopo_find_commune` |
+  | `search_address` | `swisstopo_search_address` |
+
+**You must update any client config or prompt that names these tools, and
+re-approve the server in Claude Desktop** — a renamed tool is a tool the client
+has not approved.
+
+The `swisstopo_` prefix on the façade and OpenPLZ tools reads as a misnomer,
+since those serve OSM, OpenPLZ and geodienste data rather than swisstopo data.
+That is accepted deliberately: a mixed surface is worse than an imprecise but
+consistent one.
+
+### Added
+- `scripts/snapshot_tool_hashes.py` and a committed `tool-hashes.json`
+  capturing a SHA-256 per tool over its name, description and input schema.
+  CI regenerates it and fails on a difference, so a tool-definition change
+  cannot reach a release without surfacing in review (SEC-022).
+- A semver rule in `CONTRIBUTING.md`: renaming a tool, or narrowing its
+  description or input schema, is a breaking change and needs a version bump
+  plus a re-approval note.
 
 ## [0.2.0] - 2026-07-20
 

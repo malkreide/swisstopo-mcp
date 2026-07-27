@@ -58,3 +58,16 @@ When adding new data sources, follow the **No-Auth-First** principle: Phase 1 us
 ## License
 
 By contributing, you agree that your contributions will be licensed under the [MIT License](LICENSE).
+
+## Versioning of tool definitions
+
+A tool's **name, description and input schema** are what a client approves.
+Changing any of them means the client is running against a definition it never
+saw, so:
+
+- Renaming a tool, or narrowing/renaming a field in its input schema, is a
+  **breaking change**: bump the version and add a CHANGELOG entry listing
+  old → new plus a "re-approval required" line.
+- `tool-hashes.json` must be regenerated (`python scripts/snapshot_tool_hashes.py`)
+  and committed in the same change. CI fails if it is stale.
+- Precedent: restricting `sr` to 4326 (0.2.x) and the six tool renames (0.3.0).

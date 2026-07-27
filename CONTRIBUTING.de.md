@@ -59,3 +59,18 @@ Beim Hinzufügen neuer Datenquellen gilt das **No-Auth-First**-Prinzip: Phase 1 
 ## Lizenz
 
 Mit Ihrem Beitrag erklären Sie sich damit einverstanden, dass Ihre Beiträge unter der [MIT-Lizenz](LICENSE) lizenziert werden.
+
+## Versionierung von Tool-Definitionen
+
+Name, Beschreibung und Eingabeschema eines Tools sind das, was ein Client
+freigibt. Ändert sich eines davon, läuft der Client gegen eine Definition, die
+er nie gesehen hat:
+
+- Ein Tool umbenennen oder ein Feld im Eingabeschema verengen bzw. umbenennen
+  ist ein **Breaking Change**: Version anheben, CHANGELOG-Eintrag mit alt → neu
+  und dem Hinweis, dass eine erneute Freigabe nötig ist.
+- `tool-hashes.json` muss im selben Change neu erzeugt
+  (`python scripts/snapshot_tool_hashes.py`) und committet werden. CI schlägt
+  fehl, wenn es veraltet ist.
+- Präzedenzfälle: `sr` auf 4326 eingeschränkt (0.2.x), sechs Tool-Umbenennungen
+  (0.3.0).

@@ -1,7 +1,7 @@
 # src/swisstopo_mcp/geodata.py
 """Consolidated geodata facade (Phase-2 Geodaten-Erweiterung).
 
-One façade tool — ``query_geodata`` — fronts three map/layer-style sources to
+One façade tool — ``swisstopo_query_geodata`` — fronts three map/layer-style sources to
 keep the server well under its 25-tool budget:
 
 * **A** ``strassenverzeichnis`` — amtliches Strassenverzeichnis (api3 MapServer)
@@ -11,7 +11,7 @@ keep the server well under its 25-tool budget:
 * **C** ``oereb-verfuegbarkeit`` — bundesweite ÖREB-Kataster-Verfügbarkeit
   (api3 layer ``ch.swisstopo-vd.stand-oerebkataster``)
 
-``list_available_layers`` is the discovery tool that enumerates what can be
+``swisstopo_list_available_layers`` is the discovery tool that enumerates what can be
 passed as ``layer``. See ``docs/geodaten-erweiterung-phase1.md`` for the live
 probe that motivated this design.
 """
@@ -153,7 +153,7 @@ LocationFormat = Literal["summary", "records", "geojson"]
 
 
 class QueryGeodataInput(BaseModel):
-    """Façade query: pick a ``layer`` (from list_available_layers) and exactly
+    """Façade query: pick a ``layer`` (from swisstopo_list_available_layers) and exactly
     one location (``point``, ``bbox`` or ``commune``)."""
 
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid", strict=True)
@@ -164,7 +164,7 @@ class QueryGeodataInput(BaseModel):
         max_length=120,
         pattern=r"^[\w.:\-]+$",
         description=(
-            "Layer-Kennung aus list_available_layers: 'strassenverzeichnis', "
+            "Layer-Kennung aus swisstopo_list_available_layers: 'strassenverzeichnis', "
             "'oereb-verfuegbarkeit' oder 'geodienste:<topic>:<KANTON>'."
         ),
     )
@@ -220,7 +220,7 @@ class ListLayersInput(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# Dispatch: query_geodata
+# Dispatch: swisstopo_query_geodata
 # ---------------------------------------------------------------------------
 
 
@@ -232,7 +232,7 @@ def _parse_point(point: str) -> tuple[float, float]:
     return lat, lon
 
 
-@log_tool_call("query_geodata")
+@log_tool_call("swisstopo_query_geodata")
 async def query_geodata(params: QueryGeodataInput) -> ToolResponse:
     """Route a façade query to the correct source based on ``layer``."""
     try:
@@ -244,12 +244,12 @@ async def query_geodata(params: QueryGeodataInput) -> ToolResponse:
         if layer.startswith(GEODIENSTE_PREFIX):
             return await _query_geodienste(params)
         return ToolResponse.error(
-            f"Unbekannter Layer '{layer}'. Nutze list_available_layers "
+            f"Unbekannter Layer '{layer}'. Nutze swisstopo_list_available_layers "
             f"für gültige Kennungen (z.B. 'strassenverzeichnis', "
             f"'geodienste:<topic>:<KANTON>')."
         )
     except Exception as e:  # noqa: BLE001 — handle_api_error classifies
-        return ToolResponse.error(handle_api_error(e, f"query_geodata({params.layer})"))
+        return ToolResponse.error(handle_api_error(e, f"swisstopo_query_geodata({params.layer})"))
 
 
 async def _query_streets(params: QueryGeodataInput) -> ToolResponse:
@@ -409,7 +409,7 @@ async def _query_geodienste(params: QueryGeodataInput) -> ToolResponse:
         return ToolResponse.error(
             "geodienste-Layer erwartet Format 'geodienste:<topic>:<KANTON>' "
             "(z.B. 'geodienste:kataster_belasteter_standorte:ZH'). "
-            "Nutze list_available_layers(source='geodienste', canton='ZH')."
+            "Nutze swisstopo_list_available_layers(source='geodienste', canton='ZH')."
         )
     _, topic, canton = parts
     catalog = await load_geodienste_catalog()
@@ -494,13 +494,13 @@ async def _query_geodienste(params: QueryGeodataInput) -> ToolResponse:
 
 
 # ---------------------------------------------------------------------------
-# Discovery: list_available_layers
+# Discovery: swisstopo_list_available_layers
 # ---------------------------------------------------------------------------
 
 
-@log_tool_call("list_available_layers")
+@log_tool_call("swisstopo_list_available_layers")
 async def list_available_layers(params: ListLayersInput) -> ToolResponse:
-    """Enumerate façade layers usable with query_geodata."""
+    """Enumerate façade layers usable with swisstopo_query_geodata."""
     try:
         records: list[dict[str, Any]] = []
 
@@ -535,7 +535,7 @@ async def list_available_layers(params: ListLayersInput) -> ToolResponse:
             provenance="cached",
         )
     except Exception as e:  # noqa: BLE001
-        return ToolResponse.error(handle_api_error(e, "list_available_layers"))
+        return ToolResponse.error(handle_api_error(e, "swisstopo_list_available_layers"))
 
 
 def _geodienste_layer_records(
@@ -650,6 +650,6 @@ def _format_layer_catalog(
         lines.append("")
         lines.append(
             "ℹ️ Für konkrete geodienste-Layer-Kennungen einen Kanton angeben, z.B. "
-            "list_available_layers(source='geodienste', canton='ZH')."
+            "swisstopo_list_available_layers(source='geodienste', canton='ZH')."
         )
     return "\n".join(lines)

@@ -200,9 +200,9 @@ Eine Fassade ueber mehrere Karten-/Layer-Quellen, bewusst unter dem 25-Tool-Budg
 
 | Tool | Beschreibung |
 |------|-------------|
-| `list_available_layers` | Layer-Kennungen fuer `query_geodata` entdecken (`strassenverzeichnis`, `oereb-verfuegbarkeit`, `geodienste:<topic>:<KANTON>`); zeigt nur ohne Vertrag frei nutzbare geodienste-Datensaetze |
-| `query_geodata` | Gewaehlten Layer per `point` / `bbox` / `commune` abfragen — amtliches Strassenverzeichnis, interkantonale geodienste.ch-Daten (OGC API Features) oder ÖREB-Verfuegbarkeit |
-| `query_osm_features` | OpenStreetMap-POIs (Schulen, Spielplaetze, Apotheken, …) im Umkreis via Overpass — separate Quelle, ODbL (© OpenStreetMap contributors) |
+| `swisstopo_list_available_layers` | Layer-Kennungen fuer `swisstopo_query_geodata` entdecken (`strassenverzeichnis`, `oereb-verfuegbarkeit`, `geodienste:<topic>:<KANTON>`); zeigt nur ohne Vertrag frei nutzbare geodienste-Datensaetze |
+| `swisstopo_query_geodata` | Gewaehlten Layer per `point` / `bbox` / `commune` abfragen — amtliches Strassenverzeichnis, interkantonale geodienste.ch-Daten (OGC API Features) oder ÖREB-Verfuegbarkeit |
+| `swisstopo_query_osm_features` | OpenStreetMap-POIs (Schulen, Spielplaetze, Apotheken, …) im Umkreis via Overpass — separate Quelle, ODbL (© OpenStreetMap contributors) |
 
 ### Administrative Adressebene (OpenPLZ)
 
@@ -215,9 +215,9 @@ zu BFS-Statistikdaten (`swiss-statistics-mcp`) und zu `zurich-opendata-mcp`.
 
 | Tool | Beschreibung |
 |------|-------------|
-| `lookup_postal_code` | Schweizer PLZ aufloesen → Ort, Gemeinde (+**BFS-Nummer**), Bezirk, Kanton |
-| `find_commune` | Gemeinde in beide Richtungen aufloesen (`name` ↔ `bfs_number`) oder alle Gemeinden eines `canton` / `district` auflisten. Akzeptiert Kantonskuerzel (`ZH`) oder Schluessel (`1`); die Aufloesung erfolgt serverseitig |
-| `search_address` | Volltextsuche ueber Schweizer Strassen und Ortschaften, je Treffer mit Gemeinde und BFS-Nummer |
+| `swisstopo_lookup_postal_code` | Schweizer PLZ aufloesen → Ort, Gemeinde (+**BFS-Nummer**), Bezirk, Kanton |
+| `swisstopo_find_commune` | Gemeinde in beide Richtungen aufloesen (`name` ↔ `bfs_number`) oder alle Gemeinden eines `canton` / `district` auflisten. Akzeptiert Kantonskuerzel (`ZH`) oder Schluessel (`1`); die Aufloesung erfolgt serverseitig |
+| `swisstopo_search_address` | Volltextsuche ueber Schweizer Strassen und Ortschaften, je Treffer mit Gemeinde und BFS-Nummer |
 
 ### Beispiel-Abfragen
 
@@ -229,11 +229,11 @@ zu BFS-Statistikdaten (`swiss-statistics-mcp`) und zu `zurich-opendata-mcp`.
 | *"Finde Orthophoto-Datensaetze zum Download"* | `swisstopo_search_geodata` |
 | *"Zeige mir eine Karte von Bern bei Zoomstufe 10"* | `swisstopo_map_url` |
 | *"Welche Einschraenkungen gelten fuer Musterstrasse 5?"* | `swisstopo_get_egrid` + `swisstopo_get_oereb_extract` |
-| *"Welche Schulhaeuser liegen im Umkreis von 500 m um Bederstrasse 109, 8002 Zuerich, und welche Strassen fuehren dorthin?"* | `query_osm_features` + `query_geodata` (`strassenverzeichnis`) |
-| *"Welche Daten zu belasteten Standorten sind fuer den Kanton ZH frei?"* | `list_available_layers` + `query_geodata` (`geodienste:kataster_belasteter_standorte:ZH`) |
-| *«Welche Gemeinden liegen im Bezirk Uster und wie lauten ihre BFS-Nummern?»* | `find_commune` (`district=109`) |
-| *«Zu welcher Gemeinde und welchem Kanton gehoert die PLZ 8001?»* | `lookup_postal_code` |
-| *«Wie lautet die BFS-Nummer von Winterthur (zur Verknuepfung mit BFS-Statistik)?»* | `find_commune` (`name=Winterthur`) |
+| *"Welche Schulhaeuser liegen im Umkreis von 500 m um Bederstrasse 109, 8002 Zuerich, und welche Strassen fuehren dorthin?"* | `swisstopo_query_osm_features` + `swisstopo_query_geodata` (`strassenverzeichnis`) |
+| *"Welche Daten zu belasteten Standorten sind fuer den Kanton ZH frei?"* | `swisstopo_list_available_layers` + `swisstopo_query_geodata` (`geodienste:kataster_belasteter_standorte:ZH`) |
+| *«Welche Gemeinden liegen im Bezirk Uster und wie lauten ihre BFS-Nummern?»* | `swisstopo_find_commune` (`district=109`) |
+| *«Zu welcher Gemeinde und welchem Kanton gehoert die PLZ 8001?»* | `swisstopo_lookup_postal_code` |
+| *«Wie lautet die BFS-Nummer von Winterthur (zur Verknuepfung mit BFS-Statistik)?»* | `swisstopo_find_commune` (`name=Winterthur`) |
 
 ---
 
@@ -277,9 +277,9 @@ swisstopo-mcp/
 │   ├── stac.py                  # swisstopo_search_geodata, swisstopo_get_collection
 │   ├── wmts.py                  # swisstopo_map_url
 │   ├── oereb.py                 # swisstopo_get_egrid, swisstopo_get_oereb_extract
-│   ├── geodata.py               # query_geodata + list_available_layers (Fassade)
-│   ├── overpass.py              # query_osm_features (OpenStreetMap / Overpass)
-│   └── openplz.py               # lookup_postal_code, find_commune, search_address (OpenPLZ)
+│   ├── geodata.py               # swisstopo_query_geodata + swisstopo_list_available_layers (Fassade)
+│   ├── overpass.py              # swisstopo_query_osm_features (OpenStreetMap / Overpass)
+│   └── openplz.py               # swisstopo_lookup_postal_code, swisstopo_find_commune, swisstopo_search_address (OpenPLZ)
 ├── tests/
 │   ├── test_api_client.py
 │   ├── test_geocoding.py

@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+- **SEC-014 and SEC-015 closed as enforced deferrals.** Both concern controls
+  that belong to an MCP gateway aggregating the portfolio — no single server can
+  allow-list or detect poisoning across a set it cannot see. That reasoning was
+  already in `SECURITY.md`; what was missing is that its premises were only
+  asserted. They are now checked:
+  - `tests/test_tool_hygiene.py` fails if any tool stops being read-only or
+    becomes destructive. SEC-014's risk-bounding argument depends on that and
+    can no longer go stale unnoticed.
+  - The same file scans this server's own tool descriptions for invisible
+    characters and override phrasing in **German, French and English**. The
+    descriptions here are German; an English-only pattern list would miss them.
+    This is a self-scan, not cross-server detection, and says so.
+  - `SECURITY.md` no longer implies nothing applies until a gateway exists, and
+    gains re-evaluation triggers for a non-read-only tool and for
+    config-driven or remotely-sourced descriptions.
+
 ### Added
 - **Audit remediation batch 2 — six findings closed, two partially** (ARCH-003,
   ARCH-011, OPS-001, OPS-003, SCALE-003, CH-004; SEC-005 and SEC-021 partially).

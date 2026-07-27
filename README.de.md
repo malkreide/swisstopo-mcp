@@ -17,7 +17,7 @@
 
 ## Uebersicht
 
-`swisstopo-mcp` gibt KI-Assistenten Zugriff auf die offizielle schweizerische Geodateninfrastruktur ueber 19 Tools, alle ohne Authentifizierung:
+`swisstopo-mcp` gibt KI-Assistenten Zugriff auf die offizielle schweizerische Geodateninfrastruktur ueber 20 Tools, alle ohne Authentifizierung:
 
 | Quelle | Daten | API |
 |--------|-------|-----|
@@ -39,7 +39,7 @@
 
 ## Funktionen
 
-- 🗺️ **19 Tools** (REST, Geocoding, Hoehe, STAC, WMTS, OEREB, geodienste.ch, OpenStreetMap/Overpass, OpenPLZ)
+- 🗺️ **20 Tools** (REST, Geocoding, Hoehe, STAC, WMTS, OEREB, geodienste.ch, OpenStreetMap/Overpass, OpenPLZ)
 - 🏛️ Administrative Adressebene aufloesen (PLZ → Gemeinde/**BFS-Nummer** → Bezirk → Kanton) via OpenPLZ
 - 🔍 Schweizerische Adressen geocodieren und Koordinaten rueckwaerts geocodieren
 - 🏔️ Hoehe ueber Meer abfragen und Hoehenprofile berechnen
@@ -240,7 +240,7 @@ zu BFS-Statistikdaten (`swiss-statistics-mcp`) und zu `zurich-opendata-mcp`.
 │   Claude / KI   │────▶│  swisstopo-mcp               │────▶│  Swisstopo REST API      │
 │   (MCP Host)    │◀────│  (MCP Server)                │◀────│  api3.geo.admin.ch       │
 └─────────────────┘     │                              │     ├──────────────────────────┤
-                        │  19 Tools                    │────▶│  Geocoding               │
+                        │  20 Tools                    │────▶│  Geocoding               │
                         │  Stdio | Streamable HTTP     │◀────│  api3.geo.admin.ch       │
                         │                              │     ├──────────────────────────┤
                         │  Keine Authentifizierung     │────▶│  STAC-Katalog            │
@@ -306,7 +306,7 @@ Die vollständige Sicherheitsrichtlinie und Sicherheitslage ist in
 
 ### Phase
 
-Dieser Server ist in **Phase 1 — Read-only-Wrapper**. Alle 19 Tools sind
+Dieser Server ist in **Phase 1 — Read-only-Wrapper**. Alle 20 Tools sind
 `readOnlyHint: true` / `destructiveHint: false`; es gibt keine schreibenden
 oder versendenden Funktionen. Spätere Phasen siehe
 [docs/roadmap.md](docs/roadmap.md).

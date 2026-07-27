@@ -10,6 +10,7 @@ allow-list (audit check **SEC-021**) and complements the SSRF hardening from
 | Host | Purpose | Tools |
 |---|---|---|
 | `api3.geo.admin.ch` | REST (SearchServer/MapServer), Geocoding, Height | search_layers, identify_features, find_features, get_feature, geocode, reverse_geocode, get_height, elevation_profile |
+| `geodesy.geo.admin.ch` | REFRAME — official LV95<->WGS84 coordinate transformation | convert_coordinates |
 | `data.geo.admin.ch` | STAC catalog | search_geodata, get_collection |
 | `wmts.geo.admin.ch` | WMTS tiles | (map references) |
 | `map.geo.admin.ch` | Shareable map viewer URLs | map_url |

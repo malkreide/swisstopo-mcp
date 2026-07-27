@@ -17,7 +17,7 @@
 
 ## Overview
 
-`swisstopo-mcp` gives AI assistants access to Switzerland's official geodata infrastructure through 19 tools, all without authentication:
+`swisstopo-mcp` gives AI assistants access to Switzerland's official geodata infrastructure through 20 tools, all without authentication:
 
 | Source | Data | API |
 |--------|------|-----|
@@ -39,7 +39,7 @@
 
 ## Features
 
-- 🗺️ **19 tools** (REST, Geocoding, Height, STAC, WMTS, OEREB, geodienste.ch, OpenStreetMap/Overpass, OpenPLZ)
+- 🗺️ **20 tools** (REST, Geocoding, Height, STAC, WMTS, OEREB, geodienste.ch, OpenStreetMap/Overpass, OpenPLZ)
 - 🏛️ Resolve the administrative address level (PLZ → commune/**BFS number** → district → canton) via OpenPLZ
 - 🔍 Geocode Swiss addresses and reverse-geocode coordinates
 - 🏔️ Query elevation and compute elevation profiles
@@ -240,7 +240,7 @@ BFS statistics (`swiss-statistics-mcp`) and `zurich-opendata-mcp`.
 │   Claude / AI   │────▶│  swisstopo-mcp               │────▶│  Swisstopo REST API      │
 │   (MCP Host)    │◀────│  (MCP Server)                │◀────│  api3.geo.admin.ch       │
 └─────────────────┘     │                              │     ├──────────────────────────┤
-                        │  19 Tools                    │────▶│  Geocoding               │
+                        │  20 Tools                    │────▶│  Geocoding               │
                         │  Stdio | Streamable HTTP     │◀────│  api3.geo.admin.ch       │
                         │                              │     ├──────────────────────────┤
                         │  No authentication required  │────▶│  STAC Catalog            │
@@ -308,7 +308,7 @@ The full security policy and posture is documented in [SECURITY.md](SECURITY.md)
 
 ### Phase
 
-This server is in **Phase 1 — Read-only wrapper**. All 19 tools are
+This server is in **Phase 1 — Read-only wrapper**. All 20 tools are
 `readOnlyHint: true` / `destructiveHint: false`; there are no write or send
 capabilities. See [docs/roadmap.md](docs/roadmap.md) for later phases.
 

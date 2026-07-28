@@ -12,9 +12,11 @@ metadata:
 spec:
   # SCALE-002: single replica is the safe default — MCP Streamable-HTTP sessions
   # are held per-pod, so scaling out requires session affinity or a shared
-  # session store. To run replicas > 1, add sticky sessions on the
-  # `Mcp-Session-Id` header (see deploy/ingress-sticky-sessions.yaml) or a shared
-  # store, then raise this value. See docs/deployment.md ("Scaling out").
+  # session store. Do NOT simply raise this number: sessions break on their
+  # second request, intermittently, which reads like flaky clients. The
+  # supported multi-replica path replaces this Deployment with
+  # deploy/statefulset.yaml behind deploy/haproxy-deployment.yaml — see
+  # docs/deployment.md ("Scaling out").
   replicas: 1
   selector:
     matchLabels:

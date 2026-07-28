@@ -1,32 +1,22 @@
-# See deploy/haproxy.cfg for the deployable HAProxy configuration this
-# manifest pairs with (audit SCALE-003) — the routing block is no longer
-# only a comment.
-# Sticky-session example for scaling swisstopo-mcp beyond one replica
-# (audit finding SCALE-002).
+# NGINX cookie affinity for BROWSER clients only (audit SCALE-002).
 #
-# MCP Streamable-HTTP keeps session state per pod, so a client's follow-up
-# requests must reach the SAME pod. The session id travels in the
-# `Mcp-Session-Id` HTTP header. Two approaches are shown.
+# THIS IS NOT THE GENERAL MULTI-REPLICA PATH. NGINX cannot stick on an arbitrary
+# request header, so it pins clients with an affinity cookie — and MCP hosts
+# such as Claude Desktop or mcp-remote are not browsers and do not persist
+# cookies. For everything except a browser-based client this manifest provides
+# no affinity at all.
 #
-# Apply ONE of these alongside deploy/kubernetes.yaml after raising `replicas`.
-
-# ---------------------------------------------------------------------------
-# Option A (preferred): HAProxy — stick directly on the Mcp-Session-Id header.
-# This routes by the real session identifier (no extra cookie needed).
+# The supported path is HAProxy affinity on Mcp-Session-Id:
+#   deploy/haproxy.cfg + deploy/statefulset.yaml + deploy/haproxy-deployment.yaml
+# See docs/deployment.md, "Scaling out".
 #
-#   backend swisstopo_mcp
-#       balance roundrobin
-#       stick-table type string len 64 size 100k expire 1h
-#       stick on req.hdr(Mcp-Session-Id)
-#       server s1 10.0.0.1:8000 check
-#       server s2 10.0.0.2:8000 check
-# ---------------------------------------------------------------------------
-
-# ---------------------------------------------------------------------------
-# Option B (NGINX Ingress): cookie-based affinity. NGINX cannot stick on an
-# arbitrary request header, so it pins clients with an affinity cookie instead.
-# Adequate for browser clients that carry cookies.
-# ---------------------------------------------------------------------------
+# This file previously carried a commented HAProxy snippet as "Option A
+# (preferred)". That snippet used `stick on req.hdr(Mcp-Session-Id)`, which
+# never populates the stick-table — the session id is minted in the *response*
+# to initialize, so there is nothing to store on the request. It has been
+# removed rather than corrected: the working config belongs in one place
+# (deploy/haproxy.cfg), and duplicating it is how the same error came to exist
+# in three files (audit `2026-07-27T162602-Z`, SCALE-003).
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -52,7 +42,7 @@ spec:
                   number: 80
 
 # ---------------------------------------------------------------------------
-# Option C (shared state): run a shared session store (e.g. Redis) so any pod
-# can serve any session. This removes the affinity requirement entirely but
-# needs a SessionManager wired into FastMCP — out of scope for this manifest.
+# A shared session store (e.g. Redis) would remove the affinity requirement
+# entirely and also survive pod loss, which affinity does not. It needs a
+# SessionManager wired into FastMCP and is not implemented.
 # ---------------------------------------------------------------------------

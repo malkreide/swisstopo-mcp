@@ -7,6 +7,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed (SCALE-003 / SCALE-002)
+- **The HAProxy affinity config parsed, looked correct, and would not have
+  worked.** Two independent defects:
+  - `stick on <pattern>` is shorthand for `stick match` + `stick
+    store-**request**`. The MCP session id is minted by the *server* and
+    returned in the response to `initialize` — that request carries no
+    `Mcp-Session-Id`, so nothing was ever stored. The first request that did
+    carry the header missed the empty table, was round-robined, and was then
+    pinned to a possibly-wrong replica for an hour. Replaced with
+    `stick store-response` + `stick match`, the canonical pattern for a
+    server-generated identifier.
+  - The `server` lines named `swisstopo-mcp-1` and `swisstopo-mcp-2`, hosts
+    nothing in this repository creates, with no `resolvers` section — so HAProxy
+    would have refused to start.
+
+- **The multi-replica path now exists rather than being implied.**
+  `deploy/statefulset.yaml` (StatefulSet + headless Service, for stable per-pod
+  DNS) and `deploy/haproxy-deployment.yaml` (HAProxy with the config, exposing
+  `swisstopo-mcp-lb`). `haproxy.cfg` resolves the headless Service via
+  `server-template` + `resolvers`, so pods that do not exist yet are DOWN rather
+  than a startup failure.
+
+- **The duplicated snippet is removed, not corrected.** The same defective
+  config sat in `deploy/ingress-sticky-sessions.yaml` as "Option A (preferred)"
+  and was pointed at from the docs — which is how one mistake came to exist in
+  three files. That manifest is now scoped honestly to browser clients, since
+  MCP hosts do not persist cookies.
+
+- `tests/test_deploy_manifests.py` holds the properties that were wrong, all of
+  them *cross-file* — which is why nothing caught them: the backends must
+  reference the headless Service **this repo defines** (read from the manifest,
+  not hardcoded), the StatefulSet's security contexts must equal the
+  Deployment's, and the mounted ConfigMap must be the one the documented command
+  builds — the exact defect SEC-021 had. Verified against the original config.
+
+- These tests **cannot** prove HAProxy routes correctly; that needs a cluster.
+  `docs/deployment.md` gained a "Verifying affinity" procedure instead, plus an
+  explicit note that **failover is a deliberate non-goal** — affinity routes
+  sessions, it does not replicate them, so a dead pod takes its sessions with it.
+
 ### Fixed (SEC-014)
 - **The read-only premise was enforced one indirection away from itself.** The
   gate read `t.annotations.readOnlyHint` — a value each tool asserts about

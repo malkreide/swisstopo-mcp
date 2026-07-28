@@ -1,0 +1,129 @@
+# Multi-replica swisstopo-mcp with stable per-pod DNS (audit SCALE-002/003).
+#
+# WHY A StatefulSet AND NOT THE Deployment IN kubernetes.yaml
+#
+# Streamable-HTTP sessions live in the process that created them, so a load
+# balancer has to route a session back to the same pod. HAProxy does that by
+# learning the session id from the `initialize` response and matching it on
+# later requests — see deploy/haproxy.cfg. For that it needs to address
+# individual pods, which a ClusterIP Service deliberately hides behind one
+# virtual IP. A StatefulSet plus a headless Service gives each pod a stable
+# name that the `server-template` in haproxy.cfg resolves.
+#
+# The previous haproxy.cfg named `swisstopo-mcp-1:8000` and `swisstopo-mcp-2:8000`
+# — hosts nothing in this repository ever created. The config would have parsed
+# and then failed to start.
+#
+# APPLY ORDER
+#   kubectl apply -f deploy/kubernetes.yaml      # NetworkPolicy, base Service
+#   kubectl delete deployment swisstopo-mcp      # replaced by this StatefulSet
+#   kubectl apply -f deploy/statefulset.yaml
+#   kubectl apply -f deploy/haproxy-deployment.yaml
+#
+# Everything security-relevant is copied verbatim from the Deployment in
+# kubernetes.yaml. Keep the two in sync — tests/test_deploy_manifests.py fails
+# if the container security context or the required env vars drift apart.
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: swisstopo-mcp-headless
+  labels:
+    app: swisstopo-mcp
+spec:
+  # Headless: no cluster IP, so DNS returns the pod addresses individually.
+  clusterIP: None
+  selector:
+    app: swisstopo-mcp
+  ports:
+    - name: mcp
+      port: 8000
+      targetPort: 8000
+      protocol: TCP
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: swisstopo-mcp
+  labels:
+    app: swisstopo-mcp
+spec:
+  serviceName: swisstopo-mcp-headless
+  # Raise only after the HAProxy front end is in place. Without affinity every
+  # session breaks on its second request.
+  replicas: 3
+  selector:
+    matchLabels:
+      app: swisstopo-mcp
+  template:
+    metadata:
+      labels:
+        app: swisstopo-mcp
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: swisstopo-mcp
+          image: ghcr.io/malkreide/swisstopo-mcp:latest # <-- replace
+          args: ["--http"]
+          ports:
+            - containerPort: 8000
+              name: mcp
+          env:
+            - name: SWISSTOPO_HTTP_HOST
+              value: "0.0.0.0"
+            - name: SWISSTOPO_ALLOWED_ORIGINS
+              value: "" # <-- set explicit origins for browser clients
+            # REQUIRED behind an ingress. The SDK's DNS-rebinding protection
+            # rejects any Host it was not told about: without this every MCP
+            # request returns 421 while /healthz keeps returning 200, so the
+            # readiness probe stays green and hides it (audit SCALE-001).
+            - name: SWISSTOPO_ALLOWED_HOSTS
+              value: "" # <-- set to the ingress hostname
+            # Idle timeout for Streamable-HTTP sessions (SEC-009). Matters more
+            # here than at one replica: a leaked session also pins its slot in
+            # the HAProxy stick-table until it expires.
+            - name: SWISSTOPO_SESSION_IDLE_TIMEOUT
+              value: "1800"
+            - name: OTEL_SERVICE_NAME
+              value: "swisstopo-mcp"
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: "" # <-- e.g. http://otel-collector.observability:4318
+            - name: OTEL_RESOURCE_ATTRIBUTES
+              value: "deployment.environment=production"
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8000
+            initialDelaySeconds: 3
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 64Mi

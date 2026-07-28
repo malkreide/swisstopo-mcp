@@ -97,15 +97,102 @@ kubectl apply -f deploy/kubernetes.yaml
 
 ## Scaling out (SCALE-002)
 
-The manifest ships with `replicas: 1` on purpose. MCP Streamable-HTTP keeps
+The base manifest ships with `replicas: 1` on purpose. MCP Streamable-HTTP keeps
 session state **per pod**, so a client's follow-up requests must reach the same
-pod. Before raising `replicas`, add one of:
+pod. Raising `replicas` on the plain Deployment breaks sessions on their second
+request — intermittently, which reads like flaky clients rather than a
+misconfiguration.
 
-- **Session affinity on `Mcp-Session-Id`** — HAProxy `stick on req.hdr(Mcp-Session-Id)`
-  (preferred), or NGINX Ingress cookie affinity. See
-  [`deploy/ingress-sticky-sessions.yaml`](../deploy/ingress-sticky-sessions.yaml).
-- **A shared session store** (e.g. Redis via a FastMCP `SessionManager`) so any
-  pod can serve any session.
+### The supported multi-replica path
 
-Then raise `replicas` in `deploy/kubernetes.yaml`.
+Three artefacts, applied together:
+
+| File | Provides |
+|---|---|
+| [`deploy/statefulset.yaml`](../deploy/statefulset.yaml) | A StatefulSet plus a **headless** Service, so each pod gets stable DNS. A ClusterIP Service hides pods behind one virtual IP, which defeats per-pod affinity. |
+| [`deploy/haproxy.cfg`](../deploy/haproxy.cfg) | Affinity on `Mcp-Session-Id`: the id is **learned from the `initialize` response** and matched on later requests. |
+| [`deploy/haproxy-deployment.yaml`](../deploy/haproxy-deployment.yaml) | Runs HAProxy with that config and exposes `swisstopo-mcp-lb`. |
+
+```bash
+kubectl apply -f deploy/kubernetes.yaml           # NetworkPolicy, base Service
+kubectl delete deployment swisstopo-mcp           # replaced by the StatefulSet
+kubectl apply -f deploy/statefulset.yaml
+kubectl create configmap swisstopo-mcp-haproxy --from-file=deploy/haproxy.cfg
+kubectl apply -f deploy/haproxy-deployment.yaml
+```
+
+Point your Ingress at **`swisstopo-mcp-lb`**, not at the application Service —
+routing straight to the pods bypasses the affinity this arrangement exists for.
+
+### Why `stick on` is not enough
+
+The obvious config is `stick on req.hdr(Mcp-Session-Id)`, and this repository
+shipped exactly that. It does not work, and it looks like it does.
+
+`stick on` is shorthand for `stick match` + `stick store-**request**`. The MCP
+session id is minted by the *server* and returned in the response to
+`initialize` — that request carries no `Mcp-Session-Id` at all, so nothing is
+ever stored. The client's next request is the first to carry the header, misses
+the empty table, gets round-robined to a replica that with three servers is
+wrong two times in three, and is then pinned there until the entry expires.
+
+The config therefore uses the canonical pattern for a server-generated
+identifier:
+
+```
+stick store-response res.hdr(Mcp-Session-Id)
+stick match          req.hdr(Mcp-Session-Id)
+```
+
+### Verifying affinity
+
+The repository's tests check that the config and manifests agree with each other
+— that the store-response directive is present, that the backends resolve to the
+headless Service this repo creates, that the ConfigMap the Deployment mounts is
+the one the command above builds. They **cannot** prove HAProxy routes
+correctly; that needs a running cluster. Verify it manually once after applying:
+
+```bash
+# 1. Open a session and keep both the id and the pod that served it.
+curl -sD- -X POST http://<lb>/mcp \
+  -H 'Content-Type: application/json' \
+  -H 'Accept: application/json, text/event-stream' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{
+       "protocolVersion":"2025-11-25","capabilities":{},
+       "clientInfo":{"name":"affinity-check","version":"0"}}}' \
+  | grep -i mcp-session-id
+
+# 2. Send several follow-ups with that id. All must succeed — a 404 means the
+#    request reached a pod that does not hold the session.
+for i in $(seq 1 10); do
+  curl -s -o /dev/null -w '%{http_code}\n' -X POST http://<lb>/mcp \
+    -H 'Content-Type: application/json' \
+    -H 'Accept: application/json, text/event-stream' \
+    -H "Mcp-Session-Id: <id>" \
+    -d '{"jsonrpc":"2.0","id":2,"method":"ping"}'
+done
+
+# 3. Confirm the stick-table actually holds the entry.
+kubectl exec deploy/swisstopo-mcp-haproxy -- \
+  sh -c 'echo "show table mcp_backend" | socat stdio /var/run/haproxy.sock'
+```
+
+Ten consecutive `200`s with three replicas is the signal: without affinity the
+round-robin would land elsewhere within the first few requests.
+
+**Failover is a deliberate non-goal.** Session state lives in the pod, so a pod
+that dies takes its sessions with it — clients get `404` and must re-initialise.
+Affinity routes sessions; it does not replicate them. Surviving pod loss needs a
+shared session store (option C below), which is not implemented.
+
+### Alternatives
+
+- **NGINX Ingress cookie affinity**
+  ([`deploy/ingress-sticky-sessions.yaml`](../deploy/ingress-sticky-sessions.yaml))
+  works only for clients that persist cookies. MCP hosts such as Claude Desktop
+  and `mcp-remote` are not browsers, so this is **not** a general substitute —
+  it is listed for the browser-client case only.
+- **A shared session store** (e.g. Redis via a FastMCP `SessionManager`) removes
+  the affinity requirement entirely and would also survive pod loss. Not
+  implemented here.
 

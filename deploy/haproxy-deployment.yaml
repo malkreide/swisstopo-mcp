@@ -1,0 +1,70 @@
+# HAProxy front end for a multi-replica swisstopo-mcp (audit SCALE-002/003).
+# Pairs with deploy/haproxy.cfg and deploy/statefulset.yaml.
+#
+#   kubectl create configmap swisstopo-mcp-haproxy --from-file=deploy/haproxy.cfg
+#   kubectl apply -f deploy/haproxy-deployment.yaml
+#
+# Point your Ingress at the `swisstopo-mcp-lb` Service below, not at the
+# application Service — routing straight to the pods bypasses the affinity this
+# whole arrangement exists to provide.
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: swisstopo-mcp-haproxy
+  labels:
+    app: swisstopo-mcp-haproxy
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: swisstopo-mcp-haproxy
+  template:
+    metadata:
+      labels:
+        app: swisstopo-mcp-haproxy
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 99
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: haproxy
+          image: haproxy:3.0-alpine
+          ports:
+            - containerPort: 8080
+              name: http
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: config
+              mountPath: /usr/local/etc/haproxy
+              readOnly: true
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+      volumes:
+        - name: config
+          configMap:
+            name: swisstopo-mcp-haproxy
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: swisstopo-mcp-lb
+spec:
+  selector:
+    app: swisstopo-mcp-haproxy
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080
+      protocol: TCP

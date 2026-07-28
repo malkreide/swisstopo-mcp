@@ -41,8 +41,10 @@ for the hardening history.
 This server is in **Phase 2.5** (see [docs/roadmap.md](docs/roadmap.md), the
 single authority for phase state). It remains a read-only wrapper: all 24 tools
 are `readOnlyHint: true` / `destructiveHint: false`; there are no write or send
-capabilities. Note that CI enforces the *annotation*, not the property — see
-SEC-014 in the latest audit run.
+capabilities. CI enforces both halves: `tests/test_tool_hygiene.py` fails if a
+tool drops `readOnlyHint`, **and** statically finds every outbound HTTP call in
+`src/` and fails on any mutating method. The annotation is what a tool says; the
+method check is what it does.
 
 ## Sessions & authentication
 
@@ -74,8 +76,14 @@ fixed set of trusted public-data providers.
   aggregates multiple servers, not to an individual server exposing a fixed,
   read-only tool set. Until a central gateway exists, the risk is bounded by two
   facts, both enforced in CI rather than merely asserted here:
-  - every tool is read-only — `tests/test_tool_hygiene.py` fails if one is not,
-    so this premise cannot quietly become false;
+  - every tool is read-only — enforced at two levels, because the annotation is
+    self-asserted and a write-capable tool could simply lie in it. A test fails
+    if any tool drops `readOnlyHint`, and a second one parses `src/` to find
+    every outbound HTTP call and fails on `PUT`, `PATCH` or `DELETE`. The one
+    non-GET is Overpass, which puts its *query* in the request body; it is named
+    in the test with that reason, and the test also fails if that exception
+    stops occurring — a stale exception is a permission nobody decided to grant
+    (audit `2026-07-27T162602-Z`, SEC-014);
   - egress is a code-level frozenset in
     [`src/swisstopo_mcp/api_client.py`](src/swisstopo_mcp/api_client.py), kept in
     sync with [docs/network-egress.md](docs/network-egress.md) by a test.

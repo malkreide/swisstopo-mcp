@@ -42,8 +42,10 @@ Dieser Server befindet sich in **Phase 2.5** (siehe
 [docs/roadmap.md](docs/roadmap.md) — die alleinige Autorität für den
 Phasenstand). Er bleibt ein Read-only-Wrapper: alle 24 Tools sind
 `readOnlyHint: true` / `destructiveHint: false`; es gibt keine schreibenden oder
-versendenden Funktionen. Zu beachten: die CI erzwingt die *Annotation*, nicht die
-Eigenschaft — siehe SEC-014 im aktuellen Audit-Lauf.
+versendenden Funktionen. Die CI erzwingt beide Hälften: `tests/test_tool_hygiene.py`
+schlägt fehl, wenn ein Tool `readOnlyHint` verliert, **und** findet statisch jeden
+ausgehenden HTTP-Aufruf in `src/` und schlägt bei jeder mutierenden Methode fehl.
+Die Annotation ist, was ein Tool behauptet; die Methodenprüfung ist, was es tut.
 
 ## Sessions & Authentifizierung
 
@@ -77,7 +79,16 @@ erreicht.
 - **Tool-Allow-Listing** gehört zum MCP-Host/-Gateway, das mehrere Server
   aggregiert, nicht zu einem einzelnen Server mit fixem, read-only Tool-Set.
   Solange kein zentrales Gateway existiert, ist das Risiko durch die
-  Egress-Allow-List und die read-only Tool-Oberfläche begrenzt.
+  Egress-Allow-List und die read-only Tool-Oberfläche begrenzt — beides in der
+  CI erzwungen, nicht bloss behauptet. Read-only wird auf zwei Ebenen geprüft,
+  weil die Annotation selbstbehauptet ist und ein schreibendes Tool darin
+  schlicht lügen könnte: ein Test schlägt fehl, wenn ein Tool `readOnlyHint`
+  verliert, ein zweiter parst `src/` und schlägt bei `PUT`, `PATCH` oder
+  `DELETE` fehl. Der einzige Nicht-GET-Aufruf ist Overpass, das seine *Abfrage*
+  im Request-Body überträgt; er ist im Test mit dieser Begründung benannt, und
+  der Test schlägt auch fehl, wenn diese Ausnahme wegfällt — eine veraltete
+  Ausnahme ist eine Erlaubnis, die niemand erteilt hat (Audit
+  `2026-07-27T162602-Z`, SEC-014).
 - **Server-übergreifende Tool-Poisoning-Erkennung** ist eine Host-/Gateway-
   Verantwortung — kein einzelner Server sieht über die Menge hinweg. Die
   Tool-Definitionen dieses Servers sind versionskontrolliert und werden aus

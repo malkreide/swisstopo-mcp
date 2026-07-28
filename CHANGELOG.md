@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed (SEC-014)
+- **The read-only premise was enforced one indirection away from itself.** The
+  gate read `t.annotations.readOnlyHint` — a value each tool asserts about
+  itself — so a future tool that performs a write while still declaring
+  `readOnlyHint=True` would have passed. SEC-014's entire risk-bounding
+  argument rests on that premise, and the re-audit had to verify it by hand.
+
+  A static sweep now parses every module in `src/`, finds each outbound HTTP
+  call, and asserts: no `PUT`/`PATCH`/`DELETE` anywhere; every non-GET is a
+  **named** exception with its reason (the only one is Overpass, which puts its
+  query in the request body); no method assembled at runtime, since a computed
+  verb would slip past a static check; and **listed exceptions still occur** —
+  an allow-list that outlives its entries drifts into permission. It asserts it
+  found at least 10 call sites, so it cannot pass vacuously.
+
+  Verified both ways: a `request_with_retry("DELETE", …)` planted in `stac.py`
+  failed two assertions by file and line, and flipping the Overpass `POST` to
+  `GET` failed the stale-exception test.
+
+  The annotation test stays. The annotation is what a tool *says*; the method
+  sweep is what it *does*.
+
+  **Unchanged and still deferred:** the check's actual criteria — a default-deny
+  allow-list per role, server-side group scoping, denied-call audit events — are
+  impossible without an auth model and belong to a gateway. Both security
+  policies previously stated this gap outright; that text was honest and is now
+  out of date, so it has been rewritten.
+
 ### Fixed (SEC-015)
 - **The tool-poisoning self-scan read a fraction of what the server ships.** It
   checked `tool.name` and `tool.description`. Every `description` inside an

@@ -313,3 +313,123 @@ class TestThisFileContainsNoLiteralInvisibles:
             f"{len(found)} literal invisible characters in the scanner itself — "
             "write them as \\uXXXX escapes"
         )
+
+
+# ---------------------------------------------------------------------------
+# Read-only as a property, not a declaration (audit SEC-014)
+#
+# `TestEveryToolIsReadOnly` above reads `t.annotations.readOnlyHint` — a value
+# the tool asserts about itself. A future tool that performs a write while still
+# carrying `readOnlyHint=True` passes it. The premise SEC-014's whole deferral
+# rests on was therefore one indirection away from what the gate checked, and
+# the re-audit verified the property by hand rather than by test.
+#
+# This closes that gap: every HTTP call in `src/` is found statically and its
+# method asserted. The single non-GET is Overpass, which expresses a *read* as a
+# POST because the query goes in the body — an exception that has to be named
+# here, with its reason, rather than silently tolerated.
+# ---------------------------------------------------------------------------
+
+# (module, method) pairs that are reads despite not being GET. Each needs a
+# reason, and the test fails if a listed exception stops existing — an allow-list
+# that outlives its entries drifts into permission.
+NON_GET_EXCEPTIONS: dict[tuple[str, str], str] = {
+    ("overpass.py", "POST"): (
+        "Overpass takes the query in the request body, so a read is expressed "
+        "as POST. It creates nothing: the endpoint is /api/interpreter and the "
+        "payload is an [out:json] query."
+    ),
+}
+
+MUTATING_METHODS = {"PUT", "PATCH", "DELETE", "HEAD_WRITE"}
+
+
+def _http_call_methods() -> list[tuple[str, int, str]]:
+    """(module, line, METHOD) for every outbound HTTP call in `src/`."""
+    import ast
+    import pathlib
+
+    import swisstopo_mcp
+
+    src = pathlib.Path(swisstopo_mcp.__file__).parent
+    found: list[tuple[str, int, str]] = []
+    for path in sorted(src.glob("*.py")):
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            func = node.func
+            # request_with_retry("GET", url, ...) — method is the first argument.
+            if isinstance(func, ast.Name) and func.id == "request_with_retry":
+                if node.args and isinstance(node.args[0], ast.Constant):
+                    found.append((path.name, node.lineno, str(node.args[0].value).upper()))
+                else:
+                    found.append((path.name, node.lineno, "<non-literal>"))
+            # client.get(...) / client.post(...) / client.request("GET", ...)
+            elif isinstance(func, ast.Attribute) and isinstance(func.value, ast.Name):
+                verb = func.attr.upper()
+                if verb in {"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"}:
+                    found.append((path.name, node.lineno, verb))
+                elif func.attr == "request" and func.value.id in {"client", "self"}:
+                    if node.args and isinstance(node.args[0], ast.Constant):
+                        found.append((path.name, node.lineno, str(node.args[0].value).upper()))
+                    else:
+                        # api_client's own retry wrapper forwards whatever it was
+                        # given; the literal is checked at its call sites above.
+                        found.append((path.name, node.lineno, "<forwarded>"))
+    return found
+
+
+class TestReadOnlyIsAPropertyNotOnlyAnAnnotation:
+    def test_the_sweep_finds_the_call_sites(self):
+        """A sweep that matches nothing passes vacuously — the failure mode the
+        SEC-021 CI gate had."""
+        calls = _http_call_methods()
+        assert len(calls) >= 10, f"only found {len(calls)} HTTP call sites: {calls}"
+        assert any(m == "GET" for _, _, m in calls)
+
+    def test_no_mutating_http_method_anywhere(self):
+        offenders = [
+            f"{module}:{line} {method}"
+            for module, line, method in _http_call_methods()
+            if method in MUTATING_METHODS
+        ]
+        assert offenders == [], (
+            f"mutating HTTP methods in src/: {offenders}. SEC-014's deferral "
+            "assumes a read-only surface; a write voids it and SECURITY.md must "
+            "be re-evaluated before this merges."
+        )
+
+    def test_every_non_get_is_a_named_exception(self):
+        unexpected = [
+            f"{module}:{line} {method}"
+            for module, line, method in _http_call_methods()
+            if method not in {"GET", "<forwarded>"}
+            and (module, method) not in NON_GET_EXCEPTIONS
+        ]
+        assert unexpected == [], (
+            f"non-GET requests with no documented reason: {unexpected}. Add an "
+            "entry to NON_GET_EXCEPTIONS explaining why it is a read, or the "
+            "read-only premise no longer holds."
+        )
+
+    def test_no_method_is_built_dynamically(self):
+        """A computed method defeats the whole check."""
+        dynamic = [
+            f"{module}:{line}"
+            for module, line, method in _http_call_methods()
+            if method == "<non-literal>"
+        ]
+        assert dynamic == [], (
+            f"HTTP method assembled at runtime: {dynamic} — this check can only "
+            "see literals, so a dynamic verb would slip past it."
+        )
+
+    def test_listed_exceptions_still_exist(self):
+        """An allow-list that outlives its entries drifts into permission."""
+        actual = {(module, method) for module, _, method in _http_call_methods()}
+        stale = [key for key in NON_GET_EXCEPTIONS if key not in actual]
+        assert stale == [], (
+            f"NON_GET_EXCEPTIONS entries that no longer occur: {stale}. Remove "
+            "them — a stale exception is a permission nobody decided to grant."
+        )

@@ -344,8 +344,37 @@ opake Feature-ID. Ein Zusammenlegen hinter eine diskriminierte Union wuerde die
 Tool-Wahl in eine Varianten-Wahl verwandeln — dieselbe Entscheidung, nur
 verschoben, plus ein Schema, durch das sich der Aufrufer navigieren muss. Das
 reale Risiko benennt das Audit zurecht: eine Fehlwahl liefert leer statt eines
-Fehlers. Dem begegnen stattdessen die `note`-Hinweise aus ARCH-003. Ein
-Zusammenlegen bleibt Kandidat fuer ein kuenftiges Major-Release.
+Fehlers. Dem begegnen stattdessen die `note`-Hinweise aus ARCH-003.
+
+**Das ist eine Entscheidung, keine Vertagung.** Eine fruehere Fassung dieses
+Abschnitts endete mit «bleibt Kandidat fuer ein kuenftiges Major-Release», was
+das Audit zurecht als Dokumentation der Schuld statt ihrer Tilgung gelesen hat
+(ARCH-006). Die Position jetzt: diese fuenf bleiben getrennt, und der Anlass zur
+Neubewertung ist eine *Messung* — Belege, dass Modelle das falsche waehlen —
+nicht eine Tool-Zahl.
+
+**Die zwei Paare, die dieser Abschnitt bisher unargumentiert mitgenommen hat**,
+beide vom Audit benannt:
+
+- `search_layers` + `layer_info` sind ein Discovery-Paar ueber denselben Katalog
+  und damit der klassische Merge-Kandidat. Sie bleiben getrennt, weil sich die
+  Operationen der Art nach unterscheiden, nicht nur der Tiefe nach: das eine
+  durchsucht 500+ Layer nach Stichwort, das andere liefert die abfragbaren
+  Felder und die Legende eines Layers. Wer eine Layer-ID hat und ihre Felder
+  will, fuehrt keine eingegrenzte Suche durch.
+- `geocode` + `reverse_geocode` treffen tatsaechlich denselben
+  SearchServer-Endpunkt — auf der API-Achse also zweimal ein 1:1-Mapping. Sie
+  bleiben getrennt auf der Achse, die fuer die Tool-Wahl zaehlt: «Adresse →
+  Koordinaten» und «Koordinaten → Adresse» sind verschiedene Fragen mit
+  verschiedenen Eingabetypen. Ein gemeinsamer Endpunkt ist ein
+  Implementationsdetail des Upstreams.
+
+**Eine Namensmehrdeutigkeit, die das Audit nicht benannt hat:**
+`swisstopo_search_layers` und `swisstopo_list_available_layers` sagen beide
+«Layers» und stehen vor *verschiedenen* Katalogen — dem api3-Layerkatalog und
+der konsolidierten Fassade. Keine Merge-Kandidaten, aber die Namen liegen naeher
+beieinander als die Konzepte. Eine Umbenennung gehoert ins naechste
+Breaking-Release.
 
 **Search-→-Detail-Paare.** `search_geodata` → `get_collection` ist ein echtes
 Paar: STAC-Collection-Metadaten sind umfangreich, und meist wird eines von
@@ -468,10 +497,25 @@ gebunden werden (Audit-Finding SEC-009).
 
 ## MCP-Primitive
 
-Dieser Server exponiert bewusst **nur Tools** (keine Resources/Prompts):
-Er ist ein Read-only-Wrapper, und jedes Resultat ist eine
+**Tools** sind die Oberfläche und fast alles davon: jedes Resultat ist eine
 parametrisierte Live-API-Abfrage statt ein statisches, adressierbares Dokument.
-Resources/Prompts können in einer späteren Phase ergänzt werden.
+
+**Eine Resource** — `swisstopo://catalogue/layers` — liefert den Layer-Katalog
+der Fassade. Sie ist das Einzige hier, was sich wie ein Dokument verhält:
+deterministisch, idempotent und ohnehin mit `provenance: "cached"` ausgeliefert.
+`swisstopo_list_available_layers` bleibt für gefilterte Abfragen; die Resource
+ist für Clients, die den Katalog selbst adressierbar wollen.
+
+**Zwei Prompts** kodieren die unten dokumentierten Workflows samt der
+Präzedenzregel für Punktfragen. Diese Regel steht auch in den Tool-Beschreibungen
+und in den Server-Instructions — aber ein Prompt ist die eine Stelle, an der ein
+Modell sie als Anleitung liest statt als eine von 24 Beschreibungen (Audit
+ARCH-007/ARCH-008):
+
+| Prompt | Argumente |
+|---|---|
+| `swisstopo_feature_lookup` | `ort`, `was` |
+| `swisstopo_geodata_download` | `thema` |
 
 ### Tool-Workflows
 

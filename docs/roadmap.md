@@ -35,7 +35,10 @@ authoritative, which meant neither was (audit `2026-07-27T162602-Z`, OPS-003).
       `match_type: "none"` path names a concrete next step, enforced by the
       envelope and by an AST sweep over the call sites; `swisstopo_geocode`
       relaxes a failed query and reports the retry as `match_type: "fuzzy"`
-- [ ] Resources for static catalogs (e.g. notable map layers) (ARCH-008)
+- [x] Resources for static catalogs (ARCH-008): `swisstopo://catalogue/layers`
+      exposes the façade layer catalogue, the one deterministic and already
+      cached surface here. Two Prompts were added alongside it — the check
+      passed without either, but it named both as gaps.
 - [x] OpenTelemetry tracing, opt-in via `OTEL_EXPORTER_OTLP_ENDPOINT`, with
       httpx auto-instrumentation so upstream calls nest under the tool span
       (OBS-006)

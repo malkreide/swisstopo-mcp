@@ -119,3 +119,52 @@ class TestSnapshotIsInterpreterIndependent:
         indented = "Summary.\n\n    <use_case>Something.</use_case>"
         dedented = inspect.cleandoc(indented)
         assert snap._normalise_description(indented) == snap._normalise_description(dedented)
+
+
+# ---------------------------------------------------------------------------
+# The tool budget is a gate, not an assertion (audit ARCH-006)
+#
+# The README declares a self-imposed ceiling of 25 tools, and the finding's last
+# gap was that nothing enforced it: "nothing fails if tool 26 is registered,
+# unlike the tool-hash and egress-ACL snapshots which are gated in CI". A budget
+# that only exists in prose is a number, not a budget.
+#
+# The ceiling itself is a judgement, not a law. Raising it is allowed — but as a
+# deliberate edit here and in the README, which is exactly the conversation the
+# check wants to force.
+# ---------------------------------------------------------------------------
+
+TOOL_BUDGET = 25
+
+
+class TestToolBudget:
+    def test_the_surface_is_within_budget(self, tool_names):
+        assert len(tool_names) <= TOOL_BUDGET, (
+            f"{len(tool_names)} tools against a budget of {TOOL_BUDGET}. Either "
+            "consolidate, or raise TOOL_BUDGET here and update the "
+            "'Tool budget and aggregation' section in both READMEs with the "
+            "reason — the point is that the number cannot drift silently."
+        )
+
+    def test_the_readmes_state_the_same_budget(self):
+        """A gate that disagrees with the documentation is worse than neither."""
+        import pathlib
+
+        root = pathlib.Path(__file__).resolve().parent.parent
+        for name in ("README.md", "README.de.md"):
+            text = (root / name).read_text(encoding="utf-8")
+            assert str(TOOL_BUDGET) in text, (
+                f"{name} does not mention the budget of {TOOL_BUDGET}"
+            )
+
+    def test_the_readmes_state_the_actual_count(self, tool_names):
+        """The count drifted twice before (13 → 23 → 24 in stale prose)."""
+        import pathlib
+
+        root = pathlib.Path(__file__).resolve().parent.parent
+        for name in ("README.md", "README.de.md"):
+            text = (root / name).read_text(encoding="utf-8")
+            count = len(tool_names)
+            assert f"{count} tools" in text or f"{count} Tools" in text, (
+                f"{name} does not state the current tool count ({count})"
+            )

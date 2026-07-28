@@ -1,0 +1,22 @@
+check_run:
+  id: ARCH-005
+  status: pass
+  evidence_collected: 5
+  evidence_required: 3
+  findings:
+    - "Pattern scan clean. `grep -rEn \"(api[_-]?key|password|secret|token)\\s*=\\s*[\\\"'][^\\\"']{16,}[\\\"']\" src/ --include=*.py` returns nothing (exit 1); so do the AWS `AKIA[0-9A-Z]{16}` and `(postgres|mysql|mongodb)://user:pass@` patterns. The only `Authorization` occurrence in src/ is src/swisstopo_mcp/server.py:731, a CORS `allow_headers` entry, not a credential."
+    - "There is nothing to protect: every upstream is a key-less public API. src/swisstopo_mcp/server.py:9 states «Alle Endpunkte sind offen (kein API-Schluessel erforderlich)» and .env.example:2-3 repeats it («None of these are secrets — the server uses only key-less public APIs»). This is why no `SecretStr` field exists — the criterion is vacuous here rather than skipped."
+    - "Config loading is the pass pattern: src/swisstopo_mcp/config.py:14-20 uses `BaseSettings` with `env_prefix=\"SWISSTOPO_\"`, `env_file=\".env\"`. No `os.environ.get(name, <real-value>)` default anywhere — the residual reads at api_client.py:214 and logging_config.py:33 default to `\"\"` and `\"INFO\"` respectively."
+    - ".gitignore:12-14 contains `.env`, `.env.*` and `!.env.example`, i.e. the exact allow-one-deny-rest shape the check asks for. `.env.example` exists at the repo root and contains only placeholders and defaults (SWISSTOPO_OEREB_CANTONS=ZH, SWISSTOPO_HTTP_HOST=127.0.0.1, empty allow-lists). No `.env` is present in the working tree."
+    - "CI secret scanning runs on every push and PR: .github/workflows/security.yml:10-20 defines a `gitleaks` job using `gitleaks/gitleaks-action@v3` with `GITHUB_TOKEN`."
+  gaps:
+    - "No pre-commit hook (.pre-commit-config.yaml absent), so a leak is caught in CI rather than before the commit. Remediation step 6 only, not a pass criterion."
+    - "No secret-manager integration (check's step 4, «höhere Reife»), which is moot while the server holds no secrets — it becomes live the moment a keyed cantonal ÖREB endpoint is added."
+  evaluator_notes: |
+    Clean pass, and re-verified from scratch rather than inherited: the previous
+    run produced no ARCH-005 finding and the scans above confirm that verdict
+    independently. The two criteria about SecretStr representation and secret
+    masking in logs are satisfied vacuously — there are no secrets — which is a
+    legitimate pass for a public-open-data, auth_model=none server, not a
+    documentation dodge. Worth flagging forward: the vacuity is load-bearing,
+    so the first keyed upstream re-opens three criteria at once.

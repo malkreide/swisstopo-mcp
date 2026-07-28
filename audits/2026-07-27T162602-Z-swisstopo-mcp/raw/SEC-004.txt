@@ -1,0 +1,29 @@
+check_run:
+  id: SEC-004
+  status: partial
+  evidence_collected: 6
+  evidence_required: 3
+  findings:
+    - "HTTPS scheme enforcement is real and runs first: src/swisstopo_mcp/api_client.py:126 rejects any scheme != 'https' before the host is even looked at; tests/test_egress_allowlist.py:58-71 cover http://, file://, ftp://, gopher://."
+    - "Resolved-IP guard exists and covers every range the check names: src/swisstopo_mcp/api_client.py:74-87 blocks 10/8, 172.16/12, 192.168/16, 127/8, 169.254/16 (incl. 169.254.169.254), 0.0.0.0/8, ::1/128, fe80::/10, fc00::/7; enforced at src/swisstopo_mcp/api_client.py:101-118 and invoked from assert_host_allowed at src/swisstopo_mcp/api_client.py:137."
+    - "Both guards do run on every outbound path. The single retry wrapper calls assert_host_allowed unconditionally (src/swisstopo_mcp/api_client.py:293-294), and grep confirms `check_host=False` is never passed anywhere in src/ — the parameter exists only at its definition (src/swisstopo_mcp/api_client.py:285). The two direct-client sites in oereb.py both call it first: src/swisstopo_mcp/oereb.py:91 before src/swisstopo_mcp/oereb.py:92, and src/swisstopo_mcp/oereb.py:183 before src/swisstopo_mcp/oereb.py:184."
+    - "The strongest real-world case is covered: src/swisstopo_mcp/geodata.py:426 takes `ogc_base` out of the *remote* geodienste.ch catalogue and interpolates it into request URLs at src/swisstopo_mcp/geodata.py:449 and :464 — a remotely-controlled base URL that is nonetheless forced through assert_host_allowed by request_with_retry. Redirect-based bypass is closed by follow_redirects=False at src/swisstopo_mcp/api_client.py:223."
+    - "TOCTOU is NOT closed on the default path. assert_resolved_ip_public resolves the name (src/swisstopo_mcp/api_client.py:109) and then httpx resolves it again at connect time; the pinning transport that would close the window is off unless SWISSTOPO_PIN_DNS is set (src/swisstopo_mcp/api_client.py:214-215, wired at src/swisstopo_mcp/api_client.py:224). The lru_cache on _resolve (src/swisstopo_mcp/api_client.py:90) does not help — httpx never consults it. The check's pass criterion 'DNS-Resolution erfolgt einmal, resolved IP wird für den eigentlichen Request verwendet' is therefore unmet by default."
+    - "The guard fails open on resolution error: src/swisstopo_mcp/api_client.py:110-111 swallows socket.gaierror and returns without raising, so a host that cannot be resolved is treated as vetted. Deliberate and documented, and low-impact given the frozenset host list, but it is a documented weakening rather than a closed criterion."
+  gaps:
+    - "DNS pinning is opt-in and off by default, so the shipped default configuration retains the rebinding window between the IP check and the connection (SEC-005 detail)."
+    - "The Defense-in-Depth egress proxy exists on paper (deploy/egress-proxy.yaml) but the ACL it consumes is structurally broken — see SEC-021. So the 'Egress-Proxy als Defense-in-Depth' criterion is not actually satisfied by the shipped artefacts."
+    - "assert_resolved_ip_public fails open on socket.gaierror (src/swisstopo_mcp/api_client.py:110-111)."
+    - "No runtime SSRF probe was executed against a running HTTP server; verification was code-level plus the unit suite (570 tests pass)."
+  evaluator_notes: |
+    The two claimed additions are real, not cosmetic: the scheme check and the
+    resolved-IP guard are both in assert_host_allowed and both fire on every
+    outbound path, including the two direct-client call sites in oereb.py that
+    the brief flagged. I verified there is no bypass — check_host=False is never
+    used, and the one place a URL base comes from remote data (geodata.py
+    ogc_base) still goes through the retry wrapper.
+    Not a pass, because the check lists no-TOCTOU as an explicit pass criterion
+    and the default configuration still does two independent lookups. The
+    mitigations are genuine (fixed frozenset of ten federal/cantonal hosts, no
+    auth, no secrets, public data only), which is why this is partial rather
+    than fail.

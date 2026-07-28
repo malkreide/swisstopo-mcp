@@ -232,7 +232,7 @@ zu BFS-Statistikdaten (`swiss-statistics-mcp`) und zu `zurich-opendata-mcp`.
 | *"Welche Gebaeude bei Koordinaten 2683500, 1247500?"* | `swisstopo_identify_features` |
 | *"Finde Orthophoto-Datensaetze zum Download"* | `swisstopo_search_geodata` |
 | *"Zeige mir eine Karte von Bern bei Zoomstufe 10"* | `swisstopo_map_url` |
-| *"Welche Einschraenkungen gelten fuer Musterstrasse 5?"* | `swisstopo_get_egrid` + `swisstopo_get_oereb_extract` |
+| *"Welche Einschraenkungen gelten fuer Musterstrasse 5?"* | `swisstopo_oereb_at` |
 | *"Welche Schulhaeuser liegen im Umkreis von 500 m um Bederstrasse 109, 8002 Zuerich, und welche Strassen fuehren dorthin?"* | `swisstopo_query_osm_features` + `swisstopo_query_geodata` (`strassenverzeichnis`) |
 | *"Welche Daten zu belasteten Standorten sind fuer den Kanton ZH frei?"* | `swisstopo_list_available_layers` + `swisstopo_query_geodata` (`geodienste:kataster_belasteter_standorte:ZH`) |
 | *«Welche Gemeinden liegen im Bezirk Uster und wie lauten ihre BFS-Nummern?»* | `swisstopo_find_commune` (`district=109`) |
@@ -316,10 +316,19 @@ Die vollständige Sicherheitsrichtlinie und Sicherheitslage ist in
 
 Dieser Server ist in **Phase 2.5 — Konsolidierung von `swiss-geodata-mcp`**
 (siehe [docs/roadmap.md](docs/roadmap.md), die alleinige Autorität für den
-Phasenstand). Alle 24 Tools sind
-`readOnlyHint: true` / `destructiveHint: false`; es gibt keine schreibenden
-oder versendenden Funktionen. Spätere Phasen siehe
-[docs/roadmap.md](docs/roadmap.md).
+Phasenstand).
+
+| Eigenschaft | Stand |
+|---|---|
+| Read-Tools | 24, alle `readOnlyHint: true` / `destructiveHint: false` |
+| Write-Tools | keine — Phase 3, nicht geplant |
+| Transport | stdio (Default) und Streamable-HTTP |
+| Letztes Audit | `audits/2026-07-27T162602-Z-swisstopo-mcp/` |
+
+Ein Phasenwechsel setzt voraus: die Roadmap-Punkte der Phase abgehakt, ein
+erneutes Audit ohne offene `critical`-Findings, und ein CHANGELOG-Eintrag, der
+die neue Phase benennt. Phase 3 (Write-Tools) verlangt zusätzlich eine erneute
+Lethal-Trifecta-Bewertung und ein Security-Review vor Implementationsbeginn.
 
 ### Tool-Budget und Aggregation
 
@@ -363,7 +372,7 @@ als swisstopo, seine Lizenz wird deshalb explizit gesetzt statt geerbt.
 | swisstopo REFRAME (geodesy.geo.admin.ch) | `swisstopo_convert_coordinates` | Swiss OGD (opendata.swiss) |
 | swissBOUNDARIES3D (swisstopo) | `swisstopo_municipality_at` | Swiss OGD (opendata.swiss) |
 | `ch.are.bauzonen` (**ARE**) | `swisstopo_zoning_at` | Swiss OGD — Bundesamt fuer Raumentwicklung ARE |
-| Kantonaler ÖREB-Kataster | `swisstopo_get_egrid`, `swisstopo_get_oereb_extract` | Kantonale ÖREB-Nutzungsbedingungen |
+| Kantonaler ÖREB-Kataster | `swisstopo_get_egrid`, `swisstopo_get_oereb_extract`, `swisstopo_oereb_at`, `swisstopo_query_geodata` | Kantonale ÖREB-Nutzungsbedingungen |
 | geodienste.ch (Kantone) | `swisstopo_query_geodata` | Freie Nutzung — Quellenangabe Pflicht |
 | OpenStreetMap (Overpass) | `swisstopo_query_osm_features` | ODbL — © OpenStreetMap contributors |
 | OpenPLZ (BFS + swisstopo) | `swisstopo_lookup_postal_code`, `swisstopo_find_commune`, `swisstopo_search_address` | Freie Nutzung — Quellenangabe Pflicht |
@@ -440,15 +449,22 @@ gebunden werden (Audit-Finding SEC-009).
 
 - **Ausführungsfehler** (Upstream-Fehler, ungültiger Wert) werden als
   `ToolResponse` mit `is_error: true` und menschenlesbarer `summary` zurückgegeben;
-  rohe Exception-Texte erreichen den Client nie (sie landen stattdessen auf stderr).
-- **Protokollfehler** (unbekanntes Tool, ungültige Argumente) gibt das MCP-SDK als
-  JSON-RPC-Fehler mit Standardcodes aus (z.B. `-32602` invalid params). Die
+  unerwartete Exception-Texte werden maskiert und stattdessen auf stderr geloggt.
+  Zwei bekannte Lecks bestehen (`overpass.py`-Fehlertexte, Allow-List-Preisgabe
+  via `PermissionError`) — siehe OBS-002 im aktuellen Audit-Lauf.
+- **Protokollfehler** (unbekanntes Tool, ungültige Argumente) liefert das SDK als
+  Tool-Resultat mit gesetztem Protokoll-Flag `isError` zurück — *nicht* als
+  JSON-RPC-Fehlerobjekt. Gegen mcp 1.28.1 zur Laufzeit geprüft; eine frühere
+  Fassung dieses Abschnitts behauptete `-32602` und war falsch. Die
   Eingabevalidierung erfolgt an der Pydantic-Grenze (SEC-018).
+- **Einschränkung:** bei *behandelten* Ausführungsfehlern setzt der Server nur das
+  Payload-Feld `is_error`, nie das Protokoll-Flag `isError`. Ein Client, der auf
+  das Protokoll-Flag verzweigt, sieht Erfolg. Verfolgt als OBS-001.
 
 ## MCP-Primitive
 
 Dieser Server exponiert bewusst **nur Tools** (keine Resources/Prompts):
-Er ist ein Phase-1-Read-only-Wrapper, und jedes Resultat ist eine
+Er ist ein Read-only-Wrapper, und jedes Resultat ist eine
 parametrisierte Live-API-Abfrage statt ein statisches, adressierbares Dokument.
 Resources/Prompts können in einer späteren Phase ergänzt werden.
 
@@ -461,8 +477,9 @@ Tool-Beschreibung nennt den nächsten Schritt):
 - **Feature-Abfrage:** `swisstopo_search_layers` (Layer-IDs finden) →
   `swisstopo_identify_features` / `swisstopo_find_features` →
   `swisstopo_get_feature` (Details).
-- **Kataster:** `swisstopo_geocode` → `swisstopo_get_egrid` →
-  `swisstopo_get_oereb_extract`.
+- **Kataster:** `swisstopo_geocode` → `swisstopo_oereb_at` (ein Aufruf:
+  Koordinaten → EGRID → Auszug). `swisstopo_get_egrid` →
+  `swisstopo_get_oereb_extract` nur, wenn die Parzellen-ID selbst gebraucht wird.
 - **Downloads:** `swisstopo_search_geodata` → `swisstopo_get_collection`.
 
 ---

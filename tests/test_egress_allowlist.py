@@ -141,3 +141,47 @@ class TestAllowListMatchesDocumentation:
         }
         stale = documented - set(ALLOWED_HOSTS)
         assert not stale, f"Documented but not on ALLOWED_HOSTS: {sorted(stale)}"
+
+
+# ---------------------------------------------------------------------------
+# Generated egress-proxy ACL (audit SEC-021)
+#
+# The CI gate for this file compares it byte-for-byte against the output of the
+# renderer that produced it. That catches staleness and nothing else: when the
+# renderer emitted the host entries at the wrong indent, the committed file
+# parsed with `allowed_domains: null` and ten stray strings in `services`, and
+# `--check` reported it up to date. These tests read the artefact as the proxy
+# would, which is the only way that class of defect is visible.
+# ---------------------------------------------------------------------------
+
+
+class TestGeneratedProxyAcl:
+    @staticmethod
+    def _acl() -> dict:
+        import pathlib
+
+        import yaml
+
+        path = (
+            pathlib.Path(__file__).resolve().parent.parent / "deploy" / "smokescreen-acl.yaml"
+        )
+        return yaml.safe_load(path.read_text(encoding="utf-8"))
+
+    def test_acl_parses_as_a_single_service(self):
+        acl = self._acl()
+        assert isinstance(acl.get("services"), list)
+        assert len(acl["services"]) == 1, (
+            "hosts leaked out of the service object and became siblings in "
+            "`services` — an indentation defect in scripts/render_egress_acl.py"
+        )
+        assert isinstance(acl["services"][0], dict)
+
+    def test_allowed_domains_is_the_code_allow_list(self):
+        domains = self._acl()["services"][0]["allowed_domains"]
+        assert domains is not None, "allowed_domains parsed as null — the proxy would allow nothing"
+        assert sorted(domains) == sorted(ALLOWED_HOSTS)
+
+    def test_default_rule_denies(self):
+        acl = self._acl()
+        assert acl["default"]["action"] == "enforce"
+        assert acl["default"]["allowed_domains"] == []

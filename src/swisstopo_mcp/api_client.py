@@ -210,9 +210,15 @@ _shared_client: httpx.AsyncClient | None = None
 
 
 def _pinning_enabled() -> bool:
-    """True when DNS pinning is switched on and actually applicable."""
-    flag = os.environ.get("SWISSTOPO_PIN_DNS", "").strip().lower()
-    return flag in {"1", "true", "yes"} and not _proxy_configured()
+    """True when DNS pinning is switched on and actually applicable.
+
+    Reads Settings rather than os.environ: config.py is the single source for
+    every SWISSTOPO_ variable, and a direct env read would silently ignore a
+    typo instead of surfacing it (ARCH-004).
+    """
+    from swisstopo_mcp.config import settings
+
+    return settings.pin_dns and not _proxy_configured()
 
 
 def _build_client() -> httpx.AsyncClient:

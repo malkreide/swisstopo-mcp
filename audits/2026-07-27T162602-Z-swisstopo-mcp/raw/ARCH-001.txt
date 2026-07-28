@@ -1,0 +1,19 @@
+check_run:
+  id: ARCH-001
+  status: pass
+  evidence_collected: 4
+  evidence_required: 2
+  findings:
+    - "Runtime introspection (/tmp/venv-st/bin/python -c 'await mcp.list_tools()') returns 24 tools, every name snake_case with the server prefix `swisstopo_` — e.g. src/swisstopo_mcp/server.py:111 name=\"swisstopo_geocode\", server.py:484 name=\"swisstopo_get_egrid\", server.py:523 name=\"swisstopo_oereb_at\". One convention throughout, no mixing."
+    - "No spaces, dots, brackets or non-ASCII in any tool name; enforced in CI, not just observed: tests/test_tool_namespace.py:35 asserts every tool starts with `swisstopo_` and tests/test_tool_hygiene.py:88 asserts `t.name.isascii()` for all tools."
+    - "Every name is registered explicitly via `@mcp.tool(name=...)` rather than inherited from the Python function name, so the wire name cannot drift from a refactor — src/swisstopo_mcp/server.py:110-120 is the pattern repeated at all 24 registration sites (24 `@mcp.tool` and 24 `annotations=` occurrences counted in server.py)."
+    - "Descriptions carry use-case context, not just a function restatement: all 24 contain a `<use_case>` block (runtime check), median description length 373.5 chars, minimum 181 (swisstopo_reverse_geocode). tests/test_tool_hygiene.py:91 enforces a >=40-char floor."
+  gaps:
+    - "Convention is snake_case, not the check's preferred camelCase. Explicitly listed as acceptable by the pass criteria; renaming would also be a breaking change for a published PyPI package (v0.3.0 already carried one such rename, CHANGELOG.md:266)."
+  evaluator_notes: |
+    Verified at runtime against the installed package rather than by reading
+    server.py, so the names checked are the ones actually advertised over the
+    wire. All four pass criteria met. The snake_case-vs-camelCase point is not
+    a deviation — the criterion admits snake_case. Nothing here was inherited
+    from the previous run: ARCH-001 produced no finding in 2026-07-27T125314-Z
+    and re-verification confirms that was correct.

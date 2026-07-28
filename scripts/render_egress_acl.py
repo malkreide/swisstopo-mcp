@@ -22,7 +22,11 @@ OUTPUT = pathlib.Path(__file__).resolve().parent.parent / "deploy" / "smokescree
 def render() -> str:
     existing = OUTPUT.read_text(encoding="utf-8")
     header, _, _ = existing.partition("    allowed_domains:\n")
-    rules = "\n".join(f"  - {h}" for h in sorted(ALLOWED_HOSTS))
+    # Six spaces: the entries must nest *under* `allowed_domains:`, which itself
+    # sits at four. Emitting them at two made the key parse as null and promoted
+    # every host to a sibling of the service object — a file that renders,
+    # round-trips through `--check`, and enforces nothing (audit SEC-021).
+    rules = "\n".join(f"      - {h}" for h in sorted(ALLOWED_HOSTS))
     return (
         header
         + "    allowed_domains:\n"

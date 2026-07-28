@@ -1,0 +1,22 @@
+check_run:
+  id: SEC-016
+  status: pass
+  evidence_collected: 4
+  evidence_required: 2
+  findings:
+    - "There is no 0.0.0.0 anywhere in src/. An exhaustive grep across *.py/*.toml/*.yaml/*.json/Dockerfile/*.md returns only: a comment at src/swisstopo_mcp/config.py:33, the SSRF blocklist entries at src/swisstopo_mcp/api_client.py:77 and :82 (10.0.0.0/8, 0.0.0.0/8 — unrelated), Dockerfile:26, deploy/kubernetes.yaml:41, and test/doc references. No binding default."
+    - "The code default is loopback and comes from the config object, not a literal at the call site: src/swisstopo_mcp/config.py:34 declares `http_host: str = \"127.0.0.1\"`, and src/swisstopo_mcp/server.py:749-753 passes `host=settings.http_host` to uvicorn. Verified at runtime: Settings() reports http_host=127.0.0.1 with no env set."
+    - "0.0.0.0 is set exactly where the check says it belongs — the container layer only: Dockerfile:26 sets SWISSTOPO_HTTP_HOST=0.0.0.0 with an inline comment stating it must never be a code default, and deploy/kubernetes.yaml:40-41 sets the same as a pod env var."
+    - "The local/container distinction is documented in three places: docs/deployment.md:84 ('`0.0.0.0` only in container, never a code default'), .env.example:9-11 ('Bind 127.0.0.1 locally; a container sets 0.0.0.0 itself'), and src/swisstopo_mcp/config.py:32-33. tests/test_config.py:17-22 pins the env-override behaviour."
+  gaps:
+    - "The optional warning-on-dangerous-binding heuristic is not implemented — nothing logs a warning if SWISSTOPO_HTTP_HOST=0.0.0.0 is set outside a container context (no /.dockerenv or KUBERNETES_SERVICE_HOST probe anywhere in src/). This is listed as optional in the pass criteria."
+    - "No docker-compose.yml is shipped, so the 'ports: 127.0.0.1:8000:8000' bind-address guidance has no artefact to apply to; the plain-docker example at Dockerfile:36-37 uses `-p 8000:8000` without a bind address, which on a dev laptop publishes on all interfaces."
+  evaluator_notes: |
+    Clean pass on all mandatory criteria, verified by exhaustive grep rather
+    than by spot-check: the only 0.0.0.0 occurrences outside comments and CIDR
+    blocklists are the Dockerfile ENV and the K8s env var, which is exactly the
+    prescribed shape.
+    Two soft gaps worth carrying forward: no container-context warning, and the
+    documented `docker run -p 8000:8000` at Dockerfile:36-37 would expose the
+    published port on all host interfaces if a developer copies it locally —
+    `-p 127.0.0.1:8000:8000` would be the safer example.

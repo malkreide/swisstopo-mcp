@@ -1,0 +1,27 @@
+check_run:
+  id: CH-004
+  status: partial
+  evidence_collected: 6
+  evidence_required: 2
+  findings:
+    - "The claimed constants exist and are correct: src/swisstopo_mcp/models.py:24-25 REFRAME_SOURCE/REFRAME_LICENSE, models.py:26-29 ARE_SOURCE/ARE_LICENSE (asserted separately with the ARE naming, not inherited), models.py:30-31 SWISSBOUNDARIES_SOURCE/SWISSBOUNDARIES_LICENSE, plus OEREB (39-40), GEODIENSTE (41-42), OSM/ODbL (43-44) and OPENPLZ (51-55)."
+    - "ToolResponse.error() did gain the parameter: src/swisstopo_mcp/models.py:112-129 accepts `license` alongside `source`, defaulting both to the swisstopo values."
+    - "DEFECT — the parameter is unused at 14 of the 19 error call sites, so the error envelope attributes third-party data under the swisstopo licence. AST scan of all ToolResponse.ok/error calls found 14 that pass `source=` without `license=`: src/swisstopo_mcp/overpass.py:167,175,181,188,214 (OSM); src/swisstopo_mcp/openplz.py:410,534,559 (OpenPLZ); src/swisstopo_mcp/oereb.py:117,157,171,280,316,328 (cantonal ÖREB). Every one silently falls back to SWISSTOPO_LICENSE via the models.py:118 default."
+    - "RUNTIME CONFIRMED — reproducing the exact call shapes: ToolResponse.error(..., source=OSM_SOURCE) yields source='OpenStreetMap — Overpass API (overpass.osm.ch)' with license='Swiss Open Government Data (opendata.swiss)'. ODbL data is emitted under a Swiss OGD licence label — the share-alike obligation disappears. Same for OpenPLZ and for the cantonal ÖREB terms, which are the most restrictive licence in the server."
+    - "The success paths are clean by contrast: every ToolResponse.ok() call that sets a non-default source also sets the matching licence — rest_api.py:465,501 (ARE, swissBOUNDARIES3D), coords.py:308 (REFRAME), overpass.py:209-211 (OSM/ODbL), openplz.py:402,434,446,470,492,513,551 (OpenPLZ), oereb.py:128,148,187,206,271,333 and geodata.py:280,333,382,399,453,489 (ÖREB, geodienste)."
+    - "The README source-and-licence table was added to both files and is complete: README.md:366-384 and README.de.md:355-373 list all eight sources with the serving tools and the licence, including OpenStreetMap → \"ODbL — © OpenStreetMap contributors\" and OpenPLZ → \"Free use — attribution required\", plus the non-binding caveat for ch.are.bauzonen."
+  gaps:
+    - "14 error call sites need `license=` added (overpass.py 5×, openplz.py 3×, oereb.py 6×). Better: make source and licence a single argument — a paired constant or a source enum — so they cannot drift apart again, since a defaulted licence is exactly the failure this finding produced twice."
+    - "No test asserts the source/licence pairing. tests/test_responses.py covers the envelope but nothing checks that a given source always travels with its own licence, so the regression was invisible."
+    - "README table row for the cantonal ÖREB cadastre lists only swisstopo_get_egrid and swisstopo_get_oereb_extract; swisstopo_oereb_at (oereb.py:333) and swisstopo_query_geodata (geodata.py:399) also emit OEREB_SOURCE."
+    - "geodata.py:531-533 (list_available_layers) emits a composite source with license='gemischt — siehe je Layer'. Acceptable for a discovery tool, but the per-record provenance the check asks for on aggregation is not present in the result records."
+  evaluator_notes: |
+    Three of the four claims check out: the ARE / swissBOUNDARIES3D / REFRAME
+    constants exist, ToolResponse.error() has the licence parameter, and both
+    READMEs carry a complete and accurate eight-source table. The fourth —
+    that every source a tool can emit carries correct attribution, error path
+    included — does not. The parameter was added but almost never passed: 14
+    error sites hand back a non-swisstopo source under the swisstopo licence,
+    confirmed by executing the exact call shapes. The OSM case is the sharp
+    one, since ODbL is share-alike and relabelling it as Swiss OGD is a
+    licence misstatement rather than a missing field. Partial.

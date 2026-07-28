@@ -1,0 +1,21 @@
+check_run:
+  id: SEC-013
+  status: pass
+  evidence_collected: 4
+  evidence_required: 3
+  findings:
+    - "The server holds no API credentials at all, so the storage-maturity question is not merely at level 1 — it is empty. Grepping src/ for os.environ/getenv returns exactly four sites, none of them a secret: src/swisstopo_mcp/observability.py:53 and :69 (OTEL endpoint and service name), src/swisstopo_mcp/logging_config.py:33 (log level), and the SWISSTOPO_PIN_DNS / proxy lookups at src/swisstopo_mcp/api_client.py:158-164 and :214. All ten upstream hosts in ALLOWED_HOSTS (src/swisstopo_mcp/api_client.py:55-68) are key-less public APIs."
+    - "The Settings object is the single config surface and declares no secret-shaped field: src/swisstopo_mcp/config.py:14-43 has transport, oereb_cantons, http_host, http_port, allowed_origins, allowed_hosts, log_level. There is no key/token/password/secret field to leak."
+    - "The container image carries no secret in any ENV layer: Dockerfile:22-27 sets only PYTHONUNBUFFERED, PYTHONDONTWRITEBYTECODE, SWISSTOPO_HTTP_HOST and SWISSTOPO_LOG_LEVEL. deploy/kubernetes.yaml:38-54 likewise injects only host/origin/OTEL values — there is no secretKeyRef because there is nothing to reference."
+    - "The situation is documented rather than left implicit: .env.example:2-3 states 'None of these are secrets — the server uses only key-less public APIs', SECURITY.md:30 records 'Env-vars only; .gitignore guards .env; no hardcoded secrets', and .gitignore:13-15 excludes .env and .env.* while whitelisting .env.example. .github/workflows/security.yml runs gitleaks over full history on every push and PR."
+  gaps:
+    - "There is no docs/secret-management.md as the check's pass criterion literally names; the equivalent statement is split across SECURITY.md:30 and .env.example:2-3. Cosmetic, but it means a reader following the checklist finds nothing at the named path."
+    - "No rotation procedure is documented — vacuous today (no secret exists), but nothing records that a future upstream requiring a key must move to a secret manager rather than a plain env var."
+  evaluator_notes: |
+    Data class is Public Open Data and the honest finding is stronger than
+    'level 1 accepted': the server never loads a credential. I verified that by
+    enumerating every environment read in src/ rather than by trusting the
+    SECURITY.md line, and by checking the Dockerfile and K8s manifest for ENV
+    layers. Pass.
+    The two gaps are documentation placement and forward-looking process, not
+    exposure.

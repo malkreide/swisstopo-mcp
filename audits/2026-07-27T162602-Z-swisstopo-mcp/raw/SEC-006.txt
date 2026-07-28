@@ -1,0 +1,19 @@
+check_run:
+  id: SEC-006
+  status: pass
+  evidence_collected: 4
+  evidence_required: 2
+  findings:
+    - "Default transport is stdio at the config layer: src/swisstopo_mcp/config.py:25 declares `transport: Literal[\"stdio\", \"streamable-http\"] = \"stdio\"`, and the Literal type means an unknown value is rejected at startup rather than silently accepted. Verified at runtime: Settings() reports transport=stdio, http_host=127.0.0.1, http_port=8000."
+    - "HTTP is only reachable via an explicit opt-in: src/swisstopo_mcp/server.py:742 requires either `--http` on argv or settings.transport == 'streamable-http'; otherwise src/swisstopo_mcp/server.py:755 falls through to mcp.run(), which is FastMCP's stdio default. There is no hardcoded host/port in that branch."
+    - "Runtime test performed: started `python -m swisstopo_mcp.server` with no env vars and stdin closed; the process logged server_started/server_stopped and `ss -tlnp` showed no listening Python socket. The default start opens no TCP port."
+    - "Both use cases are documented separately. README.md:90-94 shows the stdio command first and the --http command second; README.md:109-133 gives the full claude_desktop_config.json for stdio (both python -m and uvx forms); README.md:326 records 'Transport | stdio (default) and Streamable-HTTP'; the cloud path is documented separately in docs/deployment.md with the hardening table at docs/deployment.md:74-85."
+  gaps: []
+  evaluator_notes: |
+    Straightforward pass, and it survives adversarial reading: I checked that
+    there is no second entry point that could start HTTP implicitly
+    (pyproject.toml:57 maps the console script to swisstopo_mcp.server:mcp.run,
+    which is stdio), and confirmed empirically that a default start binds
+    nothing. The dual-transport arrangement is exactly the shape SEC-006
+    permits — stdio default, HTTP behind an explicit flag/setting, with the
+    cloud path documented on its own.

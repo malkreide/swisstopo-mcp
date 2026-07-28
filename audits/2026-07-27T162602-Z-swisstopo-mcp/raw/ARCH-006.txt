@@ -1,0 +1,27 @@
+check_run:
+  id: ARCH-006
+  status: partial
+  evidence_collected: 5
+  evidence_required: 2
+  findings:
+    - "Count verified at runtime: 24 tools (`mcp.list_tools()`), matching tool-hashes.json (24 entries, `scripts/snapshot_tool_hashes.py --check` reports «up to date (24 tools)»). Against the check's heuristic bands that is squarely in «16–25: ernste Zweifel, ob alle nötig sind», twice the stated ideal of <=12."
+    - "The documented justification does exist and is substantive, in both READMEs as claimed: README.md:334-364 «Tool budget and aggregation» and README.de.md:324-354 «Tool-Budget und Aggregation». It argues per cluster (api3 five, search→detail pairs, existing aggregation) rather than restating the number, and it is section-parallel across the two languages."
+    - "The api3 five are still a textbook one-tool-per-REST-endpoint mapping, which is the check's second pass criterion and it is unmet: swisstopo_search_layers → /rest/services/ech/SearchServer (rest_api.py:311), swisstopo_identify_features → /rest/services/ech/MapServer/identify (rest_api.py:339), swisstopo_find_features → /rest/services/ech/MapServer/find (rest_api.py:373), swisstopo_get_feature → /rest/services/ech/MapServer/{layer}/{id} (rest_api.py:404), swisstopo_layer_info → /rest/services/api/MapServer/{layer} (rest_api.py:549). A sixth pair, swisstopo_geocode and swisstopo_reverse_geocode, both call the same SearchServer endpoint with different params (rest_api.py:311-330 vs :339-360 region)."
+    - "The README's own text concedes the criterion rather than satisfying it. README.md:347-348: «This remains a merge candidate for a future major release, not a settled question.» The check's escape clause is «dokumentierte Begründung im README warum keine Aggregation möglich» — the README argues that merging would relocate the decision rather than that aggregation is impossible, and then defers it. That is a roadmap entry dressed as a justification."
+    - "Real aggregation did land and is not merely argued: swisstopo_oereb_at (src/swisstopo_mcp/oereb.py:305) collapses one of the two search→detail pairs the previous finding named, and swisstopo_query_geodata (src/swisstopo_mcp/geodata.py) fronts three sources behind one tool. The count went 23 → 24 in the same batch, so the net movement toward the budget is negative."
+  gaps:
+    - "Pass criterion «keine offensichtlichen 1:1-API-Mappings» is unmet and acknowledged as unmet by the repo itself."
+    - "The disjoint-argument-shapes argument is genuinely strong for identify/find/get_feature (a geometry vs an attribute pair vs an opaque ID) but is not made at all for the weaker cases it silently sweeps in: search_layers + layer_info are a discovery pair over the same catalogue, and geocode + reverse_geocode differ only in whether a bbox or a searchText is sent to one endpoint."
+    - "The self-imposed budget of 25 is a README assertion with no CI gate — nothing fails if tool 26 is registered, unlike the tool-hash and egress-ACL snapshots which are gated in .github/workflows/ci.yml:40-48."
+  evaluator_notes: |
+    Judged on the parent's specific question: does the README argument satisfy
+    the criterion about documented justification, or is it special pleading? It
+    is partly each. The section is real, bilingual, per-cluster and honest — it
+    is not the hand-wave the check's escape clause was written to exclude, and
+    it satisfies criterion 5. But the check is a checklist, and criterion 2
+    («keine offensichtlichen 1:1-API-Mappings») fails on the api3 five by the
+    repo's own admission. A justification that concludes «this remains a merge
+    candidate» documents the debt; it does not discharge it. One of the two
+    named search→detail pairs was genuinely collapsed, and the argument quality
+    is high, so partial rather than fail — but not the «Closed» the previous
+    batch recorded.

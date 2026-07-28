@@ -1,0 +1,27 @@
+check_run:
+  id: ARCH-012
+  status: pass
+  evidence_collected: 6
+  evidence_required: 3
+  findings:
+    - "The «pin is not expressible» argument is true, verified independently rather than accepted: `inspect.signature(FastMCP.__init__)` on the installed mcp 1.28.1 lists name, instructions, website_url, icons, auth_server_provider, token_verifier, event_store, retry_interval, tools, debug, log_level, host, port, mount_path, sse_path, message_path, streamable_http_path, json_response, stateless_http, warn_on_duplicate_*, dependencies, lifespan, auth, transport_security — there is no protocol_version parameter. The check's Modus-1 code pin cannot be written against this SDK."
+    - "THE DRIFT TEST WOULD ACTUALLY CATCH A BUMP. tests/test_protocol_version.py:18 pins `DOCUMENTED_PROTOCOL_VERSION = \"2025-11-25\"` and test_protocol_version.py:21-26 asserts `LATEST_PROTOCOL_VERSION == DOCUMENTED_PROTOCOL_VERSION` against the value imported from `mcp.types` at test_protocol_version.py:15. Runtime confirms `mcp.types.LATEST_PROTOCOL_VERSION == \"2025-11-25\"` on mcp 1.28.1, and the test passes in the installed venv (1 passed). Because the assertion reads the SDK constant rather than a repo-local copy, any dependency update that moves it flips the test to red — the failure mode the check cares about."
+    - "The tripwire is wired into the gate that matters: .github/workflows/ci.yml:29-32 runs `pytest tests/ -m \"not live\"` on push and pull_request to master/main; test_protocol_version.py carries no `live` marker, so it runs on every Dependabot PR. pyproject.toml:31 pins `mcp[cli]>=1.28.1,<2.0.0` — a 1.x minor bump is exactly the case that can move the constant silently, and it is the case this test covers."
+    - "CHANGELOG.md exists in Keep-a-Changelog form: header at CHANGELOG.md:1-6 citing keepachangelog.com and semver, `## [Unreleased]` at CHANGELOG.md:8, then `## [0.3.0] - 2026-07-27` (CHANGELOG.md:264), `## [0.2.0] - 2026-07-20` (:301), `## [0.1.0] - 2026-04-02` (:439). The protocol version is named in an entry: CHANGELOG.md:260-262."
+    - "README «MCP Protocol Version» section present in both languages with the concrete version and an update policy: README.md:420-436 (negotiated version 2025-11-25, SDK constant named, then «Update policy» — feature-branch testing, CHANGELOG entry naming old and new version under `### Changed`, breaking protocol change triggers a major release) and README.de.md:411-427 «MCP-Protokollversion» with the parallel content."
+    - "Dependabot is configured with the SDK isolated so its bumps arrive as their own PR: .github/dependabot.yml declares `package-ecosystem: pip`, `interval: monthly`, and a `groups.mcp-sdk` matching pattern `mcp` with the catch-all `python-deps` group excluding `mcp`. A github-actions ecosystem block follows on the same monthly cadence."
+  gaps:
+    - "Pass criterion 1 («protocolVersion ist im Server-Code explizit gepinnt») is not literally met and cannot be on this SDK. The compensating control is a test rather than a pin: it detects a bump at CI time instead of preventing a runtime mismatch. That is a weaker guarantee than the check envisages, though the stronger one is unavailable."
+    - "README.md:425-426 overstates slightly: «The SDK is pinned to the `1.x` major in `pyproject.toml` so an update cannot silently move it» — a 1.x *minor* bump can move LATEST_PROTOCOL_VERSION; it is the test, not the version range, that prevents silence. The next clause says so, but the sentence as written credits the wrong control."
+    - "The test asserts the SDK's LATEST_PROTOCOL_VERSION, not the version the server actually negotiates in an initialize handshake. For FastMCP these coincide when the client requests the latest, so the tripwire fires correctly; a genuine end-to-end assertion would be stronger. tests/test_http_app.py:62 sends `\"protocolVersion\": \"2025-06-18\"` in its handshake fixture and is not tied to the constant."
+  evaluator_notes: |
+    Pass. The parent asked whether the drift test would actually catch a bump —
+    it would: it imports the live SDK constant, is not live-marked, and runs in
+    the PR gate that Dependabot PRs pass through, with the SDK deliberately
+    grouped alone so such a bump is visible. Five of six criteria are met
+    outright; the sixth is genuinely unsatisfiable on mcp 1.28.1, which I
+    confirmed by introspecting the constructor rather than taking the
+    remediation's word for it. Closing an unsatisfiable criterion with a
+    working tripwire plus bilingual documentation and an update policy is the
+    right disposition, and unlike ARCH-006 this deviation is imposed by the
+    dependency rather than chosen.

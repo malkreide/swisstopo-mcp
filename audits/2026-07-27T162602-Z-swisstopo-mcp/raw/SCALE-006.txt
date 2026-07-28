@@ -1,0 +1,23 @@
+check_run:
+  id: SCALE-006
+  status: pass
+  evidence_collected: 4
+  evidence_required: 2
+  findings:
+    - "Memory and CPU limits are both explicit in the K8s manifest: `limits: cpu: \"500m\", memory: \"256Mi\"` at deploy/kubernetes.yaml:78-80. Nothing is left to the cluster default."
+    - "Requests are set and strictly smaller than limits, so burst headroom exists: `requests: cpu: \"50m\", memory: \"128Mi\"` at deploy/kubernetes.yaml:75-77 — a 10x CPU and 2x memory burst allowance."
+    - "Ephemeral storage is capped too, which the check does not require but is the same class of control: the tmpfs mount the read-only-rootfs design depends on is bounded at `emptyDir: sizeLimit: 64Mi` (deploy/kubernetes.yaml:84-87), so a /tmp fill cannot consume node disk."
+    - "Restart behaviour on OOM is covered by construction: the workload is a Deployment (deploy/kubernetes.yaml:6-7), whose pod restartPolicy is always `Always`, so an OOM-killed container is restarted rather than left down. Liveness/readiness probes (deploy/kubernetes.yaml:62-73) drive recovery detection."
+  gaps:
+    - "No file-descriptor limit anywhere: a repo-wide search for ulimit / nofile / RLIMIT across Dockerfile, deploy/*.yaml, docs and src/ returned nothing. The check asks for `ulimit -n` >= 4096 when there are many outbound connections, and this server holds a pooled httpx client against ~8 upstream hosts (src/swisstopo_mcp/api_client.py:220-225) — the default 1024 is probably sufficient, but it is unset rather than reasoned about."
+    - "The plain-Docker path in docs/deployment.md:12-22 passes --read-only, --tmpfs, --cap-drop and --security-opt but no --memory / --cpus, so a container run exactly as documented has no resource ceiling at all. Only the K8s path is limited."
+    - "OOM behaviour was not tested (Modus 2): no stress test, and the environment has no Docker daemon to run one."
+    - "No docker-compose.yml exists, so there is no place where `deploy.resources` / `ulimits.nofile` would be declared for the non-K8s container path."
+  evaluator_notes: |
+    The two hard criteria — explicit memory limit and explicit CPU limit — are met
+    in the deployment manifest, requests are genuinely below limits so there is burst
+    headroom, and the Deployment restart semantics cover the OOM path. That is enough
+    to pass. The residuals are real but secondary: no FD limit is declared anywhere,
+    and the documented `docker run` invocation ships without any resource flags, so
+    the non-Kubernetes path is unbounded. OOM behaviour could not be exercised (no
+    Docker daemon available). Pass with those gaps recorded.

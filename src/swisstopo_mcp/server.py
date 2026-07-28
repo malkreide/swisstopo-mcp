@@ -493,7 +493,9 @@ from swisstopo_mcp.oereb import (  # noqa: E402
 async def swisstopo_get_egrid(params: GetEgridInput) -> ToolResponse:
     """Ermittelt die EGRID (Grundstück-ID) aus Koordinaten für einen bestimmten Kanton.
 
-    <use_case>Vorstufe zu swisstopo_get_oereb_extract: Koordinaten → EGRID.</use_case>
+    <use_case>Grundstück-ID (EGRID) zu einer Koordinate, wenn die ID selbst
+    gebraucht wird. Für die Beschränkungen direkt swisstopo_oereb_at nutzen — das
+    löst den EGRID intern auf.</use_case>
     <important_notes>Erfordert einen unterstützten Kanton (z.B. ZH, BE).</important_notes>
     """
     return await get_egrid(params)
@@ -512,8 +514,9 @@ async def swisstopo_get_egrid(params: GetEgridInput) -> ToolResponse:
 async def swisstopo_get_oereb_extract(params: GetOerebExtractInput, ctx: Context) -> ToolResponse:
     """Ruft öffentlich-rechtliche Eigentumsbeschränkungen (ÖREB) für ein Grundstück (EGRID) ab.
 
-    <use_case>Beantwortet «Welche Nutzungsbeschränkungen gelten für diese Parzelle?».
-    EGRID via swisstopo_get_egrid ermitteln.</use_case>
+    <use_case>ÖREB-Auszug zu einem bereits bekannten EGRID. Wer von einer
+    Koordinate ausgeht, nimmt swisstopo_oereb_at — das erledigt beide Schritte
+    in einem Aufruf.</use_case>
     <important_notes>Erfordert einen unterstützten Kanton.</important_notes>
     """
     return await get_oereb_extract(params, ctx=ctx)

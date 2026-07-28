@@ -16,17 +16,19 @@ Melden Sie ausnutzbare Schwachstellen nicht über öffentliche Issues.
 ## Zusammenfassung der Sicherheitslage
 
 Dies ist ein **read-only**-, **PII-freier**, **Public-Open-Data**-MCP-Server.
-Alle 13 Tools fragen ausschliesslich eine fixe Allow-List schweizerischer
+Alle 24 Tools fragen ausschliesslich eine fixe Allow-List schweizerischer
 Bundes- und Kantonsgeodaten-Hosts ab. Bereits umgesetzte Härtung:
 
 | Bereich | Kontrolle |
 |---|---|
 | Egress | HTTPS-Allow-List auf Code-Ebene (`ALLOWED_HOSTS`-Frozenset), beschränkt auf `*.geo.admin.ch` und die kantonalen OEREB-Endpunkte (SEC-004 / SEC-021) — siehe [docs/network-egress.md](docs/network-egress.md) |
-| Redirects | `follow_redirects=False` am gemeinsamen `httpx`-Client, sodass ein Upstream nicht auf einen Host ausserhalb der Liste umleiten kann (SEC-005) |
+| Redirects | `follow_redirects=False` am gemeinsamen `httpx`-Client, sodass ein Upstream nicht auf einen Host ausserhalb der Liste umleiten kann (SEC-004) |
+| SSRF | Schema-Prüfung plus Resolved-IP-Guard, der Hosts abweist, die mit einer privaten oder Link-local-Adresse antworten (SEC-004) |
+| DNS-Pinning | **Implementiert, standardmässig aus** (SEC-005). `PinnedTransport` verbindet auf die vom SSRF-Guard geprüfte Adresse und behält Host und SNI auf dem Hostnamen, die Zertifikatsprüfung bleibt also unverändert. Einschalten mit `SWISSTOPO_PIN_DNS=true`; hinter einem Forward-Proxy wirkungslos und dort selbstdeaktivierend. **Im ausgelieferten Default bleibt das Rebinding-Fenster zwischen der Prüfung und dem Lookup von httpx offen.** |
 | TLS | Zertifikatsprüfung standardmässig aktiv für alle Upstream-Requests |
 | Eingabe | Strikte Pydantic-v2-Validierung an jeder Tool-Grenze (SEC-018) |
 | Secrets | Nur Umgebungsvariablen; `.gitignore` schützt `.env`; keine hartcodierten Secrets (ARCH-005) |
-| Fehler | Upstream-/Exception-Texte landen auf stderr und erreichen das Modell nie (OBS-002) |
+| Fehler | Unerwartete Exceptions werden zentral maskiert — Details auf stderr, feste Meldung an den Aufrufer (OBS-002). **Zwei bekannte Lecks bestehen:** `overpass.py` reicht bis zu 300 Zeichen eines Upstream-Fehlertexts durch, und ein `PermissionError` bei blockiertem Egress gibt die Allow-List preis. Verfolgt im Audit-Lauf `2026-07-27T162602-Z` |
 | Stdout | Reserviert für den JSON-RPC-Stream; Logging auf stderr fixiert |
 | Trifecta | Höchstens 1 von 3 Lethal-Trifecta-Beinen vorhanden — read-only, öffentliche Daten, kein Write/Send (SEC-019) |
 | Container | Gehärtetes `Dockerfile` (non-root, read-only Root-Dateisystem, gedroppte Capabilities) für HTTP-Deployments (SEC-007) — siehe [docs/deployment.md](docs/deployment.md) |
@@ -34,11 +36,14 @@ Bundes- und Kantonsgeodaten-Hosts ab. Bereits umgesetzte Härtung:
 Die vollständigen Berichte finden sich unter [`audits/`](audits/), die
 Härtungs-Historie in [CHANGELOG.md](CHANGELOG.md).
 
-## Read-only by Design (Phase 1)
+## Read-only by Design
 
-Dieser Server befindet sich in **Phase 1 — Read-only-Wrapper**. Alle 13 Tools
-sind `readOnlyHint: true` / `destructiveHint: false`; es gibt keine schreibenden
-oder versendenden Funktionen. Spätere Phasen siehe [docs/roadmap.md](docs/roadmap.md).
+Dieser Server befindet sich in **Phase 2.5** (siehe
+[docs/roadmap.md](docs/roadmap.md) — die alleinige Autorität für den
+Phasenstand). Er bleibt ein Read-only-Wrapper: alle 24 Tools sind
+`readOnlyHint: true` / `destructiveHint: false`; es gibt keine schreibenden oder
+versendenden Funktionen. Zu beachten: die CI erzwingt die *Annotation*, nicht die
+Eigenschaft — siehe SEC-014 im aktuellen Audit-Lauf.
 
 ## Sessions & Authentifizierung
 

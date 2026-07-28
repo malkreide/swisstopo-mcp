@@ -15,7 +15,7 @@ exploitable vulnerabilities.
 
 ## Posture summary
 
-This is a **read-only**, **no-PII**, **public-open-data** MCP server. All 13
+This is a **read-only**, **no-PII**, **public-open-data** MCP server. All 24
 tools only query a fixed allow-list of Swiss federal and cantonal geodata hosts.
 Hardening already in place:
 
@@ -24,11 +24,11 @@ Hardening already in place:
 | Egress | Code-layer allow-list (`ALLOWED_HOSTS` frozenset) enforcing HTTPS-only and a fixed host set. The authoritative list lives in [docs/network-egress.md](docs/network-egress.md) — it is deliberately not repeated here, so it cannot go stale (SEC-004 / SEC-021) |
 | Redirects | `follow_redirects=False` on the shared `httpx` client, so an upstream cannot redirect to an off-list host (SEC-004) |
 | SSRF | Scheme check plus a resolved-IP guard rejecting hosts that answer with a private or link-local address (SEC-004) |
-| DNS pinning | **Not implemented** (SEC-005). The reachable host set is a fixed frozenset resolved per request, so a rebinding window exists between the guard's lookup and the connection. Mitigating factors: no authentication, no secrets in requests, public data only. The Kubernetes deployment additionally restricts egress at the network layer; the local stdio path has no such compensation |
+| DNS pinning | **Implemented, off by default** (SEC-005). `PinnedTransport` connects to the address the SSRF guard vetted while keeping Host and SNI on the hostname, so certificate validation is unchanged. Enable with `SWISSTOPO_PIN_DNS=true`; it is inert behind a forward proxy and disables itself there. **With it off — the shipped default — the rebinding window between the guard's lookup and httpx's own lookup stays open.** Mitigating factors: no authentication, no secrets in requests, public data only |
 | TLS | Certificate verification on by default for all upstream requests |
 | Input | Pydantic v2 strict validation at every tool boundary (SEC-018) |
 | Secrets | Env-vars only; `.gitignore` guards `.env`; no hardcoded secrets (ARCH-005) |
-| Errors | Upstream/exception bodies logged to stderr, never forwarded to the model (OBS-002) |
+| Errors | Unexpected exceptions are masked centrally — detail to stderr, a fixed message to the caller (OBS-002). **Two known leaks remain:** `overpass.py` forwards up to 300 characters of an upstream error body, and a blocked-egress `PermissionError` discloses the allow-list. Tracked in the `2026-07-27T162602-Z` audit run |
 | Stdout | Reserved for the JSON-RPC stream; logging pinned to stderr |
 | Trifecta | At most 1 of 3 lethal-trifecta legs present — read-only, public data, no write/send (SEC-019) |
 | Container | Hardened `Dockerfile` (non-root, read-only root FS, dropped capabilities) for HTTP deployments (SEC-007) — see [docs/deployment.md](docs/deployment.md) |
@@ -36,11 +36,13 @@ Hardening already in place:
 See [`audits/`](audits/) for the full reports and [CHANGELOG.md](CHANGELOG.md)
 for the hardening history.
 
-## Read-only by design (Phase 1)
+## Read-only by design
 
-This server is in **Phase 1 — read-only wrapper**. All 13 tools are
-`readOnlyHint: true` / `destructiveHint: false`; there are no write or send
-capabilities. Later phases are tracked in [docs/roadmap.md](docs/roadmap.md).
+This server is in **Phase 2.5** (see [docs/roadmap.md](docs/roadmap.md), the
+single authority for phase state). It remains a read-only wrapper: all 24 tools
+are `readOnlyHint: true` / `destructiveHint: false`; there are no write or send
+capabilities. Note that CI enforces the *annotation*, not the property — see
+SEC-014 in the latest audit run.
 
 ## Sessions & authentication
 
@@ -67,7 +69,7 @@ fixed set of trusted public-data providers.
     [`src/swisstopo_mcp/api_client.py`](src/swisstopo_mcp/api_client.py), kept in
     sync with [docs/network-egress.md](docs/network-egress.md) by a test.
 
-  All 23 tools carry the `swisstopo_` prefix (SEC-022), so a future gateway
+  All 24 tools carry the `swisstopo_` prefix (SEC-022), so a future gateway
   allow-list can name them unambiguously.
 
 - **Cross-server tool-poisoning detection** (SEC-015) is a host/gateway

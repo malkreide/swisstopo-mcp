@@ -1,0 +1,23 @@
+check_run:
+  id: SDK-004
+  status: pass
+  evidence_collected: 6
+  evidence_required: 2
+  findings:
+    - "CORS is configured on the Streamable-HTTP app with the critical header exposed: `expose_headers=[\"Mcp-Session-Id\"]` and `allow_headers=[\"Content-Type\", \"Authorization\", \"Mcp-Session-Id\"]`, methods GET/POST/OPTIONS (src/swisstopo_mcp/server.py:730-736)."
+    - "No wildcard origin: `allow_origins=allowed_origins or []` (src/swisstopo_mcp/server.py:732) fed from settings.origins_list (src/swisstopo_mcp/server.py:753), which is exactly the configured SWISSTOPO_ALLOWED_ORIGINS with no loopback defaults added (src/swisstopo_mcp/config.py:68-71). Unconfigured means zero origins, not `*`."
+    - "RUNTIME VERIFIED against a real uvicorn process, not read from the constructor. `SWISSTOPO_ALLOWED_HOSTS=swisstopo-mcp.example.com SWISSTOPO_ALLOWED_ORIGINS=https://app.example.ch python -m swisstopo_mcp.server --http --port 8765`, then POST /mcp initialize with `Host: swisstopo-mcp.example.com` + `Origin: https://app.example.ch` → HTTP 200 with `mcp-session-id: 107f2d2742f647dd95b603dee692edae`, `access-control-expose-headers: Mcp-Session-Id`, `access-control-allow-origin: https://app.example.ch`. A browser client can therefore read the session id — the exact symptom this check exists for."
+    - "Reject path verified in the same run: `Origin: https://evil.example.com` → HTTP 403 `Invalid Origin header`; `Host: evil.example.com` → HTTP 421 `Invalid Host header`. The allow-list is enforcing, not decorative."
+    - "DNS-rebinding protection is ON, not disabled to make things pass: `enable_dns_rebinding_protection=True` at src/swisstopo_mcp/server.py:59, confirmed at runtime — `mcp.settings.transport_security` printed `enable_dns_rebinding_protection=True allowed_hosts=['localhost', 'localhost:*', '127.0.0.1', '127.0.0.1:*', 'mcp.example.ch'] allowed_origins=['http://localhost', 'http://localhost:*', 'http://127.0.0.1', 'http://127.0.0.1:*', 'https://a.ch', 'https://b.ch']`. Asserted in CI too (tests/test_http_app.py:108-111)."
+    - "Config is env-driven, not hardcoded: SWISSTOPO_ALLOWED_ORIGINS / SWISSTOPO_ALLOWED_HOSTS (src/swisstopo_mcp/config.py:37, :42), documented with the failure mode of each at docs/deployment.md:27-48, and surfaced as env entries in deploy/kubernetes.yaml:42-49. Regression tests drive the real ASGI stack (tests/test_http_app.py:146-156), all 16 pass."
+  gaps:
+    - "Loopback asymmetry: transport_origins_list includes http://localhost:* (src/swisstopo_mcp/config.py:83-91) but CORS origins_list deliberately does not (src/swisstopo_mcp/config.py:68-71). Probe confirmed a request with `Origin: http://localhost:3000` gets HTTP 200 and `access-control-expose-headers` but NO `access-control-allow-origin` — so a browser dev client at localhost passes transport security and is then blocked by the browser, unable to read Mcp-Session-Id. Documented as intentional but it reproduces the SDK-004 symptom class for local development."
+    - "`allow_credentials` is not set (defaults False, src/swisstopo_mcp/server.py:730-736). Correct for auth_model=none, but any future auth would need it plus the explicit origin list."
+  evaluator_notes: |
+    Verified end-to-end against a live server on both the accept and the reject
+    path, which is what the previous run's finding demanded. All pass criteria hold:
+    CORS configured, Mcp-Session-Id in both expose_headers and allow_headers, no
+    wildcard origin, and DNS-rebinding protection left enabled rather than switched
+    off to make the requests succeed. The one residual is the localhost CORS
+    asymmetry, which is a documented trade-off and does not affect the deployed
+    path. Pass.

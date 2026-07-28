@@ -198,6 +198,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   assumption by failing if the deviation ever exceeds one metre.
 
 ### Fixed
+- **The generated egress-proxy ACL enforced nothing (SEC-021).**
+  `scripts/render_egress_acl.py` emitted the host entries at two-space indent
+  under a four-space `allowed_domains:` key, so `deploy/smokescreen-acl.yaml`
+  parsed with `allowed_domains: null` and ten hostnames promoted to siblings of
+  the service object. A Smokescreen sidecar reading it would have failed to
+  unmarshal or allowed nothing — while `--check` reported the file up to date,
+  because it diffs against the output of the same renderer.
+  `tests/test_egress_allowlist.py::TestGeneratedProxyAcl` now loads the
+  committed artefact with `yaml.safe_load` and asserts the ten hosts are where
+  the proxy would look for them; verified to fail against the old output.
+  Also dropped the `--config-file` argument in `deploy/egress-proxy.yaml`, which
+  pointed at a file the documented ConfigMap does not contain.
 - The last stale tool-budget number (`docs/geodaten-erweiterung-phase1.md`) now
   points at the README instead of carrying a figure of its own, so it cannot go
   stale again.
@@ -260,6 +272,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **ARCH-012:** both READMEs now name the concrete negotiated protocol
     version (2025-11-25) and an update policy, and
     `tests/test_protocol_version.py` fails if an SDK bump moves it.
+
+- **Adversarial re-audit — run `2026-07-27T162602-Z`.** Same catalogue, same 44
+  applicable checks as `2026-07-27T125314-Z`, so the two compare directly:
+  **24 pass / 20 partial / 0 fail** (previously 22 / 20 / 2). The auditing
+  agents were briefed to refute the preceding remediation claims rather than
+  confirm them.
+
+  Six of those claims did not survive. Recorded here because the remediation
+  notes above are what they contradict:
+  - **SEC-021** — the generated `deploy/smokescreen-acl.yaml` is structurally
+    invalid: two-space indent under a four-space key makes
+    `services[0].allowed_domains` parse as `null`. The CI gate diffs against
+    the same renderer and is blind to it by construction.
+  - **ARCH-007** — the claim that `swisstopo_get_egrid` no longer describes
+    itself as a precursor was false when written; a replacement had silently
+    failed. Verified and fixed since. README workflow sections and the absent
+    parallelisation in `geodata.py` remain open.
+  - **OBS-006** — tool arguments *are* exported: the httpx auto-instrumentation
+    the module enables emits `http.url` with the full query string. True of the
+    span we write, false of the system we configure.
+  - **CH-004** — `ToolResponse.error()` gained a `license` parameter that 14
+    call sites never pass, so ODbL data is labelled as Swiss OGD.
+  - **SEC-018** — three string fields still lack `max_length`.
+  - **ARCH-003** — structured `note` reaches 5 of ~25 bare-negative sites.
+
+  Four findings are new: **SDK-001** (under `--http` the lifespan runs per
+  session, not per process; closing one session nulls the shared client for the
+  others), **OBS-001** (the protocol `isError` flag is never set), **OBS-002**
+  (`overpass.py` forwards up to 300 characters of an upstream error body) and
+  **SCALE-003** (`haproxy.cfg` never populates its stick table — `stick on`
+  stores from the request, the session id is minted in the response).
+
+  The run's `production_ready` flag reads YES; it gates only on hard `fail`,
+  and two `partial` findings are critical severity. See
+  `audits/2026-07-27T162602-Z-swisstopo-mcp/audit-report.md` §1a.
+
+### Documentation
+- `SECURITY.md` / `SECURITY.de.md`: corrected stale tool counts (13/23 → 24),
+  the phase declaration, and the DNS-pinning row, which said **Not implemented**
+  for a control that has been shipping since the previous batch. The error-handling
+  row no longer claims upstream bodies never reach the model.
+- `docs/roadmap.md` is now the single authority for phase state; the README and
+  roadmap previously named each other, so neither was.
+- `README.de.md` gained the phase status table and advance criteria that went
+  into the English README only.
+- Both READMEs: the cadastre workflow now names `swisstopo_oereb_at`, and the
+  error-handling section no longer claims JSON-RPC `-32602` for protocol errors
+  — a runtime probe against mcp 1.28.1 shows they arrive as `isError` tool
+  results.
 
 ## [0.3.0] - 2026-07-27
 

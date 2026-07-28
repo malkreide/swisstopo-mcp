@@ -1,0 +1,23 @@
+check_run:
+  id: SEC-022
+  status: pass
+  evidence_collected: 5
+  evidence_required: 3
+  findings:
+    - "Verified at runtime via mcp.list_tools() as instructed, not by reading server.py: 24 tools returned, 24 carry the `swisstopo_` prefix, zero unprefixed. Full list confirmed including the six previously-generic ones — swisstopo_list_available_layers, swisstopo_query_geodata, swisstopo_query_osm_features, swisstopo_lookup_postal_code, swisstopo_find_commune, swisstopo_search_address."
+    - "The prefix is regression-guarded, and the guard also blocks silent reversion: tests/test_tool_namespace.py:34-40 fails on any unprefixed tool, :42-51 asserts the six renamed names are present, and :53+ asserts the six old names are gone so a 0.3.0 client cannot reach a stale name. All 8 tests in the file pass."
+    - "tool-hashes.json exists and is a real content hash, not a version stamp: scripts/snapshot_tool_hashes.py:44-58 hashes a canonical JSON of name + normalised description + inputSchema per tool with SHA-256. I ran `--check`: exit 0, 'tool-hashes.json is up to date (24 tools)'. The description normalisation at scripts/snapshot_tool_hashes.py:31-42 (inspect.cleandoc) is a genuine fix for the 3.11/3.12 vs 3.13 docstring-dedent divergence that would otherwise make the CI matrix disagree with itself."
+    - "The CI gate is wired and blocking: .github/workflows/ci.yml:43-44 runs the snapshot check on every push and PR across Python 3.11/3.12/3.13, and its failure message (scripts/snapshot_tool_hashes.py:82-88) explicitly instructs the author to add a CHANGELOG entry naming the affected tools because clients must re-approve."
+    - "CHANGELOG discipline is present and specific: CHANGELOG.md:266-294 carries a '⚠️ BREAKING — six tools renamed (SEC-022)' section that names each rename, states 'You must update any client config or prompt that names these tools, and re-approve the server in Claude Desktop', and records the introduction of scripts/snapshot_tool_hashes.py and tool-hashes.json. CHANGELOG.md:57 additionally reasons about hash impact for an additive change ('Additive — no client breaks, tool hashes unaffected')."
+  gaps:
+    - "Documentation carries stale tool counts that contradict the runtime truth of 24: SECURITY.md:41 says 'All 13 tools', SECURITY.md:70 says 'All 23 tools carry the swisstopo_ prefix', README.md:325 says 'Read tools | 23'. Cosmetic, but SECURITY.md:19 also says 'All 13 tools' in the posture summary, and these are the documents an auditor is pointed at."
+    - "The namespace separator is a single underscore (`swisstopo_x`) rather than the double underscore (`<server>__<tool>`) the check's pass-pattern shows. Functionally adequate — the prefix is unambiguous and consistent — but a tool named e.g. swisstopo_search_address is not lexically distinguishable from a hypothetical sibling that prefixes by data source rather than server identity."
+    - "Tool hashes are committed but not published as a signed release artefact, so a client has no out-of-band way to verify them; the check lists that only under future server-signature work."
+  evaluator_notes: |
+    Verified the two load-bearing claims the brief singled out, both at runtime:
+    mcp.list_tools() returns 24 tools with 24 prefixed, and both snapshot gates
+    (`snapshot_tool_hashes.py --check`) actually execute and pass. The CI step
+    exists and is not conditional.
+    Pass. The stale '13 tools' / '23 tools' strings in SECURITY.md and README
+    are the one thing worth fixing — they are the kind of drift that erodes
+    trust in the surrounding claims even when the mechanism underneath is sound.

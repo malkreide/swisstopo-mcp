@@ -130,6 +130,11 @@ async def get_egrid(params: GetEgridInput) -> ToolResponse:
                 f"({lat}, {lon}) in Kanton {canton}.",
                 [],
                 match_type="none",
+                note=(
+                    "Die Koordinate liegt womöglich ausserhalb des Kantons oder auf "
+                    "einer Parzellengrenze. Kanton via swisstopo_municipality_at "
+                    "prüfen, oder den Punkt leicht verschieben."
+                ),
                 source=OEREB_SOURCE,
                 license=OEREB_LICENSE,
             )
@@ -188,6 +193,11 @@ async def get_oereb_extract(
                     f"EGRID '{params.egrid}' nicht gefunden in Kanton {canton}.",
                     [],
                     match_type="none",
+                    note=(
+                        f"Der EGRID {params.egrid} ist im Kanton {canton} unbekannt. "
+                        "Kanton prüfen — EGRIDs sind kantonal geführt — oder den "
+                        "EGRID via swisstopo_get_egrid neu ermitteln."
+                    ),
                     source=OEREB_SOURCE,
                     license=OEREB_LICENSE,
                 )
@@ -207,6 +217,11 @@ async def get_oereb_extract(
                 f"## ÖREB-Auszug für {params.egrid}\n\nKeine Eigentumsbeschränkungen gefunden.",
                 [],
                 match_type="none",
+                note=(
+                    "Kein Treffer heisst hier: für dieses Grundstück sind in den "
+                    "abgefragten Themen keine Beschränkungen eingetragen. Ohne "
+                    "topics-Filter erneut abfragen, um alle Themen abzudecken."
+                ),
                 source=OEREB_SOURCE,
                 license=OEREB_LICENSE,
             )

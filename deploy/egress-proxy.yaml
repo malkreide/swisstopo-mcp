@@ -27,7 +27,9 @@ spec:
         - name: smokescreen
           image: stripe/smokescreen:latest
           args:
-            - "--config-file=/etc/smokescreen/config.yaml"
+            # No --config-file: the ConfigMap above is created from
+            # smokescreen-acl.yaml alone, so a config.yaml would not exist at
+            # this mount and the sidecar would fail to start (audit SEC-021).
             - "--egress-acl-file=/etc/smokescreen/smokescreen-acl.yaml"
             - "--listen-port=4750"
           ports:

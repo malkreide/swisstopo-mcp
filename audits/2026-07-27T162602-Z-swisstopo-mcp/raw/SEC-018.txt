@@ -1,0 +1,29 @@
+check_run:
+  id: SEC-018
+  status: partial
+  evidence_collected: 6
+  evidence_required: 3
+  findings:
+    - "Checked every input model by runtime introspection, not by sampling: all 24 Pydantic models across geocoding/rest_api/stac/wmts/height/coords/oereb/geodata/overpass/openplz carry `model_config = ConfigDict(str_strip_whitespace=True, extra=\"forbid\", strict=True)`. Not one is permissive. The base SwissPointInput declares it too (src/swisstopo_mcp/coords.py:90) so a future subclass that forgets cannot regress."
+    - "Every integer field has both bounds. Enumerated: limit ge=1/le=50 (src/swisstopo_mcp/geocoding.py:50), le=10, le=30, le=100; tolerance ge=0/le=200 (src/swisstopo_mcp/rest_api.py:66); nb_points ge=2/le=1000 (src/swisstopo_mcp/height.py:58-63); radius_m ge=10/le=5000; zoom ge=1/le=13; bfs_number ge=1/le=9999. No unbounded int."
+    - "validate_sr() is genuinely wired up now, at three sites: src/swisstopo_mcp/geocoding.py:43-48, src/swisstopo_mcp/geocoding.py:61-66 and src/swisstopo_mcp/rest_api.py:102-105. The remaining three `sr` fields are guarded by something stricter — check_deprecated_sr (src/swisstopo_mcp/coords.py:57-74) rejects anything but 4326 — at src/swisstopo_mcp/rest_api.py:72-75, src/swisstopo_mcp/height.py:35-38 and src/swisstopo_mcp/height.py:69-72. No `sr` reaches an upstream unvalidated."
+    - "easting/northing look unbounded at field level but are not: the model validator at src/swisstopo_mcp/coords.py:140-156 rejects degree-magnitude values and enforces the LV95 Swiss extent (2 480 000–2 840 000 / 1 070 000–1 300 000), and src/swisstopo_mcp/coords.py:210-235 does the direction-aware equivalent for ConvertCoordinatesInput. The omission is deliberate and documented at src/swisstopo_mcp/coords.py:104-106."
+    - "Patterns are whitelist-based throughout, defined centrally at src/swisstopo_mcp/api_client.py:43-47 (TEXT/ID/COORDS/LANG/CANTON) — all `^[...]+$` allow-lists, no negative lookahead. tests/test_input_validation.py:14-40 proves rejection of NUL bytes, angle brackets, quotes, backticks and `../../etc/passwd`; tests/test_input_validation.py:44-60 proves strict mode rejects \"10\" for an int and rejects extra fields."
+    - "THE GAP the remediation overclaims: three string fields still have no max_length, so 'length bounds added' is not true across the board. src/swisstopo_mcp/stac.py:34-39 collection_id has min_length=2 and a pattern but no ceiling — and it is interpolated straight into a URL path at src/swisstopo_mcp/stac.py:174. src/swisstopo_mcp/geocoding.py:32-39 `origins` has a pattern but no length bound. src/swisstopo_mcp/wmts.py:34-38 `layers` has a pattern but no length bound. A pattern constrains the charset, not the size, so a multi-kilobyte value of legal characters passes validation and is forwarded upstream."
+  gaps:
+    - "src/swisstopo_mcp/stac.py:34-39 — collection_id: no max_length; value is interpolated into an upstream URL path."
+    - "src/swisstopo_mcp/geocoding.py:32-39 — origins: no max_length."
+    - "src/swisstopo_mcp/wmts.py:34-38 — layers: no max_length."
+    - "TEXT_PATTERN (src/swisstopo_mcp/api_client.py:43) permits ';' '&' '/' '%'. Harmless here — no shell, no SQL, and values go through httpx param encoding — but it is a broader charset than the check's whitelist ideal implies."
+    - "origins is documented as an enum of seven values (address/zipcode/gg25/...) but is validated only as a lowercase-alphanumeric-comma string; a Literal or explicit member check would be exact."
+  evaluator_notes: |
+    The brief asked me to check every input model rather than a sample, so I
+    introspected all 24 at runtime and enumerated every field's constraints.
+    The strict/extra-forbid claim holds universally, the int-bounds claim holds
+    universally, the validate_sr wiring claim holds (three direct sites plus a
+    stricter guard on the other three), and the easting/northing 'no bounds'
+    appearance is a false alarm — a model validator enforces the Swiss extent.
+    Downgraded to partial on one concrete, reproducible point: the claim that
+    length bounds were added does not hold for three string fields, one of
+    which (collection_id) lands directly in an upstream URL path. Small fix,
+    but the claim currently says more than the code does.

@@ -1,0 +1,23 @@
+check_run:
+  id: ARCH-009
+  status: pass
+  evidence_collected: 5
+  evidence_required: 2
+  findings:
+    - "All 24 tools carry explicit annotations — verified at runtime, every tool returning `{title, readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true}`. Nothing relies on SDK defaults. In source: 24 `@mcp.tool` registrations and 24 `annotations=ToolAnnotations(` blocks in src/swisstopo_mcp/server.py (counted), starting at server.py:112 and ending at server.py:688."
+    - "The hints are consistent with actual behaviour. `readOnlyHint: true` is correct — no tool writes: every handler's only side effect is an outbound GET, and src/swisstopo_mcp/api_client.py:_build_client sets `follow_redirects=False` on read-only HTTP. `openWorldHint: true` is correct on all 24 — each reaches an external federal, cantonal or third-party API. No tool name carries a delete/create/update/remove prefix, so the check's Modus-2 inconsistency scan has nothing to flag."
+    - "Drift is gated in CI rather than left to review. tests/test_tool_hygiene.py:59-63 asserts every tool declares `readOnlyHint`, tests/test_tool_hygiene.py:66-70 asserts none declares `destructiveHint`, and .github/workflows/ci.yml:31 runs `pytest tests/ -m \"not live\"` on every push and PR. A write-capable tool added without re-examining the posture fails the build."
+    - "Annotations are additionally frozen into the approved tool definition: .github/workflows/ci.yml:40-44 runs `scripts/snapshot_tool_hashes.py --check` against tool-hashes.json (24 entries; the script reports «tool-hashes.json is up to date (24 tools)» in this working tree), so a silent change to a tool's advertised contract cannot reach a release."
+    - "An annotations overview exists in user-facing docs, as the check's Modus 3 requires: README.md:324 «| Read tools | 23, all `readOnlyHint: true` / `destructiveHint: false` |» plus README.md:325 «| Write tools | none — Phase 3, not planned |», and README.de.md:319-321 «Alle 24 Tools sind `readOnlyHint: true` / `destructiveHint: false`; es gibt keine schreibenden oder versendenden Funktionen.»"
+  gaps:
+    - "Count drift in the English overview: README.md:324 says 23 read tools and docs/roadmap.md:9 says «23 today», but there are 24 (README.de.md:320 has it right). The stale number is a leftover from adding swisstopo_oereb_at in the same batch — cosmetic, but it is the same drift class the CI hash gate was built to prevent, and no gate covers the prose."
+    - "The overview is a one-line summary, not the per-tool table the check illustrates. Acceptable while every row would be identical; it stops being acceptable the moment a single tool deviates."
+    - "`idempotentHint: true` on all 24 is defensible for read queries but is asserted rather than tested — unlike readOnlyHint/destructiveHint, no test in tests/test_tool_hygiene.py pins it."
+  evaluator_notes: |
+    Pass, and one of the stronger areas of this server: annotations are
+    complete, behaviourally correct, CI-enforced against drift in two
+    independent ways, and documented in both READMEs. ARCH-009 produced no
+    finding in the previous run; re-verified here at runtime rather than
+    inherited, and the verdict holds. The only defect found is a stale «23» in
+    README.md:324 and docs/roadmap.md:9 — recorded as a gap, not a downgrade,
+    since the annotations themselves are correct on all 24 tools.

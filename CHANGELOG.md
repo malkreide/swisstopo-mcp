@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added (OPS-001)
+- **Live tests for every tool.** Ten tools had none, so the nightly run could
+  not detect upstream contract drift for them — including all three ÖREB tools,
+  the only cantonal, per-canton-format upstream here and the most drift-prone
+  thing this server talks to. Live-marked tests went 25 → 33.
+
+  `tests/test_live_coverage.py` maps tools to live tests and fails on an
+  uncovered one, so the gap cannot reopen. One exemption, with its reason
+  (`swisstopo_map_url` builds a URL locally, there is no upstream to drift), and
+  the exemption list is asserted non-stale.
+
+  Three of the new tests are **chained rather than pinned** — `get_feature`
+  resolves its id via `find_features`, `get_collection` via `search_geodata`,
+  `get_oereb_extract` via `get_egrid`. A hardcoded id rots, and a rotted id
+  produces a nightly false alarm, which is how a drift detector gets muted.
+
+### Changed (OPS-001)
+- **The failure-reporting step no longer depends on a third-party action.** It
+  only runs `if: failure()`, so nothing on that path is exercised by a green
+  run — a bad action pin would have failed silently for exactly the reader who
+  needed the report. It now uses `gh`, which ships on the runner and needs no
+  pin, keeping the same deduplication, and the job declares `issues: write`
+  explicitly instead of relying on the repository's default token scope. Five
+  tests hold those properties, including `bash -n` on the actual script.
+
+  Verification note: the four non-ÖREB live tests were run against real
+  upstreams and pass. The three ÖREB ones could **not** be verified from this
+  environment — `oereb.geo.zh.ch` is unreachable here while `api3.geo.admin.ch`
+  is not — so they will first execute on the nightly runner.
+
 ### Fixed (SCALE-002)
 - **A test now covers session affinity**, which nothing did. No unit test can
   exercise HAProxy, but it can pin the property that *creates* the requirement:

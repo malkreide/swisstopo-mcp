@@ -386,3 +386,16 @@ async def test_live_find_commune_district_uster():
     res = await find_commune(FindCommuneInput(district="109"))
     assert res.count == 10
     assert any(r["commune_name"] == "Uster" for r in res.results)
+
+
+@pytest.mark.live
+async def test_live_search_address_full_text():
+    """OPS-001: `search_address` had no live test. OpenPLZ is a separate
+    upstream from api3, with its own pagination headers, so a change there is
+    invisible to every other live test."""
+    result = await search_address(SearchAddressInput(query="Bederstrasse"))
+    assert result.is_error is False, result.summary
+    assert result.source == OPENPLZ_SOURCE
+    assert result.match_type in {"exact", "none"}
+    if result.match_type == "none":
+        assert result.note, "an empty full-text search must carry a next step"

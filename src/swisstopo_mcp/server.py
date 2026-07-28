@@ -27,23 +27,69 @@ configure_logging(settings.log_level)
 _log = get_logger("swisstopo_mcp.server")
 
 
+# Process-wide resources (shared httpx client + tracing), reference-counted.
+#
+# The FastMCP lifespan is *not* a per-process hook: under streamable-http the
+# SDK runs it once per MCP **session** (measured — three `initialize` POSTs
+# produced three startups, and a `DELETE /mcp` on one of three open sessions
+# produced one shutdown). Owning the client directly in that lifespan meant each
+# new session clobbered the previous session's client, and the first session to
+# disconnect closed the client and tore down tracing for everyone still
+# connected — leaving them on a fresh client per tool call (audit SDK-001).
+#
+# A refcount makes the lifespan safe to enter any number of times: the resources
+# are built on the first entry and released on the last exit. `build_http_app`
+# additionally holds one reference for the whole ASGI app lifetime, so on the
+# HTTP transport the count never reaches zero while the process is serving.
+#
+# No lock: the refcount is read and written with no `await` in between, so
+# within one event loop the sequence is atomic. The single await (`aclose`)
+# happens after the globals are already cleared.
+_resource_refs = 0
+_resource_client = None
+
+
 @asynccontextmanager
-async def lifespan(server: FastMCP):
-    """Create one shared httpx.AsyncClient for the server's lifetime so all
-    tool calls reuse connections (pooling) instead of opening a client per call."""
-    # Before create_shared_client(): the httpx auto-instrumentation patches the
-    # client class, so a client built earlier would never be traced (OBS-006).
-    setup_tracing()
-    client = create_shared_client()
-    set_shared_client(client)
-    _log.info("server_started")
+async def server_resources():
+    """Acquire the shared httpx client and tracing for the caller's lifetime.
+
+    Idempotent and reference-counted — see the note above. Safe to nest.
+    """
+    global _resource_refs, _resource_client
+
+    if _resource_refs == 0:
+        # Before create_shared_client(): the httpx auto-instrumentation patches
+        # the client class, so a client built earlier would never be traced
+        # (OBS-006).
+        setup_tracing()
+        _resource_client = create_shared_client()
+        set_shared_client(_resource_client)
+        _log.info("server_started")
+    _resource_refs += 1
+
     try:
         yield
     finally:
-        await client.aclose()
-        set_shared_client(None)
-        shutdown_tracing()
-        _log.info("server_stopped")
+        _resource_refs -= 1
+        if _resource_refs == 0:
+            client, _resource_client = _resource_client, None
+            set_shared_client(None)
+            if client is not None:
+                await client.aclose()
+            shutdown_tracing()
+            _log.info("server_stopped")
+
+
+@asynccontextmanager
+async def lifespan(server: FastMCP):
+    """MCP session lifespan.
+
+    On stdio this runs once, because the process serves one session. On
+    streamable-http the SDK runs it per session, which is why the resources it
+    needs live behind `server_resources()` rather than in here (SDK-001).
+    """
+    async with server_resources():
+        yield
 
 
 mcp = FastMCP(
@@ -717,6 +763,11 @@ def build_http_app(allowed_origins: list[str] | None = None):
     allowed, which is the safe choice when credentials are involved.
 
     A `/healthz` route is added for container/orchestrator liveness probes.
+
+    The app's lifespan is wrapped so the process holds one reference to the
+    shared client and tracing for as long as it is serving. Without it those
+    resources would be owned by whichever MCP session happened to open first,
+    and released when it disconnected (SDK-001).
     """
     from starlette.middleware.cors import CORSMiddleware
     from starlette.responses import JSONResponse
@@ -726,6 +777,16 @@ def build_http_app(allowed_origins: list[str] | None = None):
         return JSONResponse({"status": "ok"})
 
     app = mcp.streamable_http_app()
+
+    sdk_lifespan = app.router.lifespan_context
+
+    @asynccontextmanager
+    async def _process_lifespan(scoped_app):
+        async with server_resources():
+            async with sdk_lifespan(scoped_app):
+                yield
+
+    app.router.lifespan_context = _process_lifespan
     app.router.routes.append(Route("/healthz", _healthz, methods=["GET"]))
     app.add_middleware(
         CORSMiddleware,

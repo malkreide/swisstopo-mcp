@@ -12,7 +12,9 @@ authoritative, which meant neither was (audit `2026-07-27T162602-Z`, OPS-003).
       see the README for the current list)
 - [x] Pydantic v2 input schemas with `strict=True`, `extra="forbid"`, range and
       whitelist-pattern constraints (SEC-018)
-- [x] Shared `httpx.AsyncClient` via FastMCP lifespan (SDK-001)
+- [x] Shared `httpx.AsyncClient`, owned by a reference-counted process-level
+      context rather than by the FastMCP lifespan — which the SDK runs per
+      session, not per process, on the HTTP transport (SDK-001)
 - [x] Code-layer egress allow-list + `follow_redirects=False` (SEC-004/021)
 - [x] Error masking for unexpected exceptions (OBS-002)
 - [x] CORS with `expose_headers: Mcp-Session-Id` for HTTP transport (SDK-004)

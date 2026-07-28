@@ -81,3 +81,40 @@ concrete and reachable with two concurrent clients — ending one session nulls
 the shared client for the others, degrading them to a fresh httpx.AsyncClient
 per tool call, and tears down the tracer provider underneath them. Correct for
 stdio, broken under --http, hence partial.
+
+---
+
+### Remediation Status (2026-07-28, follow-up PR)
+
+**Closed.** Reproduced first, rather than taken on report: a fresh
+`--http` server logged 0 `server_started` at boot, 3 after three `initialize`
+POSTs, and 1 `server_stopped` after a single `DELETE /mcp` while two sessions
+were still open — the agent's measurement exactly.
+
+The client and tracing moved out of the per-session lifespan into a
+reference-counted `server_resources()` context (`src/swisstopo_mcp/server.py`).
+The FastMCP lifespan now just enters it, so entering N times builds the
+resources once and releases them on the last exit. `build_http_app` wraps the
+Starlette lifespan in the same context, so the process holds one reference for
+as long as the ASGI app is up and no session teardown can reach zero.
+
+The same server after the change: **1 `server_started` at boot, still 1 after
+three sessions and a `DELETE`, and 1 `server_stopped` on SIGTERM.**
+
+- The clobbering gap is closed by the same mechanism — a second session sees a
+  non-zero refcount and reuses the existing client rather than building its own.
+- The `setup_tracing`/`shutdown_tracing` idempotency gap is closed by
+  construction: with overlapping sessions no longer able to release the
+  resources, each runs exactly once per process.
+- No lock is used. The refcount is read and written with no `await` in between,
+  so the sequence is atomic within an event loop; the one await (`aclose`)
+  happens after the globals are already cleared. Documented at the definition.
+- The docstring that asserted a per-process invariant the HTTP transport does
+  not provide has been corrected.
+
+Four regression tests added (`tests/test_shared_client.py::TestSessionLifespanOwnership`),
+covering client reuse across sessions, survival of a co-session teardown,
+release on the last exit, and the ASGI-level hold. Three of the four were
+verified to **fail** against the previous implementation; the fourth
+(`test_last_exit_releases_everything`) passes under both, since it asserts
+behaviour the old code also had.

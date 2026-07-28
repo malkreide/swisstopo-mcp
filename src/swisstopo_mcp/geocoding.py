@@ -15,6 +15,12 @@ from swisstopo_mcp.api_client import (
 from swisstopo_mcp.logging_config import log_tool_call
 from swisstopo_mcp.models import ToolResponse
 
+# The `origins` values SearchServer accepts. Kept as a frozenset rather than a
+# Literal because the parameter is a comma-separated list (SEC-018).
+ORIGINS = frozenset(
+    {"address", "zipcode", "gg25", "district", "kantone", "gazetteer", "parcel"}
+)
+
 # ---------------------------------------------------------------------------
 # Input Models
 # ---------------------------------------------------------------------------
@@ -32,9 +38,10 @@ class GeocodeInput(BaseModel):
     )
     origins: str | None = Field(
         default=None,
+        max_length=128,
         pattern=r"^[a-z0-9,]+$",
         description=(
-            "Filter: 'address', 'zipcode', 'gg25', 'district', "
+            "Filter, kommagetrennt: 'address', 'zipcode', 'gg25', 'district', "
             "'kantone', 'gazetteer', 'parcel'"
         ),
     )
@@ -46,6 +53,27 @@ class GeocodeInput(BaseModel):
         # Wires up validate_sr(), which existed but was never called — an
         # arbitrary int used to be forwarded straight upstream (SEC-018).
         return validate_sr(v)
+
+    @field_validator("origins")
+    @classmethod
+    def _validate_origins(cls, v: str | None) -> str | None:
+        """Check each member against the documented set.
+
+        The field is a comma-separated list, so a `Literal` cannot express it.
+        The pattern only said "lowercase letters, digits and commas", which
+        accepted anything of that shape — the description promised an enum the
+        validation did not enforce (SEC-018).
+        """
+        if v is None:
+            return v
+        members = [m for m in v.split(",") if m]
+        unknown = sorted({m for m in members if m not in ORIGINS})
+        if unknown:
+            raise ValueError(
+                f"Unbekannte origins: {', '.join(unknown)}. "
+                f"Erlaubt: {', '.join(sorted(ORIGINS))}."
+            )
+        return v
 
     limit: int = Field(default=10, ge=1, le=50, description="Maximale Trefferanzahl")
 

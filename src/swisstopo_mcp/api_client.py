@@ -40,6 +40,18 @@ SUPPORTED_SRS = {4326, 2056, 21781, 3857}
 # query params, so the goal is to reject control characters and obviously
 # malicious payloads while still accepting real Swiss addresses, layer IDs and
 # search terms (incl. umlauts/accents).
+#
+# TEXT_PATTERN deliberately admits `;` `&` `/` `%` — they occur in real Swiss
+# addresses and place names ("Rue de l'Hôpital 3/5", "Bäckerei & Co."). That is
+# a broader charset than a whitelist ideal implies, and it is safe *here* for
+# reasons that must stay true: no value reaches a shell or a SQL statement, and
+# everything goes through httpx's own parameter encoding rather than string
+# concatenation. If a tool ever builds a command or a query by interpolation,
+# this pattern stops being sufficient (SEC-018).
+#
+# Length is bounded separately, per field, via `max_length` — a pattern
+# constrains the charset, not the size. `tests/test_input_validation.py` fails
+# if a string field ships without a bound.
 TEXT_PATTERN = r"^[\w\sÀ-ÿ.,;:'’\-/()&+%°]+$"  # addresses, place names, search terms
 ID_PATTERN = r"^[\w.,\s\-]+$"  # layer / feature / collection identifiers
 COORDS_PATTERN = r"^[\d.,;\s\-]+$"  # 'lat1,lon1;lat2,lon2;...'

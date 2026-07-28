@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed (SEC-018)
+- **Three string fields had no length bound.** `collection_id` (`stac.py`),
+  `origins` (`geocoding.py`) and `layers` (`wmts.py`) carried a pattern but no
+  `max_length`, and a pattern constrains the charset, not the size — a
+  multi-kilobyte value of legal characters passed validation and was forwarded
+  upstream. `collection_id` is the sharp one: it is interpolated into an
+  upstream URL *path*. Bounds added (128 / 128 / 512).
+
+  The property is now enforced rather than the instances: a sweep walks every
+  `*Input` model across the ten tool modules and fails if a string field ships
+  without a bound. It asserts it found the models first, so it cannot pass
+  vacuously.
+
+  **The sweep found three fields the audit did not name** —
+  `ListLayersInput.source`, `LookupPostalCodeInput.postal_code`,
+  `FindCommuneInput.district`. All three are genuinely bounded by anchored
+  fixed-width patterns, so they are exempt — but the exemption is *checked*: a
+  second test asserts every exempt field has an anchored pattern with no
+  unbounded quantifier, so the exempt set cannot become a way to silence the
+  first test.
+
+- **`origins` is now an actual enum.** Its description promised seven values
+  while its pattern accepted any lowercase-alphanumeric-comma string. A
+  `Literal` cannot express a comma-separated list, so a `field_validator`
+  checks each member and the error names the allowed set. This changes the
+  tool's input schema, so `tool-hashes.json` was regenerated.
+
+- **`TEXT_PATTERN`'s charset is documented as deliberate.** It admits `;` `&`
+  `/` `%` because real Swiss addresses contain them ("Rue de l'Hôpital 3/5").
+  The comment now states the conditions that make that safe — no shell, no SQL,
+  httpx does the parameter encoding — so a future tool that builds a command by
+  interpolation is visibly out of contract rather than silently covered.
+
 ### Fixed (CH-004)
 - **Third-party licences were lost on the error path.** `ToolResponse.error()`
   took a `license` parameter that 14 call sites never passed, so it fell back to

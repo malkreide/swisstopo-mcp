@@ -34,6 +34,10 @@ class GetCollectionInput(BaseModel):
     collection_id: str = Field(
         ...,
         min_length=2,
+        # A pattern constrains the charset, not the size. This value is
+        # interpolated into an upstream URL *path*, so an unbounded string of
+        # otherwise-legal characters would be forwarded verbatim (SEC-018).
+        max_length=128,
         pattern=ID_PATTERN,
         description="Collection-ID (z.B. 'ch.swisstopo.swissalti3d')",
     )

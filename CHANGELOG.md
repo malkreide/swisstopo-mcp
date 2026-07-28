@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed (User-Agent version drift)
+- **User-Agent no longer reports a version that was never current.** Three
+  numbers had drifted apart: `pyproject.toml` said `0.3.0`,
+  `__init__.__version__` said `0.2.0`, and the hard-coded `USER_AGENT` in
+  `api_client.py` said `0.1` — a value that has not matched a release since the
+  very first one. Every request to geo.admin.ch, REFRAME, STAC, Overpass and
+  OpenPLZ carried it. `__version__` now comes from the installed distribution
+  metadata (`importlib.metadata`, generated from `pyproject.toml`) and the
+  User-Agent is derived from it, so no literal has to be remembered. Running
+  from a bare source checkout yields `0.0.0+source` rather than a
+  plausible-looking wrong number. Guarded by `tests/test_version.py`.
+
 ### Changed (ARCH-007)
 - **`swisstopo_query_geodata` fans out over collections concurrently.** The loop
   was strictly sequential — the check's named anti-pattern for an aggregation

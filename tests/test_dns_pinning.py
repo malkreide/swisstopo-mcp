@@ -273,6 +273,74 @@ class TestAllResolvedAddressesAreTried:
         assert attempts == [], "the guard must run before the first connection"
 
 
+class TestTheShippedDefaultDoesNotBreakOrdinaryRequests:
+    """The end-to-end path, with pinning **on**, through the real client stack.
+
+    This class exists because of a regression it would have caught. Everything
+    above drives `PinnedTransport` directly, and `tests/conftest.py` turns
+    pinning off for the rest of the suite (a rewritten URL cannot match a
+    hostname-registered mock). Between them, flipping the default to on was
+    covered by nothing that actually issued a request — and it broke 34 tests
+    the moment CI ran it in an environment with no `HTTPS_PROXY` to disable
+    pinning silently.
+
+    So: opt back in, build the client the way the server does, and send a real
+    request through `request_with_retry`.
+    """
+
+    @pytest.fixture
+    def pinned(self, monkeypatch):
+        monkeypatch.setattr(settings, "pin_dns", True)
+        monkeypatch.setattr(api_client, "_resolve", lambda h: ("185.19.28.1",))
+        assert _pinning_enabled() is True, "the fixture must actually enable it"
+
+    async def test_the_client_factory_installs_the_pinning_transport(self, pinned):
+        client = api_client._build_client()
+        try:
+            assert isinstance(client._transport, PinnedTransport)
+        finally:
+            await client.aclose()
+
+    async def test_a_request_still_completes(self, pinned, monkeypatch):
+        """The load-bearing one. Pinning is a defence, not a change of outcome:
+        the caller asks for a hostname and gets its response back."""
+        seen: dict[str, httpx.Request] = {}
+
+        async def _stub(self, req):
+            seen["request"] = req
+            return httpx.Response(200, json={"ok": True}, request=req)
+
+        monkeypatch.setattr(httpx.AsyncHTTPTransport, "handle_async_request", _stub)
+        response = await api_client.request_with_retry(
+            "GET", "https://api3.geo.admin.ch/rest/services/test"
+        )
+        assert response.status_code == 200
+        assert response.json() == {"ok": True}
+
+    async def test_the_connection_went_to_the_pinned_address(self, pinned, monkeypatch):
+        seen: dict[str, httpx.Request] = {}
+
+        async def _stub(self, req):
+            seen["request"] = req
+            return httpx.Response(200, json={}, request=req)
+
+        monkeypatch.setattr(httpx.AsyncHTTPTransport, "handle_async_request", _stub)
+        await api_client.request_with_retry(
+            "GET", "https://api3.geo.admin.ch/rest/services/test"
+        )
+        assert seen["request"].url.host == "185.19.28.1"
+        assert seen["request"].headers["Host"] == "api3.geo.admin.ch"
+
+    async def test_the_egress_allow_list_still_sees_the_hostname(self, pinned):
+        """The guard runs on the URL the caller passed, before the transport
+        rewrites anything — so pinning cannot be a way past the allow-list, and
+        equally cannot cause a legitimate host to be refused as a bare IP."""
+        with pytest.raises(PermissionError, match="Allow-List"):
+            await api_client.request_with_retry(
+                "GET", "https://attacker.example.com/x"
+            )
+
+
 class TestAStreamingBodyIsNeverReplayed:
     """Walking the list means sending the request twice, which is only correct
     for a buffered body. This server sends none, but the transport is generic

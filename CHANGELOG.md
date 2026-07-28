@@ -81,6 +81,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the walk cannot become a way around it. On exhaustion the error names the
   hostname rather than the last IP tried.
 
+- **The unit suite depended on `HTTPS_PROXY` being set.** Fallout from the
+  default above, caught by CI. `PinnedTransport` rewrites `request.url` to the
+  resolved address before delegating to `httpx.AsyncHTTPTransport` — the exact
+  layer `respx` patches — so with pinning on, a route registered for
+  `https://api3.geo.admin.ch/…` never matches what arrives. It also made every
+  mocked test perform a real `getaddrinfo`. Neither showed up in development,
+  because a sandbox with `HTTPS_PROXY` set disables pinning.
+
+  `tests/conftest.py` now turns pinning off for the suite, deliberately and
+  visibly, rather than by accident of environment. Since that would otherwise
+  leave the shipped default untested — which is how this reached CI —
+  `TestTheShippedDefaultDoesNotBreakOrdinaryRequests` opts back in and drives a
+  request through `_build_client()` and `request_with_retry` with pinning
+  enabled, asserting the response comes back, the connection went to the pinned
+  address, and the allow-list still sees the hostname rather than the IP.
+
 - **The egress-proxy sidecar had no test guarding what it mounts (audit
   SEC-021).** The manifest's `--config-file=/etc/smokescreen/config.yaml` flag,
   pointing at a file the documented ConfigMap does not build, was dropped

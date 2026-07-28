@@ -15,7 +15,17 @@ metadata:
   labels:
     app: swisstopo-mcp-haproxy
 spec:
-  replicas: 2
+  # ONE replica, deliberately. Each HAProxy process holds its own stick-table,
+  # so two of them behind a round-robin Service would learn different halves of
+  # the session map — a client whose `initialize` lands on haproxy-1 and whose
+  # next request lands on haproxy-2 misses the table entirely. That is the same
+  # defect this whole arrangement exists to fix, one layer up.
+  #
+  # Scaling HAProxy needs a `peers` section so the instances replicate the
+  # stick-table to each other, plus stable per-peer DNS. Not shipped: it would
+  # be a second untested config, and the audit's point was that a plausible
+  # untested config is worse than none.
+  replicas: 1
   selector:
     matchLabels:
       app: swisstopo-mcp-haproxy

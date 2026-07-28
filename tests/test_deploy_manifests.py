@@ -219,3 +219,171 @@ class TestTheDocumentationPointsAtTheRealFiles:
         doc = self._doc()
         assert "Verifying affinity" in doc
         assert "Mcp-Session-Id" in doc
+
+
+# ---------------------------------------------------------------------------
+# The constraint that makes affinity necessary (audit SCALE-002)
+#
+# The finding notes that nothing tested session affinity in any form. A unit
+# test cannot exercise HAProxy, but it can pin the property that *creates* the
+# requirement: a Streamable-HTTP session lives in the process that minted it.
+# If that ever stops being true — a shared session store, an SDK change — the
+# single-replica default and the whole HAProxy arrangement are obsolete, and
+# this test failing is how anyone would find out.
+# ---------------------------------------------------------------------------
+
+MCP_HEADERS = {
+    "Content-Type": "application/json",
+    "Accept": "application/json, text/event-stream",
+}
+INITIALIZE = {
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "initialize",
+    "params": {
+        "protocolVersion": "2025-11-25",
+        "capabilities": {},
+        "clientInfo": {"name": "affinity-test", "version": "0"},
+    },
+}
+PING = {"jsonrpc": "2.0", "id": 2, "method": "ping"}
+
+
+def _asgi(manager):
+    async def app(scope, receive, send):
+        await manager.handle_request(scope, receive, send)
+
+    return app
+
+
+class TestSessionsAreConfinedToOneProcess:
+    """Two independent session managers over the same server — which is what
+    two replicas are."""
+
+    @staticmethod
+    async def _two_replicas():
+        from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
+
+        from swisstopo_mcp.server import mcp
+
+        return [
+            StreamableHTTPSessionManager(
+                app=mcp._mcp_server,
+                security_settings=mcp.settings.transport_security,
+            )
+            for _ in range(2)
+        ]
+
+    async def test_a_session_from_one_replica_is_unknown_to_the_other(self):
+        import httpx
+
+        from swisstopo_mcp.server import server_resources
+
+        replica_a, replica_b = await self._two_replicas()
+        async with server_resources(), replica_a.run(), replica_b.run():
+            async with (
+                httpx.AsyncClient(
+                    transport=httpx.ASGITransport(app=_asgi(replica_a)),
+                    base_url="http://localhost",
+                ) as client_a,
+                httpx.AsyncClient(
+                    transport=httpx.ASGITransport(app=_asgi(replica_b)),
+                    base_url="http://localhost",
+                ) as client_b,
+            ):
+                opened = await client_a.post("/mcp", headers=MCP_HEADERS, json=INITIALIZE)
+                session_id = opened.headers.get("mcp-session-id")
+                assert session_id, "no session id was minted"
+
+                headers = {**MCP_HEADERS, "Mcp-Session-Id": session_id}
+                on_a = await client_a.post("/mcp", headers=headers, json=PING)
+                on_b = await client_b.post("/mcp", headers=headers, json=PING)
+
+        assert on_a.status_code == 200, "the minting replica must still serve it"
+        assert on_b.status_code == 404, (
+            "a session resolved on a second replica — sessions are no longer "
+            "per-process, which would make the single-replica default and the "
+            "HAProxy affinity arrangement obsolete. Verify deliberately before "
+            "relaxing either."
+        )
+
+    async def test_each_replica_tracks_only_its_own_sessions(self):
+        import httpx
+
+        from swisstopo_mcp.server import server_resources
+
+        replica_a, replica_b = await self._two_replicas()
+        async with server_resources(), replica_a.run(), replica_b.run():
+            async with httpx.AsyncClient(
+                transport=httpx.ASGITransport(app=_asgi(replica_a)),
+                base_url="http://localhost",
+            ) as client_a:
+                await client_a.post("/mcp", headers=MCP_HEADERS, json=INITIALIZE)
+            assert len(replica_a._server_instances) == 1
+            assert replica_b._server_instances == {}, (
+                "state leaked between replicas"
+            )
+
+
+class TestTheDeploymentStaysAtOneReplica:
+    """A reader who raises `replicas` on the plain Deployment gets sessions that
+    break on their second request — intermittently, which reads like flaky
+    clients rather than a misconfiguration. The multi-replica path is the
+    StatefulSet."""
+
+    def test_the_base_deployment_is_single_replica(self):
+        deployment = _by_kind(_load("kubernetes.yaml"), "Deployment")
+        assert deployment["spec"]["replicas"] == 1, (
+            "deploy/kubernetes.yaml raises replicas above 1 without affinity. "
+            "Use deploy/statefulset.yaml behind deploy/haproxy-deployment.yaml, "
+            "which is the path docs/deployment.md documents."
+        )
+
+    def test_the_statefulset_is_the_multi_replica_path(self):
+        sts = _by_kind(_load("statefulset.yaml"), "StatefulSet")
+        assert sts["spec"]["replicas"] > 1, (
+            "the StatefulSet exists to run more than one replica; at 1 it is "
+            "just a more complicated Deployment"
+        )
+
+
+class TestTheAffinityFallbackAndItsLimits:
+    """`sessionAffinity: ClientIP` is a fallback for the raise-replicas case,
+    not the mechanism. Both facts need to stay true."""
+
+    def test_the_base_service_sets_client_ip_affinity(self):
+        service = _by_kind(_load("kubernetes.yaml"), "Service")
+        assert service["spec"].get("sessionAffinity") == "ClientIP"
+
+    def test_the_fallback_has_an_explicit_timeout(self):
+        service = _by_kind(_load("kubernetes.yaml"), "Service")
+        timeout = service["spec"]["sessionAffinityConfig"]["clientIP"]["timeoutSeconds"]
+        assert timeout > 0
+
+    def test_its_limits_are_documented_at_the_manifest(self):
+        """A fallback presented without its failure mode gets mistaken for the
+        solution — behind an ingress it pins every client to one pod."""
+        manifest = (DEPLOY / "kubernetes.yaml").read_text(encoding="utf-8")
+        assert "ingress" in manifest.lower()
+        assert "statefulset" in manifest.lower()
+
+
+class TestHaproxyDoesNotReintroduceTheSameDefect:
+    """Each HAProxy process holds its own stick-table. Two of them behind a
+    round-robin Service learn different halves of the session map — the same
+    defect SCALE-003 was about, one layer up."""
+
+    def test_haproxy_runs_a_single_replica(self):
+        deployment = _by_kind(_load("haproxy-deployment.yaml"), "Deployment")
+        assert deployment["spec"]["replicas"] == 1, (
+            "more than one HAProxy replica without a `peers` section means two "
+            "independent stick-tables; a client whose initialize lands on one "
+            "instance and whose next request lands on the other misses the map"
+        )
+
+    def test_the_peers_requirement_is_documented(self):
+        manifest = (DEPLOY / "haproxy-deployment.yaml").read_text(encoding="utf-8")
+        assert "peers" in manifest, (
+            "scaling HAProxy needs stick-table replication; say so where "
+            "somebody would otherwise just raise the number"
+        )

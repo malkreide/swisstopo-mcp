@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed (SCALE-002)
+- **A test now covers session affinity**, which nothing did. No unit test can
+  exercise HAProxy, but it can pin the property that *creates* the requirement:
+  two independent session managers over the same server — which is what two
+  replicas are — show that a session id resolves on the replica that minted it
+  (`200`) and nowhere else (`404`). If that ever changes, the single-replica
+  default and the whole affinity arrangement are obsolete, and this test failing
+  is how anyone finds out. A second test fails if `deploy/kubernetes.yaml` ever
+  raises `replicas` above 1 — the path the audit says a reader would take and
+  get intermittently broken sessions from.
+
+- **`sessionAffinity: ClientIP` added to the base Service** as the crude
+  fallback the audit asked for — with its failure mode named where it will be
+  read: it is inert at one replica, helps clients reaching the Service directly
+  from inside the cluster, and does nothing useful behind an ingress, where
+  kube-proxy sees the ingress pod as the source and every client collapses onto
+  one backend. A fallback presented without that caveat gets mistaken for the
+  solution.
+
+- **A defect in the SCALE-003 fix, caught before it shipped.** The HAProxy
+  Deployment added in that commit ran `replicas: 2`, and each HAProxy process
+  holds its own stick-table — so two instances behind a round-robin Service
+  learn different halves of the session map. A client whose `initialize` lands
+  on one and whose next request lands on the other misses the table entirely:
+  the same defect, one layer up. Now `replicas: 1`, with the `peers`
+  requirement for scaling named in the manifest and the docs, and two tests
+  holding both facts. No `peers` config is shipped — that would be a second
+  untested config, which is what the audit found wrong the first time.
+
 ### Fixed (SCALE-003 / SCALE-002)
 - **The HAProxy affinity config parsed, looked correct, and would not have
   worked.** Two independent defects:

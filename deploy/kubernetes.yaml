@@ -100,6 +100,19 @@ metadata:
 spec:
   selector:
     app: swisstopo-mcp
+  # Crude fallback, not the affinity mechanism (SCALE-002). At `replicas: 1`
+  # this is inert. If someone raises replicas anyway, it keeps sessions working
+  # for clients that reach the Service *directly from inside the cluster*.
+  #
+  # It does NOT help behind an ingress: kube-proxy then sees the ingress pod's
+  # address as the source, so every client looks like one client and lands on
+  # one backend — sessions survive, load balancing does not. The real path is
+  # deploy/statefulset.yaml behind deploy/haproxy-deployment.yaml, which routes
+  # on the session id itself.
+  sessionAffinity: ClientIP
+  sessionAffinityConfig:
+    clientIP:
+      timeoutSeconds: 3600
   ports:
     - port: 80
       targetPort: 8000

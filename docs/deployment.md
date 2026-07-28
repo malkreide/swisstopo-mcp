@@ -124,6 +124,19 @@ kubectl apply -f deploy/haproxy-deployment.yaml
 Point your Ingress at **`swisstopo-mcp-lb`**, not at the application Service —
 routing straight to the pods bypasses the affinity this arrangement exists for.
 
+**HAProxy itself runs one replica, deliberately.** Each process holds its own
+stick-table, so two instances behind a round-robin Service would learn different
+halves of the session map — the same defect one layer up. Scaling it needs a
+`peers` section so the instances replicate the table to each other; that is not
+shipped, because an untested second config is exactly what this section is
+correcting.
+
+The base Service in `kubernetes.yaml` sets `sessionAffinity: ClientIP` as a
+crude fallback. It is inert at one replica and it does **not** substitute for the
+above: behind an ingress, kube-proxy sees the ingress pod as the source, so every
+client looks like one client and lands on one backend — sessions survive, load
+balancing does not.
+
 ### Why `stick on` is not enough
 
 The obvious config is `stick on req.hdr(Mcp-Session-Id)`, and this repository

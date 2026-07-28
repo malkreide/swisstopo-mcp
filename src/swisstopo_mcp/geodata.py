@@ -58,6 +58,14 @@ CATALOG_TTL_SECONDS = 6 * 3600
 _MAX_LIMIT = 50
 
 # Static (non-geodienste) façade layers.
+# Per-record licences for the layer catalogue. The records use a short source
+# key ("swisstopo" / "geodienste"), not the full attribution string, so the
+# mapping lives here rather than in models.LICENSE_BY_SOURCE (CH-004).
+_LAYER_LICENSES: dict[str, str] = {
+    "swisstopo": SWISSTOPO_LICENSE,
+    "geodienste": GEODIENSTE_LICENSE,
+}
+
 STATIC_LAYERS: dict[str, dict[str, str]] = {
     "strassenverzeichnis": {
         "title": "Amtliches Strassenverzeichnis",
@@ -528,10 +536,16 @@ async def list_available_layers(params: ListLayersInput) -> ToolResponse:
         else:
             summary = _format_layer_catalog(records, params, None)
 
+        # The envelope licence is necessarily composite here, so each record
+        # carries its own — otherwise "gemischt — siehe je Layer" points at
+        # nothing the caller can actually read (audit CH-004).
+        for record in records:
+            record["license"] = _LAYER_LICENSES.get(record.get("source", ""), SWISSTOPO_LICENSE)
+
         return ToolResponse.ok(
             summary, records, match_type="exact" if records else "none",
             source=f"{SWISSTOPO_SOURCE} + {GEODIENSTE_SOURCE}",
-            license="gemischt — siehe je Layer",
+            license="gemischt — siehe je Layer (Feld `license` pro Record)",
             provenance="cached",
         )
     except Exception as e:  # noqa: BLE001

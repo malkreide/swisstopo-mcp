@@ -68,3 +68,49 @@ error sites hand back a non-swisstopo source under the swisstopo licence,
 confirmed by executing the exact call shapes. The OSM case is the sharp
 one, since ODbL is share-alike and relabelling it as Swiss OGD is a
 licence misstatement rather than a missing field. Partial.
+
+---
+
+### Remediation Status (2026-07-28, follow-up PR)
+
+**Closed, by removing the possibility rather than the instances.**
+
+The finding's own gap note asked for this: "make source and licence a single
+argument … so they cannot drift apart again, since a defaulted licence is
+exactly the failure this finding produced twice." Patching the 14 sites would
+have fixed this occurrence and left the mechanism intact.
+
+`ToolResponse.ok()` and `.error()` now take `license: str | None = None` and
+derive it from `source` via `LICENSE_BY_SOURCE` when it is not given. Omitting
+the licence therefore produces the *correct* attribution instead of the
+swisstopo default. All 14 sites are corrected without being touched —
+runtime-verified across all eight source constants that `error()` and `ok()`
+now agree, including `ToolResponse.error(..., source=OSM_SOURCE)` returning
+`ODbL — © OpenStreetMap contributors`.
+
+Two guards, because derivation alone only protects the sites that stay silent:
+
+1. **Exhaustiveness.** A test collects every `*_SOURCE` constant in `models.py`
+   by introspection and fails if one has no mapping entry. Verified by adding a
+   throwaway `NEWTHING_SOURCE` — the test named it.
+2. **Stated pairs.** An AST sweep over `src/` finds every
+   `ToolResponse.ok/error` call and fails if one pairs a source constant with a
+   different source's licence, or states a literal licence not on a declared
+   override list. Verified by flipping one `overpass.py` site to
+   `SWISSTOPO_LICENSE` — the test named the file and line. It also caught a
+   change made during this very remediation, which is the point.
+   The sweep asserts it found >50 call sites, so it cannot pass vacuously —
+   the failure mode the SEC-021 CI gate had.
+
+Also closed, from the same finding's gap list:
+
+- **Per-record provenance on aggregation.** `list_available_layers` emitted a
+  composite `license="gemischt — siehe je Layer"` that pointed at nothing
+  readable. Each record now carries its own `license`, and the envelope string
+  says where to look.
+- **The README ÖREB row** was already extended with `swisstopo_oereb_at` and
+  `swisstopo_query_geodata` in the `2026-07-27T162602-Z` batch.
+
+The six `overpass.py` error sites were given `license=OSM_LICENSE` explicitly in
+the OBS-002 PR, before this change. Those are now redundant but harmless, and
+guard 2 keeps them honest.

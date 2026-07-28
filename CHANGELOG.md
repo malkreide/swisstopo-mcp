@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed (CH-004)
+- **Third-party licences were lost on the error path.** `ToolResponse.error()`
+  took a `license` parameter that 14 call sites never passed, so it fell back to
+  the swisstopo default: OpenStreetMap data went out labelled
+  `Swiss Open Government Data (opendata.swiss)` instead of ODbL, and the
+  cantonal ÖREB terms — the most restrictive licence in the server — the same
+  way. Relabelling ODbL drops the share-alike obligation, so this was a licence
+  misstatement, not a missing field.
+
+  Fixed by removing the possibility rather than the instances. `ok()` and
+  `error()` now derive the licence from the source (`LICENSE_BY_SOURCE`) unless
+  a caller states one, so omitting it produces the correct attribution instead
+  of a wrong one. All 14 sites are corrected without being edited.
+
+  Two guards, since derivation only protects the sites that stay silent:
+  - a test that collects every `*_SOURCE` constant by introspection and fails if
+    one has no licence mapping;
+  - an AST sweep over `src/` that fails if a call site pairs a source with
+    another source's licence, or states a literal licence that is not on a
+    declared override list. It asserts it found more than 50 call sites, so it
+    cannot pass vacuously.
+
+  Both were verified to fail against a deliberately introduced defect. The sweep
+  also caught a change made during this remediation, which is the point.
+
+- **`list_available_layers` now carries a per-record licence.** Its envelope
+  licence is necessarily composite; `"gemischt — siehe je Layer"` previously
+  pointed at nothing the caller could read.
+
 ### Fixed (OBS-002)
 - **Two paths handed the model text the server should not have forwarded.**
   - `overpass.py` returned up to 300 characters of any upstream body containing

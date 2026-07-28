@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed (ARCH-007)
+- **`swisstopo_query_geodata` fans out over collections concurrently.** The loop
+  was strictly sequential — the check's named anti-pattern for an aggregation
+  tool, and `asyncio.gather` appeared nowhere in `src/`.
+
+  The naive fix would have been a regression. The sequential loop stopped as
+  soon as it had `limit` records, often after one request, and a `gather` over
+  every collection throws that away: a single geodienste dataset can hold **24**
+  collections (measured against `av_0`), so all-at-once means 24 requests
+  against a cantonal service on every call — to save latency only when the early
+  ones come back empty.
+
+  It now runs in **waves of 4**, keeping the early exit while cutting the worst
+  case by the wave size, with a cap of 12 collections per call. When the cap
+  bites the response says so; a cap nobody is told about reads as "this is
+  everything".
+
+  Six tests hold all three properties, since a fix satisfying only the first
+  would be worse than the defect: requests overlap (verified to fail at
+  concurrency 1), concurrency stays bounded, the early exit survives, results
+  stay deterministic under concurrency, and the truncation note appears exactly
+  when the cap bit.
+
 ### Added (OPS-003)
 - **`docs/isds-dsg.md` — the Phase-1 exit gate the check requires.** An ISDS
   classification and a DSG assessment existed nowhere and were not documented as

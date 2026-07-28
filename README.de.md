@@ -459,9 +459,10 @@ gebunden werden (Audit-Finding SEC-009).
   JSON-RPC-Fehlerobjekt. Gegen mcp 1.28.1 zur Laufzeit geprüft; eine frühere
   Fassung dieses Abschnitts behauptete `-32602` und war falsch. Die
   Eingabevalidierung erfolgt an der Pydantic-Grenze (SEC-018).
-- **Einschränkung:** bei *behandelten* Ausführungsfehlern setzt der Server nur das
-  Payload-Feld `is_error`, nie das Protokoll-Flag `isError`. Ein Client, der auf
-  das Protokoll-Flag verzweigt, sieht Erfolg. Verfolgt als OBS-001.
+- **Beide Flags stimmen überein.** Ein behandelter Ausführungsfehler setzt das
+  Protokoll-Flag `isError` *und* das Payload-Feld `is_error`; ein Client kann
+  auf beides verzweigen. Der Envelope inklusive `source` und `license` bleibt
+  auf dem Fehlerpfad erhalten (OBS-001).
 
 ## MCP-Primitive
 

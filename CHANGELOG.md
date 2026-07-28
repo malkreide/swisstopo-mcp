@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed (OBS-001)
+- **The protocol `isError` flag was never set.** Handled execution errors are
+  returned as a `ToolResponse` with `is_error: true` rather than raised — which
+  is what keeps them out of the JSON-RPC error channel — but the SDK builds a
+  `CallToolResult` with `isError=False` for any tool that returns normally. The
+  payload field was therefore the *only* signal, and a spec-conformant client
+  reading `CallToolResult.isError` saw success for every handled error: retry
+  logic, error dashboards and orchestrating agents would pass a German error
+  string downstream as though it were geodata. Reproduced over a real stdio
+  session before changing anything.
+
+  `_SwisstopoMCP` subclasses `FastMCP` and returns a `CallToolResult` with the
+  flag set when the envelope says so. The seam is supported rather than a
+  monkeypatch — the lowlevel handler passes a `CallToolResult` through
+  unchanged. Success behaviour, structured content, `source` and `license` are
+  all unaffected, verified over a real session.
+
+  **The gap that let this ship is closed too:** no test crossed the protocol
+  boundary, which is also why the wrong `-32602` documentation survived so long.
+  `tests/test_protocol_errors.py` drives a real client session over in-memory
+  streams — nine tests, three of them verified to fail against the previous
+  implementation. One asserts the error envelope still validates against the
+  tool's `outputSchema`, because returning a `CallToolResult` bypasses the SDK's
+  own output validation on that path.
+
+- `jsonschema` added to the dev extras. It arrives transitively via `mcp`, but
+  depending on that is exactly how the `PyYAML` gap reached CI.
+
 ### Fixed (SEC-018)
 - **Three string fields had no length bound.** `collection_id` (`stac.py`),
   `origins` (`geocoding.py`) and `layers` (`wmts.py`) carried a pattern but no

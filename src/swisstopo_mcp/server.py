@@ -12,7 +12,9 @@ Alle Endpunkte sind offen (kein API-Schluessel erforderlich, ausser OEREB-Kanton
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
+from typing import Any
 
+from mcp import types
 from mcp.server.fastmcp import Context, FastMCP
 from mcp.server.transport_security import TransportSecuritySettings
 from mcp.types import ToolAnnotations
@@ -92,7 +94,41 @@ async def lifespan(server: FastMCP):
         yield
 
 
-mcp = FastMCP(
+class _SwisstopoMCP(FastMCP):
+    """FastMCP that maps the envelope's `is_error` onto the protocol flag.
+
+    Handled execution errors are returned as a `ToolResponse` with
+    `is_error: true` rather than raised, which is what keeps them out of the
+    JSON-RPC error channel — the separation OBS-001 asks for. But the SDK builds
+    a `CallToolResult` with `isError=False` for any tool that returns normally,
+    so the payload field was the *only* signal: a spec-conformant client reading
+    `CallToolResult.isError` saw success for every handled error and would pass
+    a German error string downstream as though it were geodata (audit OBS-001).
+
+    The lowlevel `call_tool` handler returns a `CallToolResult` unchanged when
+    the registered handler produces one, so building it here is the supported
+    seam. Note this bypasses the SDK's output-schema validation on the error
+    path only; the payload is a `ToolResponse` this server constructed, so it
+    conforms by construction, and `tests/test_protocol_errors.py` asserts the
+    structured content still validates.
+    """
+
+    async def call_tool(  # type: ignore[override]
+        self, name: str, arguments: dict[str, Any]
+    ) -> Any:
+        result = await super().call_tool(name, arguments)
+        if isinstance(result, tuple) and len(result) == 2:
+            content, structured = result
+            if isinstance(structured, dict) and structured.get("is_error") is True:
+                return types.CallToolResult(
+                    content=list(content),
+                    structuredContent=structured,
+                    isError=True,
+                )
+        return result
+
+
+mcp = _SwisstopoMCP(
     "swisstopo_mcp",
     lifespan=lifespan,
     # Without this the SDK keeps its localhost-only default list and rejects

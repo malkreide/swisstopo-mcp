@@ -17,6 +17,7 @@ import pytest
 
 from swisstopo_mcp import api_client
 from swisstopo_mcp.api_client import PinnedTransport, _is_ip_literal, _pinning_enabled
+from swisstopo_mcp.config import Settings, settings
 
 
 async def _capture(monkeypatch, request: httpx.Request) -> httpx.Request:
@@ -44,19 +45,27 @@ def _request(url="https://api3.geo.admin.ch/rest/services/height"):
 
 
 class TestEnablement:
-    def test_off_by_default(self, monkeypatch):
-        monkeypatch.delenv("SWISSTOPO_PIN_DNS", raising=False)
+    """`SWISSTOPO_PIN_DNS` is read once at import into `Settings` (ARCH-004), so
+    these patch the settings object rather than the environment — setting the
+    variable after startup has no effect, by design."""
+
+    def test_off_by_default(self):
+        assert settings.pin_dns is False
         assert _pinning_enabled() is False
 
-    @pytest.mark.parametrize("value", ["1", "true", "TRUE", "yes"])
-    def test_explicit_opt_in(self, monkeypatch, value):
-        monkeypatch.setenv("SWISSTOPO_PIN_DNS", value)
+    def test_explicit_opt_in(self, monkeypatch):
+        monkeypatch.setattr(settings, "pin_dns", True)
         assert _pinning_enabled() is True
+
+    @pytest.mark.parametrize("value", ["1", "true", "TRUE", "yes"])
+    def test_truthy_env_values_parse(self, value):
+        """pydantic-settings, not us, decides what counts as true."""
+        assert Settings(pin_dns=value).pin_dns is True
 
     def test_disabled_behind_a_forward_proxy(self, monkeypatch):
         """A proxy resolves the name itself, so client-side pinning cannot
         apply — enabling it anyway would only break CONNECT."""
-        monkeypatch.setenv("SWISSTOPO_PIN_DNS", "true")
+        monkeypatch.setattr(settings, "pin_dns", True)
         monkeypatch.setenv("HTTPS_PROXY", "http://127.0.0.1:8080")
         assert _pinning_enabled() is False
 

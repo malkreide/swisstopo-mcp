@@ -7,7 +7,9 @@
     "skill_version": "1.0.0",
     "output_dir": "/home/user/swisstopo-mcp/audits/2026-07-27T162602-Z-swisstopo-mcp",
     "catalog_hash": "091f446b27965044ce658a1d5f4b2cabe2b0ab5661dcc1a53b6be8f1f2e093c0",
-    "catalog_dir": "/root/.claude/skills/mcp-audit/checks"
+    "catalog_dir": "/root/.claude/skills/mcp-audit/checks",
+    "audit_date": "2026-07-27",
+    "catalog_version": "091f446b2796"
   },
   "agent_runs": []
 }

@@ -1,0 +1,19 @@
+check_run:
+  id: OBS-004
+  status: pass
+  evidence_collected: 4
+  evidence_required: 2
+  findings:
+    - "Zero print() statements in src/: `grep -rn 'print(' src/ --include=*.py` returns nothing (matches are only in stale __pycache__ .pyc blobs). No console.log equivalents — pure Python."
+    - "stderr is configured explicitly, not relied on as a default: src/swisstopo_mcp/logging_config.py:49 `logger_factory=structlog.WriteLoggerFactory(file=sys.stderr)`, with the rationale stated at logging_config.py:3-6 and 48."
+    - "RUNTIME VERIFIED — stdout is protocol-only. Drove the real server (`python -m swisstopo_mcp.server`, stdio, SWISSTOPO_LOG_LEVEL=DEBUG) through initialize → notifications/initialized → tools/list. Every non-empty stdout line parsed as JSON-RPC; non-JSON stdout lines = 0. All log output (tracing_disabled debug record, server_started, server_stopped, per-tool records) appeared on stderr."
+    - "The dependency path is safe too: the MCP SDK's own logging helper builds a RichHandler on Console(stderr=True) (mcp/server/fastmcp/utilities/logging.py, verified by inspection of the installed package), so the SDK cannot write to stdout either. Same configuration runs for both transports — src/swisstopo_mcp/server.py:26 calls configure_logging() at import time, before the transport branch at server.py:742."
+  gaps:
+    - "No CI guard against regression. .github/workflows/ci.yml has no `no print() in src/` step, so a future debug print would only be caught by review. The check's remediation section recommends exactly such a step."
+  evaluator_notes: |
+    This is the one check where the claim could be settled empirically, and it
+    was: a live stdio session produced zero non-JSON bytes on stdout while
+    DEBUG-level structlog records and the SDK's own rich-formatted lines all
+    went to stderr. Configuration is explicit rather than accidental, and the
+    dual-transport path shares one logging setup. Pass. The missing CI guard
+    is a durability concern, not a current defect.

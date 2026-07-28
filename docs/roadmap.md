@@ -1,12 +1,14 @@
 # Roadmap
 
-Phase model per audit check **OPS-003**. The current phase is declared in the
-README ("Security & Compliance" section).
+Phase model per audit check **OPS-003**. **This document is the single authority
+for phase state** — the READMEs and `SECURITY.md` link here rather than restate
+it. The previous arrangement had each document naming the other as
+authoritative, which meant neither was (audit `2026-07-27T162602-Z`, OPS-003).
 
 ## Phase 1 — Read-only wrapper (✅ done)
 
 - [x] Read-only tool surface across the Swisstopo API families, all
-      `readOnlyHint: true` (13 tools at the time this phase closed; 23 today —
+      `readOnlyHint: true` (13 tools at the time this phase closed; 24 today —
       see the README for the current list)
 - [x] Pydantic v2 input schemas with `strict=True`, `extra="forbid"`, range and
       whitelist-pattern constraints (SEC-018)
@@ -54,8 +56,15 @@ server as the base.
 - [x] Deprecated and **archived** `swiss-geodata-mcp` (2026-07-27). No external
       users, so no alias-shim period was needed — plan §7.2.
 - [x] Re-run the audit against the changed surface — run
-      `2026-07-27T125314-Z`, 22 pass / 20 partial / 2 fail. Not
-      production-ready; see that run's `audit-report.md`.
+      `2026-07-27T125314-Z`, 22 pass / 20 partial / 2 fail.
+- [x] Adversarial re-audit after the remediation batch — run
+      `2026-07-27T162602-Z`, **24 pass / 20 partial / 0 fail** over the same 44
+      applicable checks. The agents were briefed to refute the remediation
+      claims rather than confirm them, and did so in six cases; four findings
+      are new (SDK-001, OBS-001, OBS-002, SCALE-003). The run's
+      `production_ready` flag reads YES only because it gates on hard `fail` —
+      two `partial` findings are critical severity. See that run's
+      `audit-report.md` §1a for the run-over-run comparison.
 
 ## Phase 3 — Write operations (not planned)
 

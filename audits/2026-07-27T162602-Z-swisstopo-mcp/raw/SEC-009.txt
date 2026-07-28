@@ -1,0 +1,26 @@
+check_run:
+  id: SEC-009
+  status: partial
+  evidence_collected: 5
+  evidence_required: 3
+  findings:
+    - "Session-ID generation is cryptographically sound, but it is the SDK's, not the server's. The server never generates a session id; mcp.server.streamable_http_manager creates `new_session_id = uuid4().hex` (128 bits from os.urandom). The SDK major is pinned at pyproject.toml:33 (`mcp[cli]>=1.28.1,<2.0.0`), so the generator cannot change under a minor bump without a deliberate constraint change."
+    - "The SDK does implement owner binding — `self._session_owners: dict[str, AuthorizationContext]` with a mismatch check on every request — but it is inert here. The requestor is derived from an AuthenticatedUser; with no auth configured (FastMCP is constructed without an auth/token verifier at src/swisstopo_mcp/server.py:49-99) the requestor is None for every caller, so the comparison `requestor != self._session_owners.get(...)` compares None to None and always passes. Anyone presenting a valid Mcp-Session-Id is that session."
+    - "No session TTL is configured. src/swisstopo_mcp/server.py:725 calls mcp.streamable_http_app() with defaults, and FastMCP.streamable_http_app constructs StreamableHTTPSessionManager without a session_idle_timeout; the SDK's default for that parameter is None, i.e. sessions live until the process restarts. The check's criterion 'Session-TTL ist explizit gesetzt' is unmet."
+    - "There is no server-side logout/invalidation endpoint. src/swisstopo_mcp/server.py:708-734 adds only /healthz alongside the MCP mount."
+    - "The residual risk is genuinely low and the deferral is documented honestly: SECURITY.md:45-51 states the server is unauthenticated by design, that there is no per-user state to bind to, and names SEC-009 as the trigger if an authenticated deployment is introduced. All 24 tools are stateless reads against public open data (verified via mcp.list_tools()), so a hijacked session confers no privilege the caller did not already have. Transport-level DNS-rebinding protection with explicit host/origin lists is on at src/swisstopo_mcp/server.py:58-62."
+  gaps:
+    - "No session TTL / idle timeout — sessions are unbounded for the process lifetime."
+    - "No server-side session invalidation path (no logout)."
+    - "The SDK's user-binding mechanism is present but a no-op because auth_model=none; no compensating binding (e.g. client-IP or a signed token) exists."
+    - "No runtime hijack probe was run against a live HTTP instance; verification is code- and SDK-source-level."
+  evaluator_notes: |
+    I deliberately did not inherit the prior 'documented deferral' framing. Two
+    of the six pass criteria (TTL, server-side invalidation) are independent of
+    whether auth exists, and neither is met — the server takes the SDK default
+    of no idle timeout and adds no logout route. The user-binding criteria are
+    genuinely inapplicable rather than skipped, and the ID entropy criterion is
+    met via the SDK's uuid4.
+    Partial rather than pass on the two unmet criteria; partial rather than
+    fail because the server holds no session-scoped state and serves only
+    public data, so the exploit value of a stolen session id is close to zero.

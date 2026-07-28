@@ -1,0 +1,20 @@
+check_run:
+  id: ARCH-002
+  status: pass
+  evidence_collected: 4
+  evidence_required: 2
+  findings:
+    - "Description length: runtime median 373.5 chars, min 181, max 835 across 24 tools — well above the check's median>=100 / floor-50 thresholds. No tool is a one-liner."
+    - "Use-case tags: 24/24 tools carry `<use_case>`, 18/24 carry `<important_notes>` (runtime scan of tool.description). Exceeds the 80% criterion. Example: src/swisstopo_mcp/server.py:496 and server.py:516."
+    - "Differentiation between competing tools is made explicit in the description itself, not only in the README: src/swisstopo_mcp/server.py (swisstopo_identify_features) states «Für Bauzone bzw. Gemeinde gibt es direkte Tools (swisstopo_zoning_at, swisstopo_municipality_at) — dieses Tool nur nutzen, wenn zusätzliche Rohattribute gebraucht werden» and «Im Gegensatz zu swisstopo_find_features (Attributsuche) erfolgt die Abfrage rein geografisch»."
+    - "Caveats travel in the description rather than only in the README: swisstopo_zoning_at states the ARE layer is «NICHT rechtsverbindlich»; swisstopo_query_osm_features states the ODbL source and Overpass rate limits; swisstopo_lookup_postal_code states an unknown PLZ returns an empty list with an explanatory hint."
+  gaps:
+    - "`<example>` appears in 0 of 24 descriptions. The check names it as one of the three conventional tags but the pass criteria do not require it; the input schemas are strict Pydantic models with per-field descriptions, which covers most of the same ground."
+    - "The differentiation cross-references are asymmetric for the ÖREB cluster — see ARCH-007: swisstopo_get_egrid (server.py:496) and swisstopo_get_oereb_extract (server.py:516) still describe each other as a chain and never mention the aggregate swisstopo_oereb_at."
+  evaluator_notes: |
+    All four pass criteria met on the numbers, verified at runtime. The fourth
+    criterion («bei mehreren ähnlichen Tools: Description macht Differenzierung
+    explizit») is met for the api3/zoning/municipality cluster but only
+    one-directionally for the ÖREB cluster. That gap is material enough to
+    matter, but it is ARCH-007's criterion (cross-referenced precedence), so it
+    is recorded here as a gap rather than downgrading ARCH-002.

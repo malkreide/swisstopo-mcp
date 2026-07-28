@@ -1,0 +1,25 @@
+check_run:
+  id: ARCH-011
+  status: pass
+  evidence_collected: 5
+  evidence_required: 3
+  findings:
+    - "All mandatory top-level files present: README.md, README.de.md, CHANGELOG.md, LICENSE, pyproject.toml. All mandatory directories present: src/, tests/, .github/workflows/ (ci.yml, publish.yml, security.yml, live-test.yml — so both the `test.yml`-equivalent and `publish.yml` the check names, plus two more)."
+    - "src-Layout is correct, not flat: `src/` contains exactly one package directory `swisstopo_mcp/` with no stray .py files at the src/ level, and pyproject.toml:63 declares `packages = [\"src/swisstopo_mcp\"]` under the hatchling wheel target. Tests live in tests/, not inside src/."
+    - "README parity holds: 20 of 21 `##` sections map one-to-one as translations (Overview/Uebersicht, Features/Funktionen, … Credits & Related Projects/Credits & Verwandte Projekte). The single unmatched EN section is a second `## Installation` at README.md:582, inside a `<!-- BEGIN GENERATED: install -->` block (README.md:581-600) emitted by MCP-registry tooling — machine-generated, not authored content."
+    - "THE ARGUED DEVIATION IS PRESENT IN BOTH READMEs, as claimed. README.md:386-398 «Project structure» and README.de.md:376-386 «Projektstruktur». Both state the same rationale: modules map one-to-one onto upstream API families (rest_api.py → api3 MapServer, stac.py → STAC, oereb.py → cantonal ÖREB, openplz.py → OpenPLZ, overpass.py → OSM, coords.py → REFRAME), which is the axis this code varies along, so a `tools/` level «would add a directory without adding a distinction»."
+    - "The argument's factual premise checks out. Every `@mcp.tool` function in src/swisstopo_mcp/server.py is a thin delegating wrapper whose body is a single `return await <handler>(params)` — e.g. server.py:120 (`return await geocode(params)`), server.py:564 (`return await list_available_layers(params)`), server.py:585 (`return await query_geodata(params)`), server.py:705 (`return await search_address(params)`). No tool logic lives in server.py, so the README's claim «server.py contains tool registrations only; every tool body lives in its domain module» is true, and the module split is real rather than nominal."
+  gaps:
+    - "server.py is 755 lines against the check's «< 200 Zeilen» guideline. The length is entirely registration boilerplate — 24 × (decorator + ToolAnnotations block + docstring + one-line delegation) — so it is bulk without complexity, and README.md:397-398 addresses it directly («Splitting it further is a readability question, not a structural one»). README.de.md:384-386 makes the module-body point but omits that specific sentence, so the German version argues the `tools/` question slightly less completely than the English."
+    - "The German README lacks the machine-generated `## Installation` block that README.md:581-600 carries. Generated content, no action needed, but it means a naive section-diff between the two files reports a mismatch."
+  evaluator_notes: |
+    Pass. The parent asked specifically whether the argument is actually present
+    in both READMEs — it is, at README.md:386-398 and README.de.md:376-386, and
+    it is a real architectural argument rather than a restatement of the status
+    quo. This check, unlike ARCH-006, explicitly permits argued deviations
+    («Abweichungen vom Standard sind im README begründet»), and the deviation
+    argued here is narrow (one directory level) while every other criterion —
+    mandatory files, mandatory directories, src-layout, CI workflows, README
+    parity — is met outright. I verified the argument's load-bearing premise
+    rather than accepting it: server.py really does contain no tool bodies.
+    Closing this by documentation was legitimate.

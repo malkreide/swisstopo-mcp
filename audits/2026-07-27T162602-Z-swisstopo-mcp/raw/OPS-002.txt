@@ -1,0 +1,25 @@
+check_run:
+  id: OPS-002
+  status: pass
+  evidence_collected: 7
+  evidence_required: 4
+  findings:
+    - "All eight mandatory sections are present in README.md: Installation (66), Configuration (105), Available Tools (151), Architecture (244), Security & Compliance (313), Known Limitations (492), License (555), plus the anchor demo query at README.md:36. README.de.md mirrors every one: Installation (66), Konfiguration (105), Verfuegbare Tools (151), Architektur (244), Sicherheit & Compliance (310), Bekannte Einschraenkungen (487), Lizenz (550)."
+    - "The anchor demo query is concrete and natural-language, in both files: README.md:36 «Which communes are in the Uster district, and what are their BFS numbers for joining with BFS statistics data?» / README.de.md:33 the German equivalent — each followed by an explanation of why the BFS commune number is the portfolio join key."
+    - "The ASCII architecture diagram is real box-drawing, not prose: README.md:245-267 and README.de.md:245-267 show the MCP host → server → seven upstream endpoint families with directional arrows, and it is current (24 Tools, the geodienste.ch/overpass/OpenPLZ rows all present)."
+    - "The Known-Limitations section carries four explicit limits (README.md:494-497: ÖREB canton dependency, STAC v0.9 metadata gaps, Swiss-addresses-only geocoding, Swisstopo rate limits), well past the ≥3 bar, plus a nine-row OpenPLZ live-probe findings table at README.md:499-517 that documents concrete edge-case behaviour (empty-list-is-not-absent, hard pageSize 50, HTTP 400 on raw umlauts)."
+    - "Section parity between the two READMEs is 1:1 across all 20 top-level headings, in the same order."
+    - "CHANGELOG.md follows Keep a Changelog: the format is declared at CHANGELOG.md:5, entries are dated per release (## [0.3.0] - 2026-07-27 at line 264, [0.2.0] - 2026-07-20 at 301, [0.1.0] - 2026-04-02 at 439) under an [Unreleased] head (line 8), using Added / Changed / Fixed / Security subsections."
+    - "CONTRIBUTING is bilingual and present: CONTRIBUTING.md and CONTRIBUTING.de.md, referenced from README.md:541 / README.de.md:536; SECURITY.md and SECURITY.de.md likewise."
+  gaps:
+    - "README.md has a duplicate `## Installation` heading — the human-written one at line 66 and a generated MCP-registry block at line 582 (between `<!-- BEGIN GENERATED: install -->` markers). README.de.md has no such block, so the two files differ by one section despite otherwise perfect parity."
+    - "CHANGELOG.md mixes non-standard subsection names into the Keep-a-Changelog scheme (`### Architecture decision`, `### Known findings (OpenPLZ live probe, 2026-07-20)`, `### ⚠️ BREAKING — six tools renamed (SEC-022)`). Readable, but a strict parser will not recognise them."
+    - "No CI parity gate. The check's remediation step 5 proposes a `grep '^## '` diff between the two READMEs; .github/workflows/ci.yml has no such step, so the current parity is maintained by discipline alone."
+  evaluator_notes: |
+    This is the strongest of the assigned checks. Every mandatory section is
+    present in both languages, the anchor demo query is genuinely a question a
+    non-technical stakeholder would ask, the ASCII diagram is current with the
+    24-tool surface, and the limits section goes beyond the required three
+    into a documented live-probe table. CHANGELOG and bilingual CONTRIBUTING
+    are in place. The duplicate generated Installation heading and the free-form
+    CHANGELOG subsections are cosmetic. Pass.

@@ -1,0 +1,24 @@
+check_run:
+  id: SEC-007
+  status: pass
+  evidence_collected: 5
+  evidence_required: 3
+  findings:
+    - "Dockerfile drops to a non-root, high-UID user: Dockerfile:16 creates uid/gid 10001 with a nologin shell, Dockerfile:20 sets `USER 10001`. The image is a two-stage build (Dockerfile:6 builder, Dockerfile:13 runtime) installing into an isolated prefix (Dockerfile:11), so no build toolchain survives into the runtime layer."
+    - "Kubernetes pod-level securityContext is complete: deploy/kubernetes.yaml:28 runAsNonRoot: true, :29 runAsUser: 10001, plus runAsGroup/fsGroup, and :32-33 seccompProfile type RuntimeDefault."
+    - "Container-level securityContext covers all three remaining criteria: deploy/kubernetes.yaml:58 allowPrivilegeEscalation: false, :59 readOnlyRootFilesystem: true, :61 capabilities.drop: [\"ALL\"]."
+    - "The read-only root filesystem is actually workable, not aspirational: deploy/kubernetes.yaml:83 mounts an emptyDir at /tmp with a 64Mi sizeLimit (:86-88), and Dockerfile:35-37 documents the equivalent plain-Docker invocation (--read-only --tmpfs /tmp --cap-drop ALL --security-opt no-new-privileges). Dockerfile:23 also sets PYTHONDONTWRITEBYTECODE=1, which is what makes a read-only /usr/local survivable."
+    - "No filesystem tools are exposed, so the volume-scoping criterion is vacuous by construction: no subprocess, os.system, eval, exec or open() of user-supplied paths anywhere in src/ (verified by grep), and docs/deployment.md:87 states 'No filesystem tools are exposed, so no host paths are mounted.'"
+  gaps:
+    - "No container image scanning step in CI. .github/workflows/security.yml runs gitleaks only; there is no Trivy/Grype/Snyk gate on the built image, which the check lists as remediation step 4."
+    - "The runtime verification (docker exec id / touch /etc/test / CapEff) could not be executed — no container runtime in the audit sandbox. Evidence is manifest-level only."
+    - "The image is never actually built in CI, so nothing proves the Dockerfile still builds or that the non-root user can run the app under --read-only."
+  evaluator_notes: |
+    Every item on the pass-criteria list is present in the shipped artefacts and
+    I checked each one against the file rather than against the claim: non-root
+    UID >= 10000, runAsNonRoot, explicit runAsUser, allowPrivilegeEscalation
+    false, readOnlyRootFilesystem with a tmpfs, capabilities drop ALL, seccomp
+    RuntimeDefault. The read-only filesystem claim is backed by a real tmpfs
+    mount and PYTHONDONTWRITEBYTECODE rather than just asserted.
+    Pass. The gaps are supply-chain hygiene (no image scan, no image build in
+    CI) rather than missing sandboxing controls, so they do not downgrade it.

@@ -1,0 +1,24 @@
+check_run:
+  id: SCALE-001
+  status: pass
+  evidence_collected: 5
+  evidence_required: 2
+  findings:
+    - "Transport selection is env-driven, not hardcoded: `transport: Literal[\"stdio\", \"streamable-http\"] = \"stdio\"` in Settings (src/swisstopo_mcp/config.py:25), consumed at src/swisstopo_mcp/server.py:745 (`use_http = \"--http\" in sys.argv or settings.transport == \"streamable-http\"`), with host/port from settings.http_host/http_port (src/swisstopo_mcp/config.py:34-35, used at src/swisstopo_mcp/server.py:752-755). No WebSocket implementation anywhere in src/."
+    - "The cloud path uses streamable-http, not stdio: Dockerfile:38 `CMD [\"python\", \"-m\", \"swisstopo_mcp.server\", \"--http\", \"--port\", \"8000\"]`, with SWISSTOPO_HTTP_HOST=0.0.0.0 set in the image only (Dockerfile:26) while the code default stays 127.0.0.1."
+    - "THE REGRESSION IS ACTUALLY FIXED, verified against a live server rather than by reading the constructor. With SWISSTOPO_ALLOWED_HOSTS=swisstopo-mcp.example.com, a POST /mcp initialize carrying `Host: swisstopo-mcp.example.com` returned HTTP 200 with a session id (`5d04e6a03c3d493389a8f8015cc7f286`) — this is the request that previously returned 421."
+    - "COUNTERFACTUAL run proves the setting is load-bearing and the failure mode is exactly as described: the same server started with SWISSTOPO_ALLOWED_HOSTS unset returned HTTP 421 `Invalid Host header` for the ingress Host, while GET /healthz returned HTTP 200 `{\"status\":\"ok\"}` in the same run. The green-probe-hides-broken-MCP asymmetry is real and is now asserted deliberately (tests/test_http_app.py:158-167)."
+    - "The wiring is `transport_security=TransportSecuritySettings(...)` on the FastMCP constructor (src/swisstopo_mcp/server.py:58-62) fed by settings.allowed_hosts_list / transport_origins_list (src/swisstopo_mcp/config.py:74-91). Loopback entries use the SDK's `:*` wildcard-port form (src/swisstopo_mcp/config.py:49-50) so `--port` overrides do not lock out local use — confirmed at runtime on port 8765/8766/8770."
+  gaps:
+    - "deploy/kubernetes.yaml:48-49 ships `SWISSTOPO_ALLOWED_HOSTS: \"\"` as a placeholder. Applied as-is the manifest reproduces the original outage exactly — every MCP request 421s while both probes stay green (deploy/kubernetes.yaml:62-73 both point at /healthz). The comment at :44-47 warns about it, but nothing enforces it."
+    - "Neither probe exercises /mcp, so no orchestrator-level check would ever detect the misconfiguration; the readiness probe is still the wrong signal for this failure."
+    - "No deployment manifest sets SWISSTOPO_TRANSPORT; the container relies on the `--http` CLI flag in CMD instead of the ARCH-004 settings path."
+  evaluator_notes: |
+    All four pass criteria hold and the highest-impact claim was verified live on
+    both directions: the ingress-Host request now succeeds, and with the setting
+    removed it fails again with the documented 421 while /healthz stays 200. Env-based
+    transport selection, streamable-http in the container, no WebSocket, endpoint
+    answers initialize with 200. The residual is that the shipped K8s manifest still
+    has an empty ALLOWED_HOSTS placeholder, so a copy-paste deployment lands back in
+    the broken state — a documentation/enforcement gap rather than a code defect.
+    Pass.

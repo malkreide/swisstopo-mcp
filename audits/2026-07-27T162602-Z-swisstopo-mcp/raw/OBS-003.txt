@@ -1,0 +1,22 @@
+check_run:
+  id: OBS-003
+  status: pass
+  evidence_collected: 5
+  evidence_required: 2
+  findings:
+    - "structlog is a hard runtime dependency, not dev-only: pyproject.toml:35 (`structlog>=24.1.0`)."
+    - "JSON output is configured, not merely intended: src/swisstopo_mcp/logging_config.py:38-53 chains merge_contextvars → add_log_level → TimeStamper(iso) → StackInfoRenderer → format_exc_info → JSONRenderer, with WriteLoggerFactory(file=sys.stderr) at logging_config.py:49. Runtime probe of the real stdio server emitted e.g. {\"event\": \"server_started\", \"level\": \"info\", \"timestamp\": \"...\"} on stderr."
+    - "Four severity levels are actually used, not just declared: debug ×8 (e.g. src/swisstopo_mcp/api_client.py:324 upstream_request, api_client.py:300 upstream_retry), info ×5 (src/swisstopo_mcp/server.py:39, observability.py:83), warning ×3 (api_client.py:408, observability.py:66,100), error ×2 (api_client.py:413, logging_config.py:98)."
+    - "Per-call bound context exists: src/swisstopo_mcp/logging_config.py:71 binds `tool` plus a 12-hex `correlation_id` for every call, emitting tool_invoked / tool_completed(duration_ms) / tool_failed. Applied to all 24 handlers — 24 @log_tool_call decorations across coords.py:273, geocoding.py:109,137, height.py:139,171, oereb.py:110,160,304, openplz.py:395,522,537, overpass.py:150, rest_api.py:307,337,372,402,445,478,516, stac.py:135,170, geodata.py:235,501, wmts.py:47."
+    - "Behaviour is regression-tested: tests/test_logging.py:35-52 asserts tool_invoked/tool_completed at info level and that correlation_id is bound on every record; tests/test_logging.py:53+ covers the failure path."
+  gaps:
+    - "stderr carries two formats. The MCP SDK's own stdlib logging is not routed through structlog, so the runtime probe showed a rich-formatted plaintext line (`[07/27/26 16:35:02] INFO Processing request of type ListToolsRequest  server.py:733`) interleaved with the JSON records. A log aggregator will fail to parse those lines."
+    - "No session/client identity is bound. `ctx.session_id` / client_info are available on the two handlers that take a Context (height.py:171, oereb.py:160,304) but are not bound, so multi-step workflows cannot be correlated across tool calls — only within one."
+  evaluator_notes: |
+    Every pass criterion the check names is met and verified at runtime rather
+    than by reading: structured logger as a real dependency, JSON to stderr,
+    four levels in genuine use, bound per-call context on all 24 tools, and no
+    print() anywhere in src/. The two gaps are real but neither is a criterion
+    failure: the unstructured lines come from the SDK's own logger, and the
+    check lists session_id as part of the bound-context example rather than as
+    a hard requirement. Pass, with the SDK-logger format mismatch recorded.

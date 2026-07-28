@@ -1,0 +1,27 @@
+check_run:
+  id: SDK-003
+  status: partial
+  evidence_collected: 6
+  evidence_required: 2
+  findings:
+    - "Only 3 of 24 tools take a Context: swisstopo_elevation_profile (src/swisstopo_mcp/server.py:363), swisstopo_get_oereb_extract (src/swisstopo_mcp/server.py:514) and swisstopo_oereb_at (src/swisstopo_mcp/server.py:535). The third is new since the previous run; the two tools the previous run named as the actually-slow ones still have none."
+    - "Those three do use the context rather than merely accept it: `ctx.info()` at src/swisstopo_mcp/height.py:179 and src/swisstopo_mcp/oereb.py:167, `ctx.report_progress()` at src/swisstopo_mcp/height.py:204. Inner helpers keep `ctx: Context | None = None` so direct calls still work (src/swisstopo_mcp/height.py:173, src/swisstopo_mcp/oereb.py:162, :305)."
+    - "The single report_progress call is still a post-hoc completion marker, not a cadence: src/swisstopo_mcp/height.py:204 fires `progress=1, total=1` AFTER `geo_admin_request` at :189-196 has already returned. The actual wait is unreported. This is item 2 of the previous run's remediation list and it was not applied."
+    - "swisstopo_query_osm_features — the slowest tool in the surface — still takes no ctx (src/swisstopo_mcp/server.py:615) despite a 30s client / 25s server timeout (src/swisstopo_mcp/overpass.py:39-40)."
+    - "swisstopo_find_commune still takes no ctx (src/swisstopo_mcp/server.py:672) while `_list_by_canton`/`_list_by_district` (src/swisstopo_mcp/openplz.py:458, :481, :502) drive `_fetch_all_pages` (src/swisstopo_mcp/openplz.py:153-185), a `while True` page loop bounded by OPENPLZ_MAX_RECORDS=2000 at pageSize 50 (src/swisstopo_mcp/openplz.py:49, :163) — up to 40 sequential upstream requests with no progress signal."
+    - "The swallowed legend failure is unchanged: bare `except Exception: meta[\"legend\"] = None` at src/swisstopo_mcp/rest_api.py:546-547, with no ctx threaded into layer_info (src/swisstopo_mcp/server.py:429), so a client cannot tell 'no legend exists' from 'legend fetch failed'. Item 3 of the previous remediation list, not applied."
+    - "Positive on the stdio-safety criterion: no `print()` anywhere in src/; structlog is bound to stderr so stdout stays reserved for the protocol (src/swisstopo_mcp/logging_config.py, WriteLoggerFactory(file=sys.stderr))."
+    - "Retry backoff compounds the gap: every upstream call can add 2s+4s+8s of silent waiting (src/swisstopo_mcp/api_client.py:268 RETRY_BACKOFFS), and no ctx is threaded into api_client at all, so even the three ctx-aware tools report nothing during a retry storm."
+  gaps:
+    - "No ctx on the two tools with expected runtime > 2s (query_osm_features, find_commune)."
+    - "No progress reporting at a 1-2s cadence anywhere; the one call that exists fires after the wait."
+    - "Silently swallowed upstream errors are not surfaced via ctx.warning()/ctx.error() (rest_api.py:546-547)."
+    - "tests/test_context.py:11-32 asserts only that elevation_profile awaits ctx.info and ctx.report_progress at all — it cannot distinguish a completion marker from a cadence, so it would keep passing under every gap above."
+  evaluator_notes: |
+    This check was left open by the previous run and no remediation was claimed for
+    it, which matches what the source shows: three of the four remediation items are
+    unapplied. One tool (oereb_at) gained a ctx parameter, and the stdio-safety half
+    of the check (no print, stderr-bound logging) is solid, so it is not a fail. But
+    the substantive criteria — ctx on tools >2s, progress every 1-2s, warnings for
+    swallowed errors — are all still unmet on the tools that actually keep a client
+    waiting. Partial.

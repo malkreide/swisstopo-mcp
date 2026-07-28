@@ -232,7 +232,7 @@ BFS statistics (`swiss-statistics-mcp`) and `zurich-opendata-mcp`.
 | *"What buildings are at coordinates 2683500, 1247500?"* | `swisstopo_identify_features` |
 | *"Find orthophoto datasets for download"* | `swisstopo_search_geodata` |
 | *"Show me a map of Bern at zoom level 10"* | `swisstopo_map_url` |
-| *"What restrictions apply to parcel at Musterstrasse 5?"* | `swisstopo_get_egrid` + `swisstopo_get_oereb_extract` |
+| *"What restrictions apply to parcel at Musterstrasse 5?"* | `swisstopo_oereb_at` |
 | *"Which schools are within 500 m of Bederstrasse 109, 8002 Zürich, and which streets lead there?"* | `swisstopo_query_osm_features` + `swisstopo_query_geodata` (`strassenverzeichnis`) |
 | *"Which contaminated-sites data is free for canton ZH?"* | `swisstopo_list_available_layers` + `swisstopo_query_geodata` (`geodienste:kataster_belasteter_standorte:ZH`) |
 | *"Which communes are in the Uster district and what are their BFS numbers?"* | `swisstopo_find_commune` (`district=109`) |
@@ -321,10 +321,10 @@ This server is in **Phase 2.5 — Consolidation of `swiss-geodata-mcp`**
 
 | Property | Status |
 |---|---|
-| Read tools | 23, all `readOnlyHint: true` / `destructiveHint: false` |
+| Read tools | 24, all `readOnlyHint: true` / `destructiveHint: false` |
 | Write tools | none — Phase 3, not planned |
 | Transport | stdio (default) and Streamable-HTTP |
-| Last audit | `audits/2026-07-27T125314-Z-swisstopo-mcp/` |
+| Last audit | `audits/2026-07-27T162602-Z-swisstopo-mcp/` |
 
 A phase advance requires: the phase's roadmap items checked off, a re-run audit
 with no open `critical` findings, and a CHANGELOG entry naming the new phase.
@@ -374,7 +374,7 @@ office from swisstopo, so its licence is asserted rather than inherited.
 | swisstopo REFRAME (geodesy.geo.admin.ch) | `swisstopo_convert_coordinates` | Swiss OGD (opendata.swiss) |
 | swissBOUNDARIES3D (swisstopo) | `swisstopo_municipality_at` | Swiss OGD (opendata.swiss) |
 | `ch.are.bauzonen` (**ARE**) | `swisstopo_zoning_at` | Swiss OGD — Bundesamt für Raumentwicklung ARE |
-| Cantonal ÖREB cadastre | `swisstopo_get_egrid`, `swisstopo_get_oereb_extract` | Cantonal ÖREB terms |
+| Cantonal ÖREB cadastre | `swisstopo_get_egrid`, `swisstopo_get_oereb_extract`, `swisstopo_oereb_at`, `swisstopo_query_geodata` | Cantonal ÖREB terms |
 | geodienste.ch (cantons) | `swisstopo_query_geodata` | Free use — attribution required |
 | OpenStreetMap (Overpass) | `swisstopo_query_osm_features` | ODbL — © OpenStreetMap contributors |
 | OpenPLZ (BFS + swisstopo) | `swisstopo_lookup_postal_code`, `swisstopo_find_commune`, `swisstopo_search_address` | Free use — attribution required |
@@ -445,16 +445,23 @@ validated user identity (audit finding SEC-009).
 ### Error handling
 
 - **Execution errors** (upstream failure, invalid value) are returned as a
-  `ToolResponse` with `is_error: true` and a user-friendly `summary`; raw
-  exception text is never leaked to the client (it is logged to stderr instead).
-- **Protocol errors** (unknown tool, malformed/invalid arguments) are emitted by
-  the MCP SDK as JSON-RPC errors with standard codes (e.g. `-32602` invalid
-  params). Input validation happens at the Pydantic boundary (SEC-018).
+  `ToolResponse` with `is_error: true` and a user-friendly `summary`; unexpected
+  exception text is masked and logged to stderr instead. Two known leaks remain
+  (`overpass.py` error bodies, `PermissionError` allow-list disclosure) — see
+  OBS-002 in the latest audit run.
+- **Protocol errors** (unknown tool, malformed/invalid arguments) come back from
+  the SDK as tool results with the protocol `isError` flag set — *not* as
+  JSON-RPC error objects. Verified against mcp 1.28.1 by runtime probe; an
+  earlier version of this section claimed `-32602` and was wrong. Input
+  validation happens at the Pydantic boundary (SEC-018).
+- **Caveat:** for *handled* execution errors the server sets only the payload
+  field `is_error`, never the protocol `isError` flag. A client that branches on
+  the protocol flag sees success. Tracked as OBS-001.
 
 ## MCP Primitives
 
 This server intentionally exposes **Tools only** (no Resources or Prompts):
-it is a Phase-1 read-only wrapper, and every result is a live, parameterised
+it is a read-only wrapper, and every result is a live, parameterised
 API query rather than a static addressable document. Resources/Prompts may be
 added in a later phase if stable URI schemes emerge.
 
@@ -466,8 +473,9 @@ short, documented discovery chain (each tool's description states the next step)
 - **Feature query:** `swisstopo_search_layers` (find layer IDs) →
   `swisstopo_identify_features` / `swisstopo_find_features` →
   `swisstopo_get_feature` (full detail).
-- **Cadastre:** `swisstopo_geocode` → `swisstopo_get_egrid` →
-  `swisstopo_get_oereb_extract`.
+- **Cadastre:** `swisstopo_geocode` → `swisstopo_oereb_at` (one call: coordinates
+  → EGRID → extract). Use `swisstopo_get_egrid` → `swisstopo_get_oereb_extract`
+  only when the parcel ID itself is wanted.
 - **Downloads:** `swisstopo_search_geodata` → `swisstopo_get_collection`.
 
 ---

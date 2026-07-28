@@ -33,14 +33,20 @@ allow-list (audit check **SEC-021**) and complements the SSRF hardening from
   so an upstream cannot redirect a request to an off-list host.
 - **Network layer (deployment):** a Kubernetes `NetworkPolicy` **is** shipped, in
   [`deploy/kubernetes.yaml`](../deploy/kubernetes.yaml). Be precise about what it
-  does: it blocks egress to private CIDR ranges and permits DNS, ports 80/443.
+  does: it blocks egress to private CIDR ranges and permits DNS plus TCP/443.
+  Not port 80 — an earlier version of this sentence said 80/443 and was wrong.
   It is a **CIDR and port restriction, not a per-host allow-list** — a
   NetworkPolicy cannot match on hostname, so it cannot mirror the table above.
 
   Closing that gap needs an egress proxy. The **ACL is now shipped** —
   [`deploy/smokescreen-acl.yaml`](../deploy/smokescreen-acl.yaml), generated from
   `ALLOWED_HOSTS` by `scripts/render_egress_acl.py` and checked in CI, so the
-  network layer cannot drift from the code layer.
+  network layer cannot drift from the code layer. CI checks two things, and it
+  needs both: that the committed file matches the renderer (staleness), and that
+  it *parses* with the ten hosts under `allowed_domains`
+  (`tests/test_egress_allowlist.py::TestGeneratedProxyAcl`). The byte-comparison
+  alone was blind to a renderer bug that produced a valid-looking file enforcing
+  nothing — audit `2026-07-27T162602-Z`, SEC-021.
 
   The **deployment manifest is shipped too**:
   [`deploy/egress-proxy.yaml`](../deploy/egress-proxy.yaml) adds the Smokescreen

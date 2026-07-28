@@ -1,0 +1,24 @@
+check_run:
+  id: SEC-020
+  status: pass
+  evidence_collected: 4
+  evidence_required: 3
+  findings:
+    - "Exhaustive grep over src/ and scripts/ for os.system(, shell=True, eval(, exec(, os.popen(, subprocess, pickle.loads and __import__ returns zero hits. The class of vulnerability the check targets does not exist here — the server spawns no process and evaluates no string. (The only `import subprocess` in the repo is tests/test_tool_namespace.py:16, test code, not a runtime path.)"
+    - "There is no shell surface to protect because the server is library-first by construction: every outbound action is an httpx call funnelled through src/swisstopo_mcp/api_client.py:277-318, and no external binary is invoked anywhere."
+    - "The equivalent of the timeout criterion is met for the one I/O primitive that exists: a 30s default at src/swisstopo_mcp/api_client.py:28 applied to every client (src/swisstopo_mcp/api_client.py:221), a per-request override path (src/swisstopo_mcp/api_client.py:284), and bounded retry backoff (src/swisstopo_mcp/api_client.py:268)."
+    - "Path handling uses pathlib, not string concatenation, at the only two sites that touch the filesystem: scripts/render_egress_acl.py:19 and scripts/snapshot_tool_hashes.py:26, both resolving relative to __file__ with no user input involved. No tool accepts or constructs a filesystem path."
+  gaps:
+    - "No CI regression hook for the forbidden patterns. The check's remediation step 4 suggests a grep gate in the workflow; .github/workflows/ci.yml has ruff/mypy/pytest plus the two snapshot gates but no `! grep -rnE 'os\\.system|shell=True|eval\\(|exec\\('` step, so a future reintroduction would rely on human review."
+    - "Ruff's rule selection at pyproject.toml:85 is [\"E\",\"F\",\"W\",\"I\",\"UP\"] — the security ruleset (S / flake8-bandit) is not enabled, so the linter would not flag a reintroduced subprocess/eval either."
+    - "No parametrised injection suite of the `; rm -rf /` shape exists; tests/test_input_validation.py:14-24 covers NUL, angle brackets, quotes and backticks. Vacuous today given no shell, but the check lists it as a criterion."
+    - "TEXT_PATTERN (src/swisstopo_mcp/api_client.py:43) admits ';', '&', '|'-adjacent metacharacters would be rejected but ';' and '&' pass — harmless while no shell exists, relevant if one is ever added."
+  evaluator_notes: |
+    Pass on the substance: the mandatory criteria are 'no os.system / shell=True
+    / eval / exec / popen' and 'parametrised calls, library-first', and both are
+    satisfied absolutely rather than mitigated. I verified by grep across src/
+    and scripts/ rather than reading the prior claim.
+    Recorded gaps are all defence-against-regression rather than present
+    exposure — no CI grep gate, no bandit ruleset, no injection-suite test. Given
+    43% of MCP servers fail this check, a two-line CI grep would be cheap
+    insurance for a codebase that currently has nothing to lose.

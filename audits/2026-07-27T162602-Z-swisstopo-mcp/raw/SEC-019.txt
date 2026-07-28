@@ -1,0 +1,21 @@
+check_run:
+  id: SEC-019
+  status: pass
+  evidence_collected: 5
+  evidence_required: 3
+  findings:
+    - "A Trifecta assessment table is documented, leg by leg with rationale, at README.md:399-407 (and mirrored in German at README.de.md:388-396): private data ❌, untrusted content ⚠️ limited, external communication ❌, concluding 'at most 1 of 3'. SECURITY.md:33 carries the same verdict in the posture table."
+    - "Leg 1 (private data) verified independently: all ten upstream hosts in src/swisstopo_mcp/api_client.py:55-68 are public federal/cantonal/OSM open-data endpoints requiring no credential; no PII field exists in any input or response model."
+    - "Leg 3 (external send) verified independently: no smtplib, no webhook, no mailer, no mutating HTTP verb anywhere in src/. The only non-GET request in the codebase is the Overpass query POST at src/swisstopo_mcp/overpass.py:159-165, which is a read expressed as POST. All 24 tools carry readOnlyHint=True / destructiveHint=False, enforced in CI by tests/test_tool_hygiene.py:60-72."
+    - "Leg 2 (untrusted content) is correctly rated 'limited' rather than absent, and the compensating control is a frozenset, not config: src/swisstopo_mcp/api_client.py:55 declares ALLOWED_HOSTS as a frozenset with an explicit comment that it is not loaded from env so it cannot be widened at runtime — precisely the check's 'FrozenSet im Code, nicht config-mutierbar' criterion. Note the ⚠️ is honest: overpass.osm.ch and openplzapi.org are community/third-party sources, so some untrusted content genuinely enters."
+    - "The re-evaluation trigger is recorded as process, not just prose: README.md:329-331 requires re-running the Lethal-Trifecta assessment and a security review before any Phase-3 write tool is implemented; docs/roadmap.md:63 repeats it; SECURITY.md:86-97 lists write/send capability as the first trigger that voids the current risk-bounding argument."
+  gaps:
+    - "There is no separate ADR file — the assessment lives in README.md/SECURITY.md rather than a docs/adr-*.md. The check only requires an ADR at score 2; at score 1 the README table satisfies the criterion, so this is a form preference, not a miss."
+    - "The recipient-allow-list criterion is vacuous today (nothing is sent); nothing pre-commits the shape of that control for a future send-capable tool beyond the re-evaluation trigger."
+  evaluator_notes: |
+    I re-derived each leg from the source instead of accepting the table: no
+    credentials on any upstream, no send primitive of any kind, and the one
+    genuinely untrusted-content vector (Overpass/OpenPLZ) is bounded by an
+    immutable frozenset. Score is 1, arguably 1.5 — well inside the safe band.
+    Pass. The trigger discipline for Phase 3 is documented in three independent
+    places, which is what makes this durable rather than a point-in-time claim.

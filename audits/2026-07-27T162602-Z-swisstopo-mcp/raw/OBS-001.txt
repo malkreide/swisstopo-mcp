@@ -1,0 +1,22 @@
+check_run:
+  id: OBS-001
+  status: partial
+  evidence_collected: 4
+  evidence_required: 2
+  findings:
+    - "Execution errors are handled, not raised: every tool handler wraps its body in try/except and returns ToolResponse.error(...) — e.g. src/swisstopo_mcp/height.py:167-168, src/swisstopo_mcp/rest_api.py:334, src/swisstopo_mcp/stac.py:167. No handler lets an upstream failure escape as a JSON-RPC error."
+    - "But the error flag never reaches the MCP protocol layer. Runtime probe (stdio, tools/call swisstopo_elevation_profile with a single coordinate pair) returns result.content[0].text = a JSON blob containing \"is_error\": true, and the tool result carries NO protocol-level isError field. The envelope field is defined at src/swisstopo_mcp/models.py:86 and set at models.py:126; nothing maps it onto mcp.types.CallToolResult.isError."
+    - "README.md:450-452 and README.de.md:444-446 claim protocol errors are emitted as JSON-RPC errors with standard codes (\"e.g. -32602 invalid params\"). Runtime probe contradicts this: an unknown tool returns {\"result\":{\"content\":[{\"text\":\"Unknown tool: does_not_exist\"}],\"isError\":true}} and a missing required argument returns an isError tool result carrying the raw Pydantic message — neither is a JSON-RPC error object."
+    - "Error-path test coverage exists for the execution side (tests/test_api_client.py:67-86 asserts the 404/timeout/connect/unexpected classifications) and per-tool error tests exist (e.g. tests/test_openplz.py, tests/test_overpass.py), but no test asserts the shape of the tool result at the protocol boundary — the mismatch between documented and actual protocol behaviour was invisible to the suite."
+  gaps:
+    - "ToolResponse.is_error is a payload convention only; a client that reads CallToolResult.isError (the spec mechanism) sees success for every handled error."
+    - "No test exercises tools/call end-to-end and asserts the isError flag, so the documented-vs-actual divergence is uncaught."
+    - "The READMEs' JSON-RPC error-code claim is factually wrong for this SDK version (mcp 1.28.1) and should be corrected or the behaviour changed."
+  evaluator_notes: |
+    The separation the check cares about most — execution errors must not
+    become JSON-RPC errors — holds cleanly across all 24 tools. What is
+    missing is the other half: the spec's isError flag on the tool result.
+    The server invented its own payload field instead, and then documented
+    protocol behaviour (-32602) that a runtime probe shows the SDK does not
+    produce. Partial rather than pass because a spec-conformant client cannot
+    distinguish a handled error from a success without parsing the JSON body.

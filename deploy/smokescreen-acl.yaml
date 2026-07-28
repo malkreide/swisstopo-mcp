@@ -20,16 +20,16 @@ services:
     project: swiss-public-data-mcp
     action: enforce          # deny anything not listed
     allowed_domains:
-  - api3.geo.admin.ch
-  - data.geo.admin.ch
-  - geodesy.geo.admin.ch
-  - geodienste.ch
-  - map.geo.admin.ch
-  - oereb.geo.zh.ch
-  - openplzapi.org
-  - overpass.osm.ch
-  - wmts.geo.admin.ch
-  - www.oereb2.apps.be.ch
+      - api3.geo.admin.ch
+      - data.geo.admin.ch
+      - geodesy.geo.admin.ch
+      - geodienste.ch
+      - map.geo.admin.ch
+      - oereb.geo.zh.ch
+      - openplzapi.org
+      - overpass.osm.ch
+      - wmts.geo.admin.ch
+      - www.oereb2.apps.be.ch
 
 default:
   name: default

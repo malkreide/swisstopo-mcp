@@ -1,0 +1,20 @@
+check_run:
+  id: SDK-002
+  status: pass
+  evidence_collected: 5
+  evidence_required: 2
+  findings:
+    - "No annotation drift remains: all 24 `@mcp.tool` handlers in src/swisstopo_mcp/server.py are annotated `-> ToolResponse` (verified handler-by-handler, src/swisstopo_mcp/server.py:120 through :696; tool count confirmed at 24 decorators). The four `-> str` handlers the previous run flagged are gone."
+    - "The mypy gate is real and runs on src/: .github/workflows/ci.yml:37-38 (`- name: Type check` / `run: mypy src/`), on the same job as tests across Python 3.11/3.12/3.13. Config at pyproject.toml:73-82 sets `files = [\"src\"]`, `check_untyped_defs = true`, `warn_return_any = true`."
+    - "The gate passes on the current tree: `/tmp/venv-st/bin/mypy src/` → `Success: no issues found in 17 source files`, exit 0."
+    - "ADVERSARIAL PROOF the gate is load-bearing, not decorative: temporarily changing src/swisstopo_mcp/server.py:120 to `-> str` made mypy fail with `src/swisstopo_mcp/server.py:127: error: Incompatible return value type (got \"ToolResponse\", expected \"str\") [return-value]`. The file was restored byte-identically afterwards (diff clean). The gate catches exactly the regression class SDK-002 was raised for."
+    - "Envelope is a Pydantic v2 BaseModel with the required consistent fields — `results`, `count`, `match_type`, `source`, `license`, `provenance`, plus `summary`/`note`/`is_error` (src/swisstopo_mcp/models.py:62-86). Literal types for enumerables (`Provenance`, `MatchType` at src/swisstopo_mcp/models.py:15-16), `Field(default_factory=list)` for the mutable default (src/swisstopo_mcp/models.py:68-70), `ConfigDict(extra=\"forbid\")` at :65. pydantic>=2.0.0 declared at pyproject.toml:34."
+  gaps:
+    - "mypy is deliberately permissive (no `disallow_untyped_defs`, `ignore_missing_imports = true` at pyproject.toml:82), so an unannotated handler would not be flagged — only a wrong annotation would. The comment at pyproject.toml:74-76 states this is intentional."
+    - "tests/ is not type-checked (`files = [\"src\"]`), so a test helper with a wrong ToolResponse assumption would not be caught."
+  evaluator_notes: |
+    Verified rather than inherited. The annotation drift is genuinely gone across
+    all 24 handlers, the CI step exists and targets src/, and — the point that
+    matters — the gate was proven to fail on a re-injected `-> str` regression and
+    to pass again once reverted. Envelope structure, Pydantic v2, Literal enums and
+    default_factory all satisfy the remaining criteria. Pass.

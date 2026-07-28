@@ -24,6 +24,10 @@ class Settings(BaseSettings):
     # having to inject a CLI flag (ARCH-004).
     transport: Literal["stdio", "streamable-http"] = "stdio"
 
+    # DNS pinning (SEC-005). Off by default: it rewrites the target of every
+    # outbound request, and it is inert behind a forward proxy anyway.
+    pin_dns: bool = False
+
     # Cantonal OEREB endpoints to enable. Read here rather than via a call-time
     # os.environ lookup in oereb.py, so the value is validated once at startup
     # and the config object stays the single source (ARCH-004).

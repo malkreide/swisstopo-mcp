@@ -1,0 +1,27 @@
+check_run:
+  id: ARCH-004
+  status: pass
+  evidence_collected: 5
+  evidence_required: 3
+  findings:
+    - "No transport internals leak into tool handlers. Grep for `request.headers` / `starlette.requests` / `Request)` across src/ hits only src/swisstopo_mcp/api_client.py:170 and api_client.py:187, which are inside `PinnedTransport.handle_async_request` (an httpx transport for outbound calls, SEC-005) — not an MCP tool handler. Handlers that need session context take `ctx: Context | None`, e.g. src/swisstopo_mcp/oereb.py:305 and height.py:204."
+    - "Both transports are driven from one Settings object and one FastMCP instance. src/swisstopo_mcp/config.py:25 declares `transport: Literal[\"stdio\", \"streamable-http\"] = \"stdio\"`; src/swisstopo_mcp/server.py:742 selects on it (`use_http = \"--http\" in sys.argv or settings.transport == \"streamable-http\"`). Confirmed the claimed move: config.py:29 also carries `oereb_cantons`, and grep confirms oereb.py no longer reads os.environ — src/swisstopo_mcp/oereb.py:33 is now only a comment saying so."
+    - "Lifespan is shared across transports, not duplicated: src/swisstopo_mcp/server.py:30-46 defines one `lifespan` (tracing setup + shared httpx client), attached at server.py:49 to the single `mcp` object that both `mcp.run()` (server.py:755) and `build_http_app()` (server.py:709-735, via `mcp.streamable_http_app()`) use. There is no second FastMCP instance."
+    - "Settings is real pydantic-settings, not a globals bag: src/swisstopo_mcp/config.py:14-20 (`BaseSettings` with `env_prefix=\"SWISSTOPO_\"`, `env_file=\".env\"`), with derived values as properties (config.py:56, :71, :77, :86) so transport-security and CORS lists cannot drift from the raw env strings."
+    - "RESIDUAL AD-HOC READS — the parent's specific question. Three remain in src/: (a) src/swisstopo_mcp/api_client.py:214 `os.environ.get(\"SWISSTOPO_PIN_DNS\", \"\")` — a SWISSTOPO_-prefixed server knob that is NOT a Settings field, contradicting config.py:4's own claim that «All variables use the SWISSTOPO_ prefix» and come from Settings; it is documented in .env.example:28 but never validated at startup. (b) src/swisstopo_mcp/logging_config.py:33 `os.environ.get(\"SWISSTOPO_LOG_LEVEL\", \"INFO\")` — a second read path for a value Settings already owns (config.py:44), harmless today only because server.py:26 passes `settings.log_level` explicitly. (c) src/swisstopo_mcp/server.py:742,747-748 `sys.argv` for `--http` / `--port`, which is a deliberate documented CLI override (server.py:740-741, config.py:22-24)."
+  gaps:
+    - "SWISSTOPO_PIN_DNS bypasses Settings entirely (api_client.py:214). Since `Settings` uses `extra=\"ignore\"` (config.py:19), an operator typo like SWISSTOPO_PINDNS=true fails silently in both directions — the setting is never validated and never surfaces in the config object. The previous run's remediation note said «`oereb.py` no longer reads `os.environ` directly — the contradiction with `config.py`'s own docstring is gone». It is not gone; it moved to api_client.py."
+    - "No runtime test compares stdio and streamable-HTTP tool output (the check's Modus 3). tests/test_http_app.py exercises the HTTP app but does not diff a tool result against a stdio invocation. Structurally identical handlers make a divergence unlikely, but the equivalence is unasserted."
+  evaluator_notes: |
+    Pass on the substance. The check is about transport-agnostic server logic,
+    and that is genuinely achieved: one FastMCP instance, one lifespan, one
+    Settings object, zero transport internals in handlers, both transports
+    selectable without a code change. Four of five pass criteria are clean.
+    The fifth (config via Settings rather than ad-hoc reads) is met for the
+    transport and canton values the remediation actually addressed, but the
+    unconditional «Closed» is overstated — SWISSTOPO_PIN_DNS reproduces exactly
+    the pattern the original finding objected to, one file over. That is a
+    config-hygiene defect rather than an IoC violation, so it is a gap, not a
+    downgrade. The OTEL_* reads at observability.py:53,69 and the proxy reads
+    at api_client.py:160-163 are standard upstream env conventions and are
+    correctly excluded from the Settings prefix by design (.env.example:34-36).

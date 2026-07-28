@@ -1,0 +1,87 @@
+## Finding: SCALE-003 — Mcp-Session-Id Routing via Edge-LB (HAProxy Stick-Tables)
+
+**Severity:** high
+**Status:** partial
+**Server:** swisstopo-mcp
+**Check-Reference:** SCALE-003
+**PDF-Reference:** Sec 5.2
+**Run:** 2026-07-27T162602-Z (re-audit)
+
+### Observed Behavior
+`deploy/haproxy.cfg` is a complete, parseable config with transport-aware timeouts
+(`timeout tunnel 1h`), a 100k stick-table with `expire 1h`, an explicit
+`stick on req.hdr(Mcp-Session-Id)` and a wired health check. The nominal checklist
+items are met.
+
+It would not work. `stick on` is shorthand for `stick match` + `stick store-REQUEST`.
+The session id is minted by the server in the **response** — verified at runtime, an
+`initialize` POST carrying no `Mcp-Session-Id` returned 200 with
+`mcp-session-id: dc67841a766944d0927c20a291deb6e3`. On that request the pattern is
+empty, so nothing is stored. The client's next request is the first to carry the
+header, misses the empty table, is round-robined to a replica that with two servers is
+wrong half the time, and is then pinned there for the full hour.
+
+Second defect: `server mcp1 swisstopo-mcp-1:8000` / `mcp2 swisstopo-mcp-2:8000`
+(`haproxy.cfg:45-46`) name hosts nothing in `deploy/` creates — there is a Deployment
+and one ClusterIP Service, not a StatefulSet or a headless Service — and with no
+`resolvers` section HAProxy resolves once at startup and refuses to start on
+unresolvable names. The same defective snippet is duplicated at
+`deploy/ingress-sticky-sessions.yaml:17-22` and pointed at from
+`docs/deployment.md:104-106`.
+
+### Expected Behavior
+- Load balancer routes on `Mcp-Session-Id`
+- Stick-table sized ≥100k with an explicit TTL
+- Failover behaviour tested
+
+### Evidence
+- The claim that the comment-only sketch was replaced by a real file is TRUE as far as it goes: deploy/haproxy.cfg is a complete, syntactically plausible config with global/defaults/frontend/backend sections (deploy/haproxy.cfg:12-46), mountable at /usr/local/etc/haproxy/haproxy.cfg as its header states (:8-10). Timeouts are transport-aware (`timeout server 120s`, `timeout tunnel 1h` at :24-25), which matters for a long-lived response stream.
+- The header-routing criteria are nominally met: the LB reads Mcp-Session-Id explicitly (`stick on req.hdr(Mcp-Session-Id)`, deploy/haproxy.cfg:37), stick-table capacity is 100k which meets the check's >=100k floor, and TTL is explicit (`expire 1h`, :36). Health check is wired (`option httpchk GET /healthz` + `http-check expect status 200`, :42-43).
+- CORRECTNESS DEFECT — the config does not actually deliver affinity. HAProxy's `stick on <pattern>` is shorthand for `stick match` + `stick store-REQUEST`. The session id is minted by the server and returned in the RESPONSE header: verified at runtime, an initialize POST carrying no Mcp-Session-Id returned 200 with `mcp-session-id: dc67841a766944d0927c20a291deb6e3`. On that request the pattern is empty, so nothing is matched and nothing is stored. The client's NEXT request is the first to carry the header — it misses the empty table, gets round-robined (deploy/haproxy.cfg:32) to a replica that with 2 servers is the wrong one 50% of the time, and `stick store-request` then pins the session to that wrong replica for the full hour.
+- The missing line is `stick store-response res.hdr(Mcp-Session-Id)` — the canonical HAProxy pattern for a server-generated identifier. Without it the whole stick-table block at deploy/haproxy.cfg:36-37 is inert on the only request that could populate it.
+- DEPLOYABILITY DEFECT — the backend addresses correspond to nothing this repo ships: `server mcp1 swisstopo-mcp-1:8000` / `server mcp2 swisstopo-mcp-2:8000` (deploy/haproxy.cfg:45-46). deploy/kubernetes.yaml provides a Deployment (:6-87) and a single ClusterIP Service named `swisstopo-mcp` (:89-98) — not a StatefulSet and not a headless Service, so no per-pod DNS names of that shape exist. There is also no `resolvers` section, so HAProxy resolves server names once at startup and refuses to start on unresolvable names.
+- The same defective snippet is duplicated as the 'preferred' option at deploy/ingress-sticky-sessions.yaml:17-22 and pointed to as preferred in docs/deployment.md:104-106, so the error is reproduced in three places.
+- No failover test exists (no test references haproxy, stick, or affinity), so the check's Modus 2 / fourth pass criterion is unmet.
+
+Gaps:
+- `stick store-response res.hdr(Mcp-Session-Id)` missing — affinity is never learned from the initialize response.
+- Backend server names/addresses do not match any manifest in deploy/; no StatefulSet, no headless Service, no `resolvers` section.
+- No failover behaviour test, and no documented manual verification of the routing.
+- docs/deployment.md:98-110 links only to deploy/ingress-sticky-sessions.yaml and never mentions deploy/haproxy.cfg, so the 'real' config is unreferenced from the deployment docs.
+
+### Risk Description
+This is worse than having no config: it looks correct, it parses, it satisfies every
+checklist item a reviewer would grep for, and it silently pins half of all sessions to
+the wrong replica for an hour. The symptom at the client is a session that works for
+one call and then returns "session not found" — indistinguishable from a client bug.
+
+### Remediation
+1. Add `stick store-response res.hdr(Mcp-Session-Id)` — the canonical HAProxy pattern
+   for a server-generated identifier. Without it the whole stick-table block is inert
+   on the only request that could populate it.
+2. Either ship a StatefulSet plus a headless Service so `swisstopo-mcp-{0,1}` resolve,
+   or replace the static `server` lines with a `resolvers` section against the cluster
+   DNS and `server-template`.
+3. Fix the duplicated snippet in `ingress-sticky-sessions.yaml` and reference
+   `deploy/haproxy.cfg` from `docs/deployment.md`, which currently never mentions it.
+4. Add a failover test, or document a manual verification procedure — nothing in
+   `tests/` references haproxy, stick or affinity.
+
+### Effort Estimate
+M (1-3d)
+
+### Relation to run `2026-07-27T125314-Z`
+The previous run's finding was that this existed only as a comment. It is now a real file — and the real file does not work.
+
+### Auditor Notes
+Judged on whether it is genuinely deployable, the honest answer is: it is a real
+file rather than a comment, and it would parse — but it would not work. Two
+independent problems. First, the stick-table is never populated: `stick on`
+stores from the request, and the request that establishes the session has no
+session header yet, so the mapping is learned only on a later request that has
+already been round-robined, pinning half the sessions to the wrong replica.
+Second, the server lines name hosts no manifest in this repo creates, and with no
+resolvers block HAProxy would fail to start against them. The nominal checklist
+items (reads the header, 100k table, explicit TTL) are satisfied, so this is not
+a fail — but calling it a deployable session-affinity config is not supportable.
+Partial.

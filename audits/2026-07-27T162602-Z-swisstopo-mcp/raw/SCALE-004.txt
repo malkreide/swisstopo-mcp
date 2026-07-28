@@ -1,0 +1,21 @@
+check_run:
+  id: SCALE-004
+  status: pass
+  evidence_collected: 4
+  evidence_required: 2
+  findings:
+    - "Multi-stage with named stages: `FROM python:3.11-slim AS builder` (Dockerfile:6) and `FROM python:3.11-slim AS runtime` (Dockerfile:13) — 2 FROM statements, both named, both on a `-slim` base. Build artefacts are isolated via `pip install --no-cache-dir --prefix=/install .` (Dockerfile:11) and only `/install` crosses into the runtime stage (Dockerfile:18), so no build cache or source tree leaks forward."
+    - "Non-root is explicit and numeric: a fixed-UID account is created (`useradd --uid 10001 --user-group --create-home --shell /usr/sbin/nologin mcp`, Dockerfile:16) and `USER 10001` is set before CMD (Dockerfile:20). The numeric form matches the K8s `runAsNonRoot: true` / `runAsUser: 10001` guard at deploy/kubernetes.yaml:28-31, so the two layers agree."
+    - "HEALTHCHECK is present and dependency-free: Dockerfile:32-33 uses stdlib urllib against http://127.0.0.1:8000/healthz with interval/timeout/start-period/retries all set — deliberately not curl, which the slim base does not carry. The endpoint it targets exists (src/swisstopo_mcp/server.py:725-729) and was verified live returning HTTP 200 {\"status\":\"ok\"}."
+    - "The image is designed for a hardened runtime rather than just built small: read-only root filesystem + tmpfs /tmp documented at Dockerfile:35-37 and enforced at deploy/kubernetes.yaml:57-61 (`readOnlyRootFilesystem: true`, `allowPrivilegeEscalation: false`, `capabilities.drop: [ALL]`), with PYTHONDONTWRITEBYTECODE=1 (Dockerfile:23) so a read-only fs does not break imports."
+  gaps:
+    - "Final image size could NOT be verified: no Docker daemon in this environment (`dial unix /var/run/docker.sock: connect: no such file or directory`), so the <200 MB criterion is unproven. Proxy measurement: the project's site-packages footprint is 193 MB including dev extras (pytest/mypy/ruff/coverage); runtime-only deps are smaller but the OpenTelemetry SDK + exporter + instrumentation stack (pyproject.toml:38-41) plus pydantic-core on top of a ~130 MB python:3.11-slim base makes exceeding 200 MB plausible. Should be measured in CI with `docker images --format '{{.Size}}'`."
+    - "No image-size or CVE-scan gate in .github/workflows/ — nothing prevents the image from growing past the threshold."
+    - "The HEALTHCHECK hardcodes port 8000 (Dockerfile:33) while CMD's `--port` is overridable (src/swisstopo_mcp/server.py:750-751); running the image on another port silently yields a permanently unhealthy container."
+  evaluator_notes: |
+    Every structural criterion is satisfied and verifiable from source: two named
+    stages, slim base, artefact-only copy forward, explicit non-root UID consistent
+    with the K8s securityContext, and a working HEALTHCHECK whose target endpoint
+    was confirmed live. The only unmet criterion is the size threshold, which is
+    unverifiable here for environmental reasons rather than because of anything in
+    the Dockerfile — recorded as a gap, not held against the status. Pass.

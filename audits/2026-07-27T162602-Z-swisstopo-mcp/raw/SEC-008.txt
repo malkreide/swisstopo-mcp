@@ -1,0 +1,22 @@
+check_run:
+  id: SEC-008
+  status: pass
+  evidence_collected: 4
+  evidence_required: 2
+  findings:
+    - "No install-time code execution of any kind. pyproject.toml:1-3 uses the stock hatchling backend with no cmdclass, no custom build hooks and no [tool.hatch.build.hooks.*] section; pyproject.toml:56-57 declares a single plain console script (`swisstopo-mcp = \"swisstopo_mcp.server:mcp.run\"`). There is no setup.py and no package.json, so the pre/postinstall class of failure does not exist here."
+    - "The two scripts in the repo are audit tooling, not install steps, and both are plain readable Python with no dynamic code loading or network fetch: scripts/snapshot_tool_hashes.py and scripts/render_egress_acl.py. Neither is referenced from any build hook — they are invoked only from .github/workflows/ci.yml:44 and :49."
+    - "README shows the unabridged install command in every form a user would copy: README.md:73-82 (pip install -e . / uv pip install -e . / uvx swisstopo-mcp) and README.md:113-133, which gives the complete claude_desktop_config.json block for both the `python -m swisstopo_mcp.server` and the `uvx swisstopo-mcp` invocation. Nothing is hidden behind a bootstrap script."
+    - "PyPI publishing uses OIDC Trusted Publishing, so releases are Sigstore-attested: .github/workflows/publish.yml:36-38 pins the `pypi` environment, :40 grants `id-token: write`, and :50 uses pypa/gh-action-pypi-publish@release/v1 with no API token. The MCP-Registry job does the same (.github/workflows/publish.yml:57)."
+  gaps:
+    - "CONTRIBUTING.md does not explain the build process for independent verification — grep for install/build/hatch/publish finds only 'pytest tests/ -m \"not live\"' at CONTRIBUTING.md:25. That is the one pass-criterion bullet not met; pyproject.toml is standard enough to read directly, so impact is low."
+    - "README does not tell users how to verify the Sigstore signature of a downloaded artefact (the check's optional step 4)."
+  evaluator_notes: |
+    I looked for the failure modes rather than for the claim: no setup.py, no
+    package.json, no hatch build hooks, no custom cmdclass, no script invoked
+    at install time. The only executable scripts are CI-only and readable. The
+    published-package half is stronger than the checklist minimum — Trusted
+    Publisher with id-token: write and no long-lived token, on both PyPI and
+    the MCP Registry.
+    Pass. The missing CONTRIBUTING build section is a documentation gap, not a
+    consent-integrity problem.

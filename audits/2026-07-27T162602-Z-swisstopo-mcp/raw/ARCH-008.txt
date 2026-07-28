@@ -1,0 +1,21 @@
+check_run:
+  id: ARCH-008
+  status: pass
+  evidence_collected: 4
+  evidence_required: 2
+  findings:
+    - "Confirmed Tools-only at runtime, not assumed: `mcp.list_resources()` → [], `mcp.list_resource_templates()` → [], `mcp.list_prompts()` → [] against the installed package. Grep for `@mcp.resource` / `@mcp.prompt` in src/ returns nothing. So the check falls to its documentation escape clause."
+    - "The escape clause is satisfied in both READMEs, with a reason specific to this server rather than boilerplate: README.md:454-458 «This server intentionally exposes **Tools only** (no Resources or Prompts): it is a Phase-1 read-only wrapper, and every result is a live, parameterised API query rather than a static addressable document. Resources/Prompts may be added in a later phase if stable URI schemes emerge.» README.de.md:448-453 carries the parallel section «MCP-Primitive»."
+    - "The argument is materially correct for this server. Every one of the 24 tools takes parameters that make the result non-addressable by a static URI — a coordinate (swisstopo_zoning_at, swisstopo_oereb_at), a radius (swisstopo_query_osm_features), a search term (swisstopo_search_layers). The nearest genuine Resource candidate is the static façade catalogue, and the code already treats it as cached rather than live: src/swisstopo_mcp/geodata.py:534 `list_available_layers` returns `provenance=\"cached\"`."
+    - "The Resources-migration assessment the check asks for is recorded rather than merely asserted: docs/roadmap.md:28 «[ ] Resources for static catalogs (e.g. notable map layers) (ARCH-008)» sits under Phase 2 as an open item, i.e. the candidates were identified and deferred with a named owner phase."
+  gaps:
+    - "No Prompts despite two documented recurring workflows that are prompt-shaped (README.md:463-472: the feature-query chain and the downloads chain). A `feature_lookup` prompt template would be cheap and would encode the precedence rule that ARCH-007 shows is not reliably reaching the model through descriptions alone."
+    - "The `swisstopo_list_available_layers` catalogue is the one tool that is deterministic, idempotent and already cached — the strongest Resource candidate and still a tool. Correctly captured as an open roadmap item, not as a closed question."
+  evaluator_notes: |
+    Pass via the documented-justification route, which this check explicitly
+    permits («README dokumentiert begründet, warum nur Tools verwendet
+    werden») — unlike ARCH-006, where the escape clause is narrower and the
+    repo's own text does not meet it. Here the reason given is true of the
+    server's actual shape and is backed by an open, specific roadmap item
+    rather than a promise. Verified independently at runtime; ARCH-008 produced
+    no finding in the previous run and that verdict holds.

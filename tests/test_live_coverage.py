@@ -230,3 +230,104 @@ class TestTheFailureReportingPathIsRobust:
                     "an action on the failure-only path is never exercised by a "
                     "green run"
                 )
+
+
+# ---------------------------------------------------------------------------
+# Phase declarations stay consistent (audit OPS-003)
+#
+# The original defect was the READMEs declaring Phase 1 while the roadmap said
+# 2.5, and the remediation reintroduced a variant of it: the status table went
+# into the English README only, both files kept a stray "Phase-1 read-only
+# wrapper" sentence, and the two documents named *each other* as authoritative,
+# so neither was. All of that was found by reading. This makes it mechanical.
+# ---------------------------------------------------------------------------
+
+ROOT = TESTS.parent
+PHASE_DOCS = ("README.md", "README.de.md", "SECURITY.md", "SECURITY.de.md")
+
+
+def _declared_phase(text: str) -> set[str]:
+    import re
+
+    return set(re.findall(r"Phase[\s-]?(\d(?:\.\d)?)", text))
+
+
+class TestPhaseDeclarationsAgree:
+    @staticmethod
+    def _roadmap_phase() -> str:
+        import re
+
+        text = (ROOT / "docs" / "roadmap.md").read_text(encoding="utf-8")
+        done = re.findall(r"^## Phase ([\d.]+) .*✅", text, re.M)
+        assert done, "the roadmap declares no completed phase"
+        return done[-1]
+
+    def test_the_roadmap_declares_itself_the_authority(self):
+        text = (ROOT / "docs" / "roadmap.md").read_text(encoding="utf-8")
+        assert "single authority" in text
+
+    def test_no_document_claims_authority_back(self):
+        """The circular reference that made neither document authoritative."""
+        roadmap = (ROOT / "docs" / "roadmap.md").read_text(encoding="utf-8")
+        assert "declared in the README" not in roadmap
+
+    def test_every_document_names_the_current_phase(self):
+        current = self._roadmap_phase()
+        for name in PHASE_DOCS:
+            text = (ROOT / name).read_text(encoding="utf-8")
+            assert current in _declared_phase(text), (
+                f"{name} does not mention Phase {current}, which docs/roadmap.md "
+                "declares as current"
+            )
+
+    def test_no_document_still_calls_itself_phase_one(self):
+        """Both READMEs kept a 'Phase-1 read-only wrapper' sentence 138 lines
+        below the section declaring Phase 2.5."""
+        import re
+
+        offenders = []
+        for name in PHASE_DOCS:
+            text = (ROOT / name).read_text(encoding="utf-8")
+            if re.search(r"Phase[\s-]1[\s-](read-only|Read-only)", text):
+                offenders.append(name)
+        assert offenders == [], (
+            f"{offenders} still describe the server as a Phase-1 wrapper"
+        )
+
+
+class TestBothReadmesCarryTheSamePhaseTable:
+    """The remediation put the status table in the English README only — the
+    same bilingual drift the original finding was about."""
+
+    ROWS = ("ISDS", "DSG")
+
+    @staticmethod
+    def _phase_section(name: str) -> str:
+        text = (ROOT / name).read_text(encoding="utf-8")
+        start = text.index("### Phase")
+        return text[start : start + 2000]
+
+    def test_both_readmes_have_a_status_table(self):
+        for name in ("README.md", "README.de.md"):
+            section = self._phase_section(name)
+            assert "|---|---|" in section, f"{name} has no phase status table"
+
+    def test_both_readmes_state_the_advance_criteria(self):
+        for name, marker in (("README.md", "advance requires"), ("README.de.md", "Phasenwechsel")):
+            assert marker in self._phase_section(name), (
+                f"{name} does not state what a phase advance requires"
+            )
+
+    def test_both_readmes_reference_the_phase_one_exit_criteria(self):
+        """ISDS classification and DSG record are the check's Phase-1 gate. They
+        were absent and not documented as waived."""
+        for name in ("README.md", "README.de.md"):
+            section = self._phase_section(name)
+            for row in self.ROWS:
+                assert row in section, f"{name} phase table has no {row} row"
+
+    def test_the_assessment_document_exists_and_is_reasoned(self):
+        doc = (ROOT / "docs" / "isds-dsg.md").read_text(encoding="utf-8")
+        assert "Verarbeitungsverzeichnis" in doc
+        # A waiver without its trigger conditions is a hand-wave.
+        assert "umstösst" in doc or "Neubewertung" in doc

@@ -7,6 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added (OPS-003)
+- **`docs/isds-dsg.md` — the Phase-1 exit gate the check requires.** An ISDS
+  classification and a DSG assessment existed nowhere and were not documented as
+  waived. Both READMEs' phase tables now carry the rows.
+
+  It is a real assessment, and it says two things the easy version would not:
+  - **Query inputs can be personal data.** An address is personal data once
+    linkable to a person. "Public open data, therefore no personal data" is
+    correct about the *responses* and wrong about the *inputs*.
+  - **Where inputs actually go, checked rather than assumed.** The normal log
+    carries tool name, correlation id, duration and length — no arguments. But
+    `handled_error` logs `str(e)`, and a validation message can quote the input;
+    `overpass_error_page` logs up to 1000 characters of an upstream body that
+    can echo the submitted query. So stderr must be treated as a log that
+    occasionally contains request content.
+
+  No processing record is maintained, with three reasons — and an explicit note
+  that this does not discharge an operator, who must record this server as a
+  processing step in their own application's register. §6 lists what overturns
+  the conclusion; §7 states it is an engineering assessment, not a legal opinion.
+
+### Fixed (OPS-003)
+- **Phase consistency is now mechanical.** The original defect (READMEs saying
+  Phase 1 while the roadmap said 2.5) and its half-applied remediation (table in
+  the English README only, stray "Phase-1 wrapper" sentences, two documents
+  naming *each other* as authoritative) were both found by reading. Nine tests
+  hold it instead: the roadmap must declare itself authoritative and no document
+  may claim authority back, every phase document must name the current phase,
+  none may still describe the server as Phase 1, both READMEs must carry the
+  status table with advance criteria and the ISDS/DSG rows, and the assessment
+  must contain its own overturn conditions — a waiver without trigger conditions
+  is a hand-wave. Verified: dropping the ISDS row from `README.de.md` alone
+  fails the bilingual guard.
+
 ### Added (OPS-001)
 - **Live tests for every tool.** Ten tools had none, so the nightly run could
   not detect upstream contract drift for them — including all three ÖREB tools,

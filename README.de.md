@@ -323,6 +323,8 @@ Phasenstand).
 | Read-Tools | 24, alle `readOnlyHint: true` / `destructiveHint: false` |
 | Write-Tools | keine — Phase 3, nicht geplant |
 | Transport | stdio (Default) und Streamable-HTTP |
+| ISDS-Klassifikation | [`docs/isds-dsg.md`](docs/isds-dsg.md) — tiefer Schutzbedarf |
+| DSG-Verarbeitungsverzeichnis | wird nicht geführt, mit Begründung — [`docs/isds-dsg.md` §5](docs/isds-dsg.md) |
 | Letztes Audit | `audits/2026-07-27T162602-Z-swisstopo-mcp/` |
 
 Ein Phasenwechsel setzt voraus: die Roadmap-Punkte der Phase abgehakt, ein

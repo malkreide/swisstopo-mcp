@@ -71,3 +71,65 @@ README got neither the table nor the criteria, both READMEs still contain
 a literal "Phase-1 read-only wrapper" sentence further down, and the two
 documents point at each other for authority. Tool annotations do match the
 declared phase, which is the substantive half of the check. Partial.
+
+---
+
+### Remediation Status (2026-07-28, follow-up PR)
+
+**Closed.** Four of the finding's six gaps were already closed in earlier
+commits of this batch; the two that remained are done here, and the whole thing
+is now enforced mechanically rather than by reading.
+
+**Already closed earlier in this batch:**
+
+- `README.de.md` has the same status table and advance criteria as the English
+  one (added in the ARCH-003/SEC-009 work).
+- Neither README still calls the server a "Phase-1 read-only wrapper".
+- The circular authority is gone: `docs/roadmap.md` declares itself the single
+  authority and the READMEs and both `SECURITY` files link to it.
+- `README.md` citing this run as the last audit was a claim that preceded its
+  evidence. The evidence — `audit-report.md` and the findings — was committed in
+  the first PR of this batch, so the citation is now true.
+
+**Closed here — the Phase-1 exit gate.** The check names an ISDS classification
+and a DSG *Verarbeitungsverzeichnis* as Phase-1 exit criteria, and its example
+table has a row for each. Neither existed and neither was documented as waived.
+[`docs/isds-dsg.md`](../../../docs/isds-dsg.md) now covers both, and both
+READMEs' phase tables carry the rows.
+
+It is a real assessment rather than a hand-wave, and it says several things the
+audit did not have to establish:
+
+- **Query inputs can be personal data.** An address is personal data once
+  linkable to a person. Saying "public open data, therefore no personal data"
+  would be the easy answer and it is wrong about the *inputs*.
+- **Where inputs actually go, verified rather than assumed.** The normal log
+  (`tool_invoked` / `tool_completed`) carries tool name, correlation id,
+  duration and length — no arguments. But `handled_error` logs `str(e)`, and a
+  validation message can quote the input; `overpass_error_page` logs up to 1000
+  characters of an upstream body that can echo the submitted query. So stderr
+  must be treated as a log that occasionally contains request content. That is
+  the operational consequence, and it is stated rather than glossed.
+- **No processing record is maintained**, with three reasons (not a controller
+  under DSG Art. 5 lit. j, no retention, forwarding only to official bodies) —
+  and an explicit statement that this does *not* discharge the operator, who
+  must record this server as a processing step in their own application's
+  register. §3 exists to make that possible.
+- **What overturns the conclusion** is listed: write tools, authentication,
+  persistence of any kind, a source with personal-data content, or tracing into
+  a backend with a wider access list.
+- It is labelled an engineering assessment, not a legal opinion.
+
+**The mechanism, which is the part that matters.** All of the above was found by
+reading, twice — the original defect and the half-applied remediation both. Nine
+tests now hold it: the roadmap must declare itself authoritative and no document
+may claim authority back; every phase document must name the phase the roadmap
+declares current; no document may still describe the server as Phase 1; both
+READMEs must have a status table, advance criteria and the ISDS/DSG rows; and
+the assessment must contain its own overturn conditions, since a waiver without
+trigger conditions is a hand-wave. Verified: removing the ISDS row from
+`README.de.md` alone fails the bilingual guard.
+
+**Not addressed:** nothing from this finding. The ISDS/DSG document is
+deliberately scoped to what the code does — a deployment that enables tracing,
+forwards logs or adds authentication needs its own assessment, and §7 says so.

@@ -324,6 +324,8 @@ This server is in **Phase 2.5 — Consolidation of `swiss-geodata-mcp`**
 | Read tools | 24, all `readOnlyHint: true` / `destructiveHint: false` |
 | Write tools | none — Phase 3, not planned |
 | Transport | stdio (default) and Streamable-HTTP |
+| ISDS classification | [`docs/isds-dsg.md`](docs/isds-dsg.md) — low protection requirement |
+| DSG processing record | not maintained, with reasons — [`docs/isds-dsg.md` §5](docs/isds-dsg.md) |
 | Last audit | `audits/2026-07-27T162602-Z-swisstopo-mcp/` |
 
 A phase advance requires: the phase's roadmap items checked off, a re-run audit

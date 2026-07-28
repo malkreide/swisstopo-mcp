@@ -19,6 +19,10 @@ authoritative, which meant neither was (audit `2026-07-27T162602-Z`, OPS-003).
 - [x] Error masking for unexpected exceptions (OBS-002)
 - [x] CORS with `expose_headers: Mcp-Session-Id` for HTTP transport (SDK-004)
 - [x] Audit run against mcp-audit-skill (`audits/`)
+- [x] ISDS classification and DSG assessment — [`isds-dsg.md`](isds-dsg.md).
+      The check lists both as Phase-1 exit criteria (OPS-003). No processing
+      record is maintained; §5 gives the reasons and §6 the triggers that would
+      overturn them.
 
 ## Phase 2 — Semantic / richer responses (✅ largely done)
 

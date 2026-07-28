@@ -87,6 +87,54 @@ class TestHandleApiError:
         assert "Mindestens 2 Koordinatenpaare" in result
 
 
+class TestEgressRefusalsDoNotDiscloseConfiguration:
+    """OBS-002: a PermissionError used to be returned verbatim, which handed the
+    model the complete ten-host egress allow-list or the internal address a name
+    resolved to. The caller learns the request was refused; the detail is logged.
+    """
+
+    def test_allow_list_is_not_in_the_message(self):
+        from swisstopo_mcp.api_client import ALLOWED_HOSTS, assert_host_allowed
+
+        try:
+            assert_host_allowed("https://evil.example.com/x")
+        except PermissionError as exc:
+            result = handle_api_error(exc, "Test")
+        else:  # pragma: no cover - the guard must raise
+            raise AssertionError("expected PermissionError")
+
+        for host in ALLOWED_HOSTS:
+            assert host not in result, f"egress allow-list disclosed: {host}"
+        assert "evil.example.com" not in result
+        assert "Egress-Richtlinie" in result
+
+    def test_resolved_internal_address_is_not_in_the_message(self):
+        exc = PermissionError(
+            "Host 'x.example' löst auf eine interne Adresse auf (10.4.5.6). "
+            "Blockiert (SSRF/DNS-Rebinding-Schutz)."
+        )
+        result = handle_api_error(exc, "Test")
+        assert "10.4.5.6" not in result
+        assert "x.example" not in result
+
+    def test_detail_survives_in_the_log(self, monkeypatch):
+        from swisstopo_mcp import api_client
+
+        recorded: list[tuple[str, dict]] = []
+
+        class _Recorder:
+            def warning(self, event, **kw):
+                recorded.append((event, kw))
+
+        monkeypatch.setattr(api_client, "_log", _Recorder())
+        handle_api_error(PermissionError("Host nicht auf der Egress-Allow-List: 'q'"), "Test")
+
+        assert recorded, "the refusal detail was dropped instead of logged"
+        event, kw = recorded[0]
+        assert event == "egress_blocked"
+        assert "Egress-Allow-List" in kw["detail"]
+
+
 class TestParseCoordinateString:
     def test_two_points(self):
         pairs = parse_coordinate_string("47.38,8.54;47.39,8.55")

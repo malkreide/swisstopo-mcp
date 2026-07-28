@@ -134,17 +134,70 @@ def _build_query(tag: str, lat: float, lon: float, radius_m: int, limit: int) ->
     )
 
 
-def _extract_error(text: str) -> str | None:
-    """Overpass returns errors as XML/HTML even for [out:json]. Pull the message."""
+# Fixed, user-facing classifications of an Overpass error page (audit OBS-002).
+#
+# The upstream text is never forwarded. A real Overpass error page echoes the
+# submitted query and can name server-side paths — `open64: 2 No such file or
+# directory /opt/osm/db/overpass_db/...` is a message the public instance
+# genuinely returns. Passing that to the model disclosed infrastructure and gave
+# a third party a channel into the context window. The body goes to stderr
+# instead, where an operator can read it and the model cannot.
+_ERROR_SIGNATURES: tuple[tuple[str, str], ...] = (
+    (
+        "timed out",
+        "Overpass hat das Zeitlimit überschritten. Kleinerer Radius oder "
+        "niedrigeres limit hilft meist.",
+    ),
+    (
+        "out of memory",
+        "Die Abfrage war für Overpass zu gross. Radius oder limit reduzieren.",
+    ),
+    (
+        "too many requests",
+        "Overpass hat die Anfrage wegen Rate-Limiting abgewiesen.",
+    ),
+    (
+        "rate_limited",
+        "Overpass hat die Anfrage wegen Rate-Limiting abgewiesen.",
+    ),
+    (
+        "parse error",
+        "Overpass konnte die Abfrage nicht verarbeiten (interner Abfragefehler).",
+    ),
+)
+_ERROR_GENERIC = "Overpass meldete einen Fehler."
+
+
+def _classify_error(text: str) -> str | None:
+    """Return a fixed message when the body is an Overpass error page.
+
+    Returns None when the body is not an error page. The return value never
+    contains upstream text — see the note on `_ERROR_SIGNATURES`.
+    """
     lowered = text.lstrip().lower()
     if lowered.startswith("{"):
         return None  # looks like JSON, not an error page
-    matches = re.findall(r"<strong[^>]*>\s*Error\s*</strong>\s*:?\s*([^<]+)", text)
-    if matches:
-        return "; ".join(m.strip() for m in matches)
-    if "error" in lowered:
-        return text.strip()[:300]
-    return None
+
+    is_error = "error" in lowered or bool(
+        re.search(r"<strong[^>]*>\s*Error\s*</strong>", text, re.IGNORECASE)
+    )
+    if not is_error:
+        return None
+
+    _log.warning("overpass_error_page", body=text.strip()[:1000])
+    return _match_signature(lowered)
+
+
+def _match_signature(lowered: str) -> str:
+    for signature, message in _ERROR_SIGNATURES:
+        if signature in lowered:
+            return message
+    return _ERROR_GENERIC
+
+
+def _classify_remark(remark: str) -> str:
+    """Same treatment for the HTTP-200 `remark` path."""
+    return _match_signature(remark.lower())
 
 
 @log_tool_call("swisstopo_query_osm_features")
@@ -167,26 +220,30 @@ async def query_osm_features(params: QueryOsmFeaturesInput) -> ToolResponse:
             return ToolResponse.error(
                 _degraded(handle_api_error(exc, "Overpass-Abfrage")),
                 source=OSM_SOURCE,
+                license=OSM_LICENSE,
             )
 
         text = response.text
-        err = _extract_error(text)
+        err = _classify_error(text)
         if err is not None:
-            return ToolResponse.error(
-                _degraded(f"Overpass-Fehler: {err}"), source=OSM_SOURCE
-            )
+            return ToolResponse.error(_degraded(err), source=OSM_SOURCE, license=OSM_LICENSE)
         try:
             data = json.loads(text)
         except json.JSONDecodeError:
             return ToolResponse.error(
-                _degraded("Overpass lieferte keine gültige JSON-Antwort."), source=OSM_SOURCE
+                _degraded("Overpass lieferte keine gültige JSON-Antwort."),
+                source=OSM_SOURCE,
+                license=OSM_LICENSE,
             )
 
-        # A server-side timeout returns HTTP 200 + an embedded 'remark'.
+        # A server-side timeout returns HTTP 200 + an embedded 'remark'. The
+        # remark is upstream text like every other error string here, so it is
+        # classified rather than forwarded (OBS-002).
         remark = data.get("remark", "")
         if remark and ("timed out" in remark.lower() or "runtime error" in remark.lower()):
+            _log.warning("overpass_remark", remark=remark.strip()[:1000])
             return ToolResponse.error(
-                _degraded(f"Overpass-Laufzeitfehler: {remark.strip()}"), source=OSM_SOURCE
+                _degraded(_classify_remark(remark)), source=OSM_SOURCE, license=OSM_LICENSE
             )
 
         elements = data.get("elements", [])[: params.limit]
@@ -211,7 +268,11 @@ async def query_osm_features(params: QueryOsmFeaturesInput) -> ToolResponse:
             source=OSM_SOURCE, license=OSM_LICENSE,
         )
     except Exception as e:  # noqa: BLE001
-        return ToolResponse.error(handle_api_error(e, "query_osm_features"), source=OSM_SOURCE)
+        return ToolResponse.error(
+            handle_api_error(e, "query_osm_features"),
+            source=OSM_SOURCE,
+            license=OSM_LICENSE,
+        )
 
 
 def _degraded(detail: str) -> str:

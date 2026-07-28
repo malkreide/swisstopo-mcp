@@ -411,8 +411,20 @@ def handle_api_error(e: Exception, context: str = "") -> str:
     if isinstance(e, httpx.ConnectError):
         return f"{prefix}Verbindungsfehler. Prüfe die Netzwerkverbindung."
 
+    # Egress refusals carry internal configuration — the ten-host allow-list, or
+    # the internal address a name resolved to. The model needs to know the
+    # request was refused, not what the boundary looks like, so the detail stays
+    # in the log and a fixed message goes back (OBS-002).
+    if isinstance(e, PermissionError):
+        _log.warning("egress_blocked", context=context, detail=str(e))
+        return (
+            f"{prefix}Ziel nicht erlaubt (Egress-Richtlinie). "
+            "Dieser Server spricht nur mit einer festen Liste schweizerischer "
+            "Geodaten-Endpunkte."
+        )
+
     # Intentional, user-facing validation errors carry helpful guidance — keep them.
-    if isinstance(e, (ValueError, PermissionError)):
+    if isinstance(e, ValueError):
         _log.warning("handled_error", context=context, error_type=type(e).__name__, detail=str(e))
         return f"{prefix}{e}"
 

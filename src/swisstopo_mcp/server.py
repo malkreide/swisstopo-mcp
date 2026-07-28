@@ -833,12 +833,22 @@ async def layer_catalogue_resource() -> str:
 
     Deliberately the *unfiltered* catalogue: a resource has no parameters, and
     the filtered views are what the tool is for.
+
+    An upstream failure raises rather than returning a document. The tool this
+    wraps degrades gracefully — it returns an envelope with `is_error: true` and
+    no results, which is right for a tool call. Serialising that same envelope's
+    *results* into a resource would publish `count: 0` and an empty list as
+    ordinary JSON, so a geodienste outage would be indistinguishable from a
+    genuinely empty catalogue. A resource is a document; when there is no
+    document, the honest answer is an error, not an empty one.
     """
     import json
 
     from swisstopo_mcp.geodata import ListLayersInput, list_available_layers
 
     result = await list_available_layers(ListLayersInput())
+    if result.is_error:
+        raise RuntimeError(result.summary)
     return json.dumps(
         {
             "source": result.source,

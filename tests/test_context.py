@@ -129,7 +129,7 @@ class TestTheSlowToolsTakeAContext:
             return pages.pop(0)
 
         monkeypatch.setattr(openplz, "openplz_request", fake_request)
-        monkeypatch.setattr(openplz, "_resolve_canton_key", lambda c: _async("ZH"))
+        monkeypatch.setattr(openplz, "_resolve_canton_key", lambda c, ctx=None: _async("ZH"))
         await find_commune(FindCommuneInput(canton="ZH"), ctx=_Recorder(timeline))
 
         progress = [e for e in timeline if e.startswith("progress:")]
@@ -258,3 +258,144 @@ class TestSwallowedLegendFailureIsSurfaced:
 
         result = await layer_info(LayerInfoInput(layer="ch.x"))
         assert result.results[0]["legend_status"] == "ok"
+
+
+# ---------------------------------------------------------------------------
+# The mechanism, not the instances (audit SDK-003)
+#
+# Threading `ctx` through by hand is exactly the kind of work that rots: a new
+# helper takes an optional `ctx` for symmetry and never forwards it, and the
+# tool still *looks* context-aware from its signature. That is not hypothetical
+# — it was the state of `_find_by_name`, the most-used mode of
+# `swisstopo_find_commune`, one of the two tools this finding named. It took a
+# `ctx` and dropped it, so a retry storm on a lookup by name stayed silent
+# while the same tool's `canton=` mode reported per page. `_get_canton_index`
+# was the same shape: one uncached upstream request on the canton path, with no
+# context reaching it.
+#
+# Per-call assertions cannot catch that class — they only cover the paths
+# somebody remembered to write a test for. These two sweep the source instead.
+# ---------------------------------------------------------------------------
+
+#: Every helper that reaches an upstream host. A `ctx` in scope must be passed
+#: to these, or the retry backoff behind them goes unreported.
+REQUEST_HELPERS = {
+    "openplz_request",
+    "geo_admin_request",
+    "geo_admin_request_text",
+    "stac_request",
+    "request_with_retry",
+}
+
+
+def _functions_taking_ctx():
+    """Yield (path, ast node) for every function in src/ that accepts a `ctx`."""
+    import ast
+    import pathlib
+
+    src = pathlib.Path(__file__).resolve().parent.parent / "src" / "swisstopo_mcp"
+    for path in sorted(src.glob("*.py")):
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if not isinstance(node, (ast.AsyncFunctionDef, ast.FunctionDef)):
+                continue
+            if "ctx" in [a.arg for a in node.args.args + node.args.kwonlyargs]:
+                yield path, node
+
+
+class TestEveryContextThatIsAcceptedIsAlsoUsed:
+    def test_no_function_takes_a_ctx_it_never_references(self):
+        import ast
+
+        dead = [
+            f"{path.name}:{fn.lineno} {fn.name}"
+            for path, fn in _functions_taking_ctx()
+            if not any(isinstance(n, ast.Name) and n.id == "ctx" for n in ast.walk(fn))
+        ]
+        assert dead == [], (
+            "these accept a Context and never touch it — the signature promises "
+            f"progress reporting the body does not do: {dead}"
+        )
+
+    def test_every_call_that_could_carry_the_ctx_does(self):
+        """The chain, not just its last link.
+
+        Checking only the five request helpers would have missed
+        `_list_by_canton() -> _resolve_canton_key()`: the break was one link
+        further up, in a helper that reaches the network only indirectly. So
+        the target set is every function in `src/` that accepts a `ctx` —
+        derived from the source, not listed here, so a new helper joins it
+        automatically.
+
+        `ctx` counts as forwarded whether it is passed positionally or by
+        keyword; both styles are in use and neither is wrong.
+        """
+        import ast
+
+        targets = {fn.name for _, fn in _functions_taking_ctx()} | REQUEST_HELPERS
+        missed = []
+        for path, fn in _functions_taking_ctx():
+            for call in ast.walk(fn):
+                if not isinstance(call, ast.Call):
+                    continue
+                name = getattr(call.func, "id", None) or getattr(call.func, "attr", None)
+                if name not in targets or name == fn.name:
+                    continue
+                forwarded = any(
+                    isinstance(a, ast.Name) and a.id == "ctx" for a in call.args
+                ) or any(kw.arg == "ctx" for kw in call.keywords)
+                if not forwarded:
+                    missed.append(f"{path.name}:{call.lineno} {fn.name}() -> {name}()")
+        assert missed == [], (
+            "a callee that accepts a Context was called from a function that has "
+            f"one, without passing it — the progress chain breaks here: {missed}"
+        )
+
+    def test_the_sweep_actually_looks_at_something(self):
+        """A sweep over an empty set passes for the wrong reason."""
+        found = {fn.name for _, fn in _functions_taking_ctx()}
+        assert len(found) > 10, f"the ctx sweep found almost nothing: {found}"
+        assert "_find_by_name" in found
+
+
+class TestFindCommuneByNameReportsRetries:
+    """The behavioural half of the guard above — the path that was actually
+    broken, asserted through the public tool rather than the helper."""
+
+    async def test_a_retry_on_the_name_path_warns(self, monkeypatch):
+        import httpx
+
+        from swisstopo_mcp import api_client
+        from swisstopo_mcp.openplz import FindCommuneInput, find_commune
+
+        attempts = {"n": 0}
+
+        class _Client:
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *exc):
+                return False
+
+            async def request(self, method, url, **kwargs):
+                attempts["n"] += 1
+                if attempts["n"] == 1:
+                    raise httpx.ConnectError("down")
+                return httpx.Response(
+                    200, json=[], request=httpx.Request(method, url)
+                )
+
+        monkeypatch.setattr(api_client, "_get_client", lambda: _async(_Client()))
+        monkeypatch.setattr(api_client, "_sleep", lambda s: _async(None))
+        monkeypatch.setattr(api_client, "assert_host_allowed", lambda url: None)
+
+        timeline: list[str] = []
+        result = await find_commune(
+            FindCommuneInput(name="Uster"), ctx=_Recorder(timeline)
+        )
+
+        assert result.is_error is False, result.summary
+        assert any(e.startswith("warning:") for e in timeline), (
+            "a retry on the commune-by-name path was silent; the tool takes a "
+            f"Context but this mode dropped it. Timeline: {timeline}"
+        )

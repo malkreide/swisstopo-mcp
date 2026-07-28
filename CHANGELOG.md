@@ -1,3 +1,67 @@
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+
+### Fixed
+- **Two paths accepted a `Context` and dropped it (audit SDK-003).** Both fed
+  `swisstopo_find_commune`, one of the two tools that finding named as the
+  actually-slow ones. `_find_by_name` — which backs the `name=` mode, the
+  most-used of the tool's four — took a `ctx` and never forwarded it to
+  `openplz_request`, so a lookup by name stayed silent through 2+4+8 s of retry
+  backoff while the `canton=` mode of the same tool reported per page.
+  `_get_canton_index` issues one uncached upstream request on the canton path,
+  before the paged fetch emits anything, and took no `ctx` at all.
+
+  Both were missed because the earlier remediation was verified by reading the
+  *tool* signatures, and both tools did have a `ctx` there. A parameter that is
+  accepted and dropped is indistinguishable from one that is used, from the
+  outside.
+
+  `tests/test_context.py` now sweeps the source with two AST guards — no
+  function may accept a `ctx` it never references, and no upstream call with a
+  `ctx` in scope may omit it — plus an assertion that the sweep covers a
+  non-trivial set, since a sweep over nothing passes for the wrong reason. All
+  three were confirmed to fail against the defect before the fix.
+
+- **The catalogue resource published an upstream outage as an empty catalogue.**
+  Raised in review of PR #41 by an automated reviewer, and correct. The tool
+  that `swisstopo://catalogue/layers` wraps degrades gracefully — on a
+  geodienste failure it returns an envelope with `is_error: true` and no
+  results, which is right for a *tool* call. Serialising that envelope's results
+  into the resource dropped both the flag and the summary, publishing
+  `count: 0` and an empty list as ordinary JSON, so a client could not
+  distinguish an outage from a genuinely empty catalogue.
+
+  The resource now raises, which the SDK surfaces as a `ResourceError` carrying
+  the masked summary. A resource is a document; when there is no document, an
+  error is the honest answer rather than an empty one.
+
+  Same defect class as ARCH-003 (a bare negative read as a factual answer) and
+  OBS-001 (an error presenting as success) — on a surface added in the very
+  commit that closed them.
+
+- **Restored the changelog header.** The merge `a9f6bc4` resolved a conflict by
+  dropping 70 lines, including the document title, the Keep-a-Changelog
+  preamble, the `## [Unreleased]` heading and the User-Agent entry below. Both
+  merge parents had them; this is a merge-resolution accident, not an edit.
+
+### Fixed (User-Agent version drift)
+- **User-Agent no longer reports a version that was never current.** Three
+  numbers had drifted apart: `pyproject.toml` said `0.3.0`,
+  `__init__.__version__` said `0.2.0`, and the hard-coded `USER_AGENT` in
+  `api_client.py` said `0.1` — a value that has not matched a release since the
+  very first one. Every request to geo.admin.ch, REFRAME, STAC, Overpass and
+  OpenPLZ carried it. `__version__` now comes from the installed distribution
+  metadata (`importlib.metadata`, generated from `pyproject.toml`) and the
+  User-Agent is derived from it, so no literal has to be remembered. Running
+  from a bare source checkout yields `0.0.0+source` rather than a
+  plausible-looking wrong number. Guarded by `tests/test_version.py`.
+
 ### Changed (ARCH-007)
 - **`swisstopo_query_geodata` fans out over collections concurrently.** The loop
   was strictly sequential — the check's named anti-pattern for an aggregation

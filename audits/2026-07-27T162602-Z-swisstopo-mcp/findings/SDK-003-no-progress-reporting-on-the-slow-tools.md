@@ -129,3 +129,40 @@ a regression test, which is what the finding correctly said about the old one.
 
 **Not changed:** the stdio-safety half of the check was already solid (no
 `print()` in `src/`, structlog bound to stderr) and remains so.
+
+---
+
+### Remediation Status — correction (2026-07-28, follow-up)
+
+The section above claimed closure while two paths still dropped their context.
+Both fed `swisstopo_find_commune`, one of the two tools this finding named:
+
+- `_find_by_name` took a `ctx` and never forwarded it to `openplz_request`. It
+  backs the `name=` mode — the most-used of the tool's four. So a lookup by
+  name stayed silent through 2+4+8 s of backoff while the `canton=` mode of the
+  same tool reported per page.
+- `_get_canton_index` issues one uncached upstream request on the `canton=`
+  path, before `_fetch_all_pages` emits anything, and took no `ctx` at all.
+
+Both now thread the context. The more useful part is why they were missed: item
+1 was verified by reading the tool signatures, and both tools *had* a `ctx` in
+their signature. A parameter that is accepted and dropped looks identical from
+the outside to one that is used.
+
+`tests/test_context.py` now sweeps the source with two AST guards — no function
+may accept a `ctx` it never references, and no call to a `ctx`-accepting callee
+from a `ctx`-bearing caller may omit it — plus a third assertion that the sweep
+covers a non-trivial set, since a sweep over nothing passes for the wrong
+reason.
+
+The second guard checks the whole chain rather than only the five functions
+that touch the network. Restricted to those, it would have caught
+`_find_by_name` but not `_list_by_canton -> _resolve_canton_key`, where the
+break is one link further up in a helper that reaches the network only
+indirectly. The target set is derived from the source — every function
+accepting a `ctx` — so a new helper joins it without anyone maintaining a list.
+
+Both defect shapes were confirmed to fail the guards before the fix, and the
+indirect one fails *only* the transitive version. That is the property this
+finding asked for in item 5, applied to the mechanism rather than to the two
+instances that happened to be found.

@@ -115,11 +115,17 @@ def reset_canton_cache() -> None:
     _canton_index = None
 
 
-async def _get_canton_index() -> dict[str, str]:
-    """Return (and cache) an uppercase abbreviation → canton-key map."""
+async def _get_canton_index(ctx: Any | None = None) -> dict[str, str]:
+    """Return (and cache) an uppercase abbreviation → canton-key map.
+
+    The cache makes this free on every call but the first. That first call is a
+    real upstream request on the `canton=` path of `swisstopo_find_commune`, so
+    it carries the context too — a retry storm here would otherwise be silent
+    before the paged fetch has emitted anything (audit SDK-003).
+    """
     global _canton_index
     if _canton_index is None:
-        resp = await openplz_request("/Cantons")
+        resp = await openplz_request("/Cantons", ctx=ctx)
         cantons = resp.json()
         _canton_index = {
             str(c["shortName"]).upper(): str(c["key"])
@@ -129,7 +135,7 @@ async def _get_canton_index() -> dict[str, str]:
     return _canton_index
 
 
-async def _resolve_canton_key(value: str) -> str:
+async def _resolve_canton_key(value: str, ctx: Any | None = None) -> str:
     """Accept a canton abbreviation ('ZH') or a numeric key ('1') → key.
 
     Guards against the abbreviation-vs-key trap: an abbreviation used as a path
@@ -138,7 +144,7 @@ async def _resolve_canton_key(value: str) -> str:
     v = value.strip()
     if v.isdigit():
         return v
-    index = await _get_canton_index()
+    index = await _get_canton_index(ctx)
     key = index.get(v.upper())
     if key is None:
         raise ValueError(
@@ -441,7 +447,7 @@ async def lookup_postal_code(params: LookupPostalCodeInput) -> ToolResponse:
 
 
 async def _find_by_name(name: str, ctx: Any | None = None) -> ToolResponse:
-    resp = await openplz_request("/Localities", {"name": name})
+    resp = await openplz_request("/Localities", {"name": name}, ctx=ctx)
     localities = resp.json()
     # A commune can back several localities — dedupe by BFS number.
     seen: dict[str, dict[str, Any]] = {}
@@ -519,7 +525,7 @@ async def _find_by_bfs(bfs_number: int, ctx: Any | None = None) -> ToolResponse:
 
 
 async def _list_by_canton(canton: str, ctx: Any | None = None) -> ToolResponse:
-    canton_key = await _resolve_canton_key(canton)
+    canton_key = await _resolve_canton_key(canton, ctx)
     communes, total, truncated = await _fetch_all_pages(
         f"/Cantons/{canton_key}/Communes", ctx=ctx
     )

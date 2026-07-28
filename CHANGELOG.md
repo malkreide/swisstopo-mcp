@@ -8,6 +8,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **Two paths accepted a `Context` and dropped it (audit SDK-003).** Both fed
+  `swisstopo_find_commune`, one of the two tools that finding named as the
+  actually-slow ones. `_find_by_name` — which backs the `name=` mode, the
+  most-used of the tool's four — took a `ctx` and never forwarded it to
+  `openplz_request`, so a lookup by name stayed silent through 2+4+8 s of retry
+  backoff while the `canton=` mode of the same tool reported per page.
+  `_get_canton_index` issues one uncached upstream request on the canton path,
+  before the paged fetch emits anything, and took no `ctx` at all.
+
+  Both were missed because the earlier remediation was verified by reading the
+  *tool* signatures, and both tools did have a `ctx` there. A parameter that is
+  accepted and dropped is indistinguishable from one that is used, from the
+  outside.
+
+  `tests/test_context.py` now sweeps the source with two AST guards — no
+  function may accept a `ctx` it never references, and no upstream call with a
+  `ctx` in scope may omit it — plus an assertion that the sweep covers a
+  non-trivial set, since a sweep over nothing passes for the wrong reason. All
+  three were confirmed to fail against the defect before the fix.
+
 - **The catalogue resource published an upstream outage as an empty catalogue.**
   Raised in review of PR #41 by an automated reviewer, and correct. The tool
   that `swisstopo://catalogue/layers` wraps degrades gracefully — on a

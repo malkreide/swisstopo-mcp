@@ -26,7 +26,7 @@ Warum nützlich: Gibt Familien sofortige Klarheit über die baulichen Gegebenhei
 
 **Gefahrenzonen im Wohnquartier prüfen**
 «Gibt es am Standort unseres Hauses (Koordinaten 46.852, 9.531) Naturgefahren wie Hochwasser oder Erdrutschgefahr?»
-→ `swisstopo_identify_features(layers="ch.bafu.gefahrenkarten-uebersicht", lat=46.852, lon=9.531)`
+→ `swisstopo_map_query(operation="features_at_point", layers="ch.bafu.gefahrenkarten-uebersicht", lat=46.852, lon=9.531)`
 Warum nützlich: Klärt Familien schnell über mögliche naturgegebene Risiken am Wohnort auf und hilft bei Entscheidungen zu Präventionsmassnahmen oder Versicherungen.
 
 ### 🗳️ Bevölkerung & öffentliches Interesse
@@ -41,7 +41,7 @@ Warum nützlich: Schafft Transparenz für die Nachbarschaft bei geplanten Baupro
 **Details zu Gebäuden und Infrastruktur nachschlagen**
 «Zeig mir alle amtlichen Gebäudeauskünfte (GWR) zur Adresse Bundesplatz 1 in Bern, zum Beispiel das Baujahr.»
 → `swisstopo_geocode(search_text="Bundesplatz 1, Bern")`
-→ `swisstopo_identify_features(layers="ch.bfs.gebaeude_wohnungs_register", lat=46.947, lon=7.444)`
+→ `swisstopo_map_query(operation="features_at_point", layers="ch.bfs.gebaeude_wohnungs_register", lat=46.947, lon=7.444)`
 Warum nützlich: Fördert das Verständnis öffentlicher Gebäude und gibt zivilgesellschaftlichen Akteuren detaillierte Einblicke in amtliche Registerdaten für eigene Recherchen.
 
 ### 🤖 KI-Interessierte & Entwickler:innen
@@ -69,6 +69,6 @@ Warum nützlich: Zeigt, wie zuverlässiges amtliches Geocoding als unverzichtbar
 | **ein Höhenprofil für eine Route berechnen** | `swisstopo_elevation_profile` | Nein |
 | **Kartenlinks zum Teilen im Browser generieren** | `swisstopo_map_url` | Nein |
 | **herunterladbare Geodaten (3D, Orthofotos) finden** | `swisstopo_search_geodata`, `swisstopo_get_collection` | Nein |
-| **herausfinden, was sich an einem bestimmten Punkt befindet** | `swisstopo_search_layers`, `swisstopo_identify_features` | Nein |
-| **ein spezifisches Kartenobjekt nach ID oder Attribut suchen** | `swisstopo_find_features`, `swisstopo_get_feature` | Nein |
+| **herausfinden, was sich an einem bestimmten Punkt befindet** | `swisstopo_map_query` (`operation='search_layers'`, dann `'features_at_point'`) | Nein |
+| **ein spezifisches Kartenobjekt nach ID oder Attribut suchen** | `swisstopo_map_query` (`operation='features_by_attribute'` bzw. `'feature_by_id'`) | Nein |
 | **baurechtliche Eigentumsbeschränkungen (ÖREB) abfragen** | `swisstopo_get_egrid`, `swisstopo_get_oereb_extract` | Nein |

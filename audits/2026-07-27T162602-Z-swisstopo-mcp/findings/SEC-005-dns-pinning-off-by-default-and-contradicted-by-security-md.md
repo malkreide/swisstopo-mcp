@@ -69,3 +69,74 @@ It is not a pass because the control is inert in the default configuration
 and, on the cluster path, is deliberately mutually exclusive with an egress
 proxy whose ACL does not work. The doc contradiction at SECURITY.md:27 is
 the mirror image of overclaiming, but it is still drift and should be fixed.
+
+---
+
+### Remediation Status (2026-07-28, follow-up PR)
+
+**Closed. Pinning is on by default as of 0.4.0** (`Settings.pin_dns = True`,
+`SWISSTOPO_PIN_DNS=0` to disable), and the three supporting items are done.
+
+The finding's central objection was not that the transport was wrong — it said
+plainly that the transport is sound — but that a control which is inert in the
+shipped default is not a control. That was the right way to put it, and it is
+what changed.
+
+**1. The default (item 2, shared with SEC-004 item 1).** The previous reasoning
+was recorded in the code: *"a default-on control that breaks egress is worse
+than the narrow risk it closes."* That is a real trade-off and it was not
+dishonest, but it was resolved in the wrong direction, because it weighed a
+hypothetical breakage against a hypothetical attack and then shipped the option
+that let the criterion fail quietly. The way to settle it is to remove the
+breakage, not to keep the control switched off — which is what item 3 turned out
+to be about.
+
+**2. Only `addresses[0]` was used (item 3) — the item that made item 1
+possible.** The finding listed this fifth, as a minor gap. It is not minor: it
+*was* the argument against defaulting on. `getaddrinfo` has no obligation to
+return a reachable family first, so an AAAA-first answer in an IPv4-only network
+failed the request outright — while unpinned `httpx` would have moved to the next
+address by itself. Pinning being the reason a working host becomes unreachable is
+exactly the "breaks egress" fear, and it was real rather than hypothetical.
+
+`PinnedTransport` now walks the list, falling through on `ConnectError` /
+`ConnectTimeout` only:
+
+- **Connect-phase failures only.** A `ReadError` means the request reached the
+  peer; replaying it would be a duplicate request, not a retry. Tested.
+- **Buffered bodies only.** Trying a second address means sending the request
+  twice, which is wrong for a streaming body already consumed by the first
+  attempt — that would put a *truncated* request on the wire, worse than the
+  error being recovered from. A streaming request keeps the old single-address
+  behaviour. This server sends no request bodies today; the transport is generic
+  and should not depend on that staying true.
+- **Every candidate is vetted, not just the first.** `assert_resolved_ip_public`
+  raises if *any* answer is private, and it runs before the first connection —
+  so the walk cannot become a way around the SEC-004 guard. A test asserts no
+  connection is attempted at all when a second answer points at loopback.
+- **The error names the hostname, not the last IP tried.** A traceback reading
+  `185.19.28.2` sends the reader looking for a host they never configured.
+
+The three walk tests were verified to fail against the old `addresses[0]` code.
+
+**3. `SECURITY.md` (item 1).** Already corrected before this PR — it read
+"Implemented, off by default", which was accurate at the time. Both language
+versions are updated again for the new default, and both now name the release
+the window was open until rather than describing only the current state; "on by
+default" without a version tells a 0.3.x operator nothing.
+
+**4. The live-only TLS proof (item 4).** Stated in the test module docstring, as
+asked, and stated as a limit on *reading CI* rather than as a note about the
+tests: a green PR run is evidence about request rewriting only, because
+`pytest -m "not live"` deselects the handshake tests. That is the right split —
+the point is that the split is legible to whoever reads the green tick.
+
+**On the mutual exclusivity with the egress proxy.** The finding treats this as a
+gap ("a Kubernetes deployment following the shipped manifests gets neither"). The
+first half of that is by construction and correct: behind a proxy the proxy owns
+resolution, and pinning anyway would only break CONNECT. The second half was the
+real complaint — that the proxy's ACL did not work — and that is SEC-021, now
+closed. With a working ACL the cluster path has per-host control at the network
+layer and the direct-egress path has pinning, and neither is left with nothing.
+The docs now say this positively: the two are mutually exclusive *by
+construction*, so an operator does not have to choose correctly.

@@ -17,7 +17,7 @@
 
 ## Uebersicht
 
-`swisstopo-mcp` gibt KI-Assistenten Zugriff auf die offizielle schweizerische Geodateninfrastruktur ueber 24 Tools, alle ohne Authentifizierung:
+`swisstopo-mcp` gibt KI-Assistenten Zugriff auf die offizielle schweizerische Geodateninfrastruktur ueber 20 Tools, alle ohne Authentifizierung:
 
 | Quelle | Daten | API |
 |--------|-------|-----|
@@ -43,7 +43,7 @@
 
 ## Funktionen
 
-- 🗺️ **24 Tools** (REST, Geocoding, Hoehe, STAC, WMTS, OEREB, geodienste.ch, OpenStreetMap/Overpass, OpenPLZ)
+- 🗺️ **20 Tools** (REST, Geocoding, Hoehe, STAC, WMTS, OEREB, geodienste.ch, OpenStreetMap/Overpass, OpenPLZ)
 - 🏛️ Administrative Adressebene aufloesen (PLZ → Gemeinde/**BFS-Nummer** → Bezirk → Kanton) via OpenPLZ
 - 🔍 Schweizerische Adressen geocodieren und Koordinaten rueckwaerts geocodieren
 - 🏔️ Hoehe ueber Meer abfragen und Hoehenprofile berechnen
@@ -154,13 +154,24 @@ Fuer den Einsatz via **claude.ai im Browser** (z.B. auf verwalteten Arbeitsplaet
 
 | Tool | Beschreibung |
 |------|-------------|
-| `swisstopo_search_layers` | Swisstopo-Layerkatalog (500+ Layer) nach Stichwort durchsuchen |
-| `swisstopo_identify_features` | Kartenobjekte an einer bestimmten Koordinate finden (raeumliche Abfrage) |
-| `swisstopo_find_features` | Features anhand eines Attributwerts in einem Layer suchen (z.B. Gebaeude nach EGID) |
-| `swisstopo_get_feature` | Vollstaendige Attribute und Geometrie eines Features per ID abrufen |
-| `swisstopo_layer_info` | Abfragbare Felder und Legende eines Layers auflisten (zulaessige `search_field`-Werte) |
+| `swisstopo_map_query` | Der nationale Kartenkatalog (api3.geo.admin.ch). Eine `operation` pro Aufruf — siehe die fuenf unten |
 | `swisstopo_zoning_at` | Harmonisierte Bauzone an einer Koordinate — ein Aufruf, ohne Layer-Suche (nicht rechtsverbindlich) |
 | `swisstopo_municipality_at` | Gemeinde, Kanton und amtliche BFS-Nummer an einer Koordinate |
+
+#### Operationen von `swisstopo_map_query`
+
+| `operation` | Beantwortet | Pflichtargumente |
+|-------------|-------------|------------------|
+| `search_layers` | Welche Layer gibt es zu einem Stichwort? (500+ Katalog) | `query` |
+| `layer_info` | Welche Felder sind auf diesem Layer abfragbar, und wie sieht die Legende aus? | `layer` |
+| `features_at_point` | Was liegt an dieser Koordinate? | `layers` + ein Punkt (`lat`/`lon` **oder** `easting`/`northing`) |
+| `features_by_attribute` | Welche Features tragen diesen Wert? (z.B. Gebaeude nach EGID) | `layer`, `search_field`, `search_text` |
+| `feature_by_id` | Gib mir dieses eine Feature vollstaendig, mit Geometrie | `layer`, `feature_id` |
+
+Argumente, die zu einer anderen Operation gehoeren, werden **abgelehnt, nicht
+ignoriert** — die Fehlermeldung nennt die zulaessigen. Ein stillschweigend
+verworfenes `search_field` wuerde eine plausible Antwort auf eine nie gestellte
+Frage liefern, und genau dagegen ist das Envelope-Design gerichtet.
 
 ### Geocoding
 
@@ -229,7 +240,7 @@ zu BFS-Statistikdaten (`swiss-statistics-mcp`) und zu `zurich-opendata-mcp`.
 |---------|------|
 | *"Wo ist die Bahnhofstrasse 1, Zuerich?"* | `swisstopo_geocode` |
 | *"Welche Hoehe hat der Uetliberg-Gipfel?"* | `swisstopo_get_height` |
-| *"Welche Gebaeude bei Koordinaten 2683500, 1247500?"* | `swisstopo_identify_features` |
+| *"Welche Gebaeude bei Koordinaten 2683500, 1247500?"* | `swisstopo_map_query` (`operation='features_at_point'`) |
 | *"Finde Orthophoto-Datensaetze zum Download"* | `swisstopo_search_geodata` |
 | *"Zeige mir eine Karte von Bern bei Zoomstufe 10"* | `swisstopo_map_url` |
 | *"Welche Einschraenkungen gelten fuer Musterstrasse 5?"* | `swisstopo_oereb_at` |
@@ -248,7 +259,7 @@ zu BFS-Statistikdaten (`swiss-statistics-mcp`) und zu `zurich-opendata-mcp`.
 │   Claude / KI   │────▶│  swisstopo-mcp               │────▶│  Swisstopo REST API      │
 │   (MCP Host)    │◀────│  (MCP Server)                │◀────│  api3.geo.admin.ch       │
 └─────────────────┘     │                              │     ├──────────────────────────┤
-                        │  24 Tools                    │────▶│  Geocoding               │
+                        │  20 Tools                    │────▶│  Geocoding               │
                         │  Stdio | Streamable HTTP     │◀────│  api3.geo.admin.ch       │
                         │                              │     ├──────────────────────────┤
                         │  Keine Authentifizierung     │────▶│  STAC-Katalog            │
@@ -276,7 +287,7 @@ swisstopo-mcp/
 │   ├── server.py                # MCP-Server (Tool-Registrierungen)
 │   ├── api_client.py            # Gemeinsamer HTTP-Client (httpx + Fehlerbehandlung)
 │   ├── geocoding.py             # swisstopo_geocode, swisstopo_reverse_geocode
-│   ├── rest_api.py              # swisstopo_search_layers, identify, find, get_feature
+│   ├── rest_api.py              # swisstopo_map_query (5 Operationen), zoning_at, municipality_at
 │   ├── height.py                # swisstopo_get_height, swisstopo_elevation_profile
 │   ├── stac.py                  # swisstopo_search_geodata, swisstopo_get_collection
 │   ├── wmts.py                  # swisstopo_map_url
@@ -334,34 +345,45 @@ Lethal-Trifecta-Bewertung und ein Security-Review vor Implementationsbeginn.
 
 ### Tool-Budget und Aggregation
 
-24 Tools bei einem selbstgesetzten Budget von 25. Das Ideal des Checks liegt bei
-≤12, die Zahl braucht also eine Begruendung, nicht nur eine Nennung. Pro Cluster:
+20 Tools bei einem selbstgesetzten Budget von 25. Das Ideal des Checks liegt bei
+≤12, die Zahl braucht also weiterhin eine Begruendung, nicht nur eine Nennung.
+Pro Cluster:
 
-**Die fuenf api3-Tools** (`search_layers`, `layer_info`, `identify_features`,
-`find_features`, `get_feature`) bleiben getrennt, weil ihre Argumentformen
-tatsaechlich disjunkt sind: eine Geometrie, ein Attributname plus Wert, eine
-opake Feature-ID. Ein Zusammenlegen hinter eine diskriminierte Union wuerde die
-Tool-Wahl in eine Varianten-Wahl verwandeln — dieselbe Entscheidung, nur
-verschoben, plus ein Schema, durch das sich der Aufrufer navigieren muss. Das
-reale Risiko benennt das Audit zurecht: eine Fehlwahl liefert leer statt eines
-Fehlers. Dem begegnen stattdessen die `note`-Hinweise aus ARCH-003.
+**Die fuenf api3-Tools sind zusammengelegt** (0.4.0, Breaking Change).
+`search_layers`, `layer_info`, `identify_features`, `find_features` und
+`get_feature` sind jetzt `operation`-Werte von `swisstopo_map_query`. Sie waren
+das lehrbuchhafte Ein-Tool-pro-REST-Endpunkt-Mapping, das der Check benennt, und
+als solche verschwunden.
 
-**Das ist eine Entscheidung, keine Vertagung.** Eine fruehere Fassung dieses
-Abschnitts endete mit «bleibt Kandidat fuer ein kuenftiges Major-Release», was
-das Audit zurecht als Dokumentation der Schuld statt ihrer Tilgung gelesen hat
-(ARCH-006). Die Position jetzt: diese fuenf bleiben getrennt, und der Anlass zur
-Neubewertung ist eine *Messung* — Belege, dass Modelle das falsche waehlen —
-nicht eine Tool-Zahl.
+Fruehere Releases haben hier das Gegenteil argumentiert, und das Argument bleibt
+sichtbar, weil es nicht falsch war, sondern ueberwogen wurde: Ein Merge
+verschiebt die Entscheidung von der Tool-Wahl in die Schema-Navigation, wo ein
+Modell weniger Hilfe hat — Tool-Beschreibungen sind das, was es tatsaechlich
+liest. Drei Dinge adressieren das direkt, statt zu hoffen, es falle nicht ins
+Gewicht:
 
-**Die zwei Paare, die dieser Abschnitt bisher unargumentiert mitgenommen hat**,
-beide vom Audit benannt:
+- **Die Operationen sind nach Fragen benannt, nicht nach Endpunkten.**
+  `identify` und `find` sind ESRI-Vokabular — sie nennen die aufgerufene
+  MapServer-Route, nicht die gestellte Frage, und ohne ArcGIS-Erfahrung sind sie
+  nicht auseinanderzuhalten. `features_at_point` und `features_by_attribute`
+  lassen sich allein aus der Operationsliste richtig waehlen.
+- **Ein fehlplatziertes Argument ist ein Fehler, kein stilles Verwerfen.** Bei
+  fuenf Tools machte das Schema eine falsche Paarung unmoeglich. Bei einem Tool
+  nicht mehr, also uebernimmt das die Validierung: jede Operation deklariert die
+  Felder, die sie akzeptiert, alles andere wird mit Nennung der Alternativen
+  abgelehnt.
+- **Die `note`-Hinweise aus ARCH-003 nennen weiterhin den naechsten Schritt**,
+  jetzt als Operationen statt als Tool-Namen — eine leere Attributsuche
+  verweist auf `operation='layer_info'` fuer die zulaessigen Feldnamen, und so
+  weiter.
 
-- `search_layers` + `layer_info` sind ein Discovery-Paar ueber denselben Katalog
-  und damit der klassische Merge-Kandidat. Sie bleiben getrennt, weil sich die
-  Operationen der Art nach unterscheiden, nicht nur der Tiefe nach: das eine
-  durchsucht 500+ Layer nach Stichwort, das andere liefert die abfragbaren
-  Felder und die Legende eines Layers. Wer eine Layer-ID hat und ihre Felder
-  will, fuehrt keine eingegrenzte Suche durch.
+Observability war der andere Preis, und er wird nicht bezahlt: jede Operation
+behaelt ihr eigenes Log- und Trace-Label
+(`swisstopo_map_query:features_at_point`), Timing und Fehlerraten pro Operation
+ueberleben den Merge also.
+
+**Die zwei Paare, die getrennt bleiben**, beide vom Audit benannt:
+
 - `geocode` + `reverse_geocode` treffen tatsaechlich denselben
   SearchServer-Endpunkt — auf der API-Achse also zweimal ein 1:1-Mapping. Sie
   bleiben getrennt auf der Achse, die fuer die Tool-Wahl zaehlt: «Adresse →
@@ -369,12 +391,13 @@ beide vom Audit benannt:
   verschiedenen Eingabetypen. Ein gemeinsamer Endpunkt ist ein
   Implementationsdetail des Upstreams.
 
-**Eine Namensmehrdeutigkeit, die das Audit nicht benannt hat:**
-`swisstopo_search_layers` und `swisstopo_list_available_layers` sagen beide
-«Layers» und stehen vor *verschiedenen* Katalogen — dem api3-Layerkatalog und
-der konsolidierten Fassade. Keine Merge-Kandidaten, aber die Namen liegen naeher
-beieinander als die Konzepte. Eine Umbenennung gehoert ins naechste
-Breaking-Release.
+**Die Namensmehrdeutigkeit ist aufgeloest** — das Audit hatte sie nicht benannt,
+die vorherige Fassung dieses Abschnitts hatte sie fuers «naechste
+Breaking-Release» vorgemerkt, und das ist dieses. `swisstopo_search_layers` und
+`swisstopo_list_available_layers` sagten beide «Layers» und standen vor
+*verschiedenen* Katalogen. Das erste ist jetzt `swisstopo_map_query` mit
+`operation='search_layers'`, womit der nationale Katalog im Tool-Namen steht und
+`list_available_layers` eindeutig die konsolidierte Fassade bleibt.
 
 **Search-→-Detail-Paare.** `search_geodata` → `get_collection` ist ein echtes
 Paar: STAC-Collection-Metadaten sind umfangreich, und meist wird eines von
@@ -389,8 +412,12 @@ hinter einem Tool; `zoning_at` und `municipality_at` loesen je eine
 Discovery-Kette auf, die vorher zwei Aufrufe brauchte.
 
 **Bei der naechsten Datenquelle** steht die Wahl zwischen Anheben und
-Konsolidieren. Der Konsolidierungskandidat sind die api3-Fuenf; das ist ein
-Breaking Change und gehoert in ein Major-Release.
+Konsolidieren. Mit den zusammengelegten api3-Fuenf gibt es keinen offensichtlichen
+Konsolidierungskandidaten mehr, der Spielraum verdeckt — das naechste Wachstum
+der Oberflaeche ist also ein echtes Gespraech ueber die Obergrenze statt eine
+vertagte Aufraeumarbeit. Erzwungen wird dieses Gespraech in
+`tests/test_tool_namespace.py::TestToolBudget`: das Budget anheben heisst, die
+Zahl dort *und* in beiden READMEs zu aendern.
 
 ### Datenquellen und Lizenzen
 
@@ -523,9 +550,10 @@ Die meisten Tools liefern ein gedanklich abgeschlossenes Resultat in einem
 Aufruf. Zwei Domänen nutzen eine kurze, dokumentierte Discovery-Kette (jede
 Tool-Beschreibung nennt den nächsten Schritt):
 
-- **Feature-Abfrage:** `swisstopo_search_layers` (Layer-IDs finden) →
-  `swisstopo_identify_features` / `swisstopo_find_features` →
-  `swisstopo_get_feature` (Details).
+- **Feature-Abfrage:** alle vier Schritte sind `swisstopo_map_query` mit anderer
+  `operation`: `search_layers` (Layer-IDs finden) → `layer_info` (abfragbare
+  Felder ansehen) → `features_at_point` / `features_by_attribute` →
+  `feature_by_id` (Details).
 - **Kataster:** `swisstopo_geocode` → `swisstopo_oereb_at` (ein Aufruf:
   Koordinaten → EGRID → Auszug). `swisstopo_get_egrid` →
   `swisstopo_get_oereb_extract` nur, wenn die Parzellen-ID selbst gebraucht wird.

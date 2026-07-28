@@ -24,9 +24,22 @@ class Settings(BaseSettings):
     # having to inject a CLI flag (ARCH-004).
     transport: Literal["stdio", "streamable-http"] = "stdio"
 
-    # DNS pinning (SEC-005). Off by default: it rewrites the target of every
-    # outbound request, and it is inert behind a forward proxy anyway.
-    pin_dns: bool = False
+    # DNS pinning (SEC-005/SEC-004). **On by default since 0.4.0.**
+    #
+    # It was off, on the reasoning that a control which rewrites the target of
+    # every outbound request should be verified before being switched on. That
+    # reasoning kept the rebinding window SEC-004 names open in the shipped
+    # default — including on the stdio path, which has no network-layer
+    # compensation at all — so the criterion "the resolved IP is used for the
+    # TCP connection" held only for operators who opted in.
+    #
+    # Set SWISSTOPO_PIN_DNS=0 to restore the previous behaviour. Two reasons it
+    # is safe to leave on, both enforced in code rather than assumed:
+    #   * behind a forward proxy it turns itself off (`_pinning_enabled`), since
+    #     the proxy owns resolution and pinning would only break CONNECT;
+    #   * a name that will not resolve, or resolves to nothing usable, falls
+    #     through to the unpinned path rather than failing the request.
+    pin_dns: bool = True
 
     # Cantonal OEREB endpoints to enable. Read here rather than via a call-time
     # os.environ lookup in oereb.py, so the value is validated once at startup

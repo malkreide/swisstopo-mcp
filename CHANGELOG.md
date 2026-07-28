@@ -7,7 +7,88 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed — BREAKING
+
+- **The five api3 tools are now one tool with an `operation` argument (audit
+  ARCH-006).** `swisstopo_search_layers`, `swisstopo_identify_features`,
+  `swisstopo_find_features`, `swisstopo_get_feature` and `swisstopo_layer_info`
+  are removed and replaced by **`swisstopo_map_query`**. 24 → 20 tools. Every
+  client calling any of the five must be updated; there is no alias shim.
+
+  | Removed tool | Replacement |
+  |---|---|
+  | `swisstopo_search_layers` | `swisstopo_map_query(operation="search_layers", query=…)` |
+  | `swisstopo_layer_info` | `swisstopo_map_query(operation="layer_info", layer=…)` |
+  | `swisstopo_identify_features` | `swisstopo_map_query(operation="features_at_point", layers=…, lat=…, lon=…)` |
+  | `swisstopo_find_features` | `swisstopo_map_query(operation="features_by_attribute", layer=…, search_field=…, search_text=…)` |
+  | `swisstopo_get_feature` | `swisstopo_map_query(operation="feature_by_id", layer=…, feature_id=…)` |
+
+  Argument names are unchanged within each operation, so a migration is adding
+  `operation=` and changing the tool name. Two behavioural notes:
+
+  - **A field belonging to another operation is now an error.** With five tools
+    the schema made a wrong pairing impossible; with one tool it does not, so
+    validation does. The message names the fields the chosen operation accepts.
+  - **`sr` no longer exists on the point query.** It had been deprecated to
+    4326-only there; passing it to `operation='features_at_point'` is now
+    rejected as belonging to another operation. It remains on `feature_by_id`,
+    where it selects the output geometry's coordinate system.
+
+  Two things the merge deliberately does *not* cost. Operations are named for
+  the question rather than the upstream route — `features_at_point` and
+  `features_by_attribute`, not ESRI's `identify` and `find` — so the choice can
+  be made from the operation list alone. And each operation keeps its own log
+  and trace label (`swisstopo_map_query:features_at_point`), so per-operation
+  timing and error rates survive.
+
+  This reverses the position recorded in 0.3.x, where both READMEs argued the
+  five should stay separate and named a *measurement* as the trigger for
+  revisiting. The rationale is rewritten rather than deleted — see "Tool budget
+  and aggregation" in either README.
+
+  Resolves the naming ambiguity the previous rationale had deferred to "the next
+  breaking release": `swisstopo_search_layers` and
+  `swisstopo_list_available_layers` both said "layers" while fronting different
+  catalogues. The national one is now inside `swisstopo_map_query`.
+
+### Security
+
+- **DNS pinning is on by default (audit SEC-004 / SEC-005).**
+  `SWISSTOPO_PIN_DNS` now defaults to `1`. Every release up to 0.3.x shipped it
+  off, which left the TOCTOU window between the SSRF guard's lookup and httpx's
+  own connect-time lookup open in the configuration almost everyone runs —
+  including stdio, which has no network-layer compensation. Set
+  `SWISSTOPO_PIN_DNS=0` to restore the previous behaviour.
+
+  Pinning remains automatically inert behind a forward proxy (the proxy owns
+  resolution), so cluster deployments using `deploy/egress-proxy.yaml` are
+  unaffected in either direction.
+
 ### Fixed
+
+- **DNS pinning used only the first resolved address (audit SEC-005).**
+  `PinnedTransport` took `addresses[0]` and committed the request to it, so an
+  AAAA-first answer in an IPv4-only network failed outright — while *unpinned*
+  httpx would have moved on to the next address by itself. This was the concrete
+  form of the "a default-on control that breaks egress" objection that kept
+  pinning off, so fixing it was the precondition for the default above.
+
+  The transport now walks the resolved list, falling through only on
+  `ConnectError` / `ConnectTimeout` — a `ReadError` means the request reached the
+  peer and must not be replayed — and only when the request body is buffered, so
+  a streaming body is never sent twice. The SSRF guard still runs before the
+  first connection and rejects the whole answer if *any* address is private, so
+  the walk cannot become a way around it. On exhaustion the error names the
+  hostname rather than the last IP tried.
+
+- **The egress-proxy sidecar had no test guarding what it mounts (audit
+  SEC-021).** The manifest's `--config-file=/etc/smokescreen/config.yaml` flag,
+  pointing at a file the documented ConfigMap does not build, was dropped
+  earlier — but a deletion leaves no trace, and nothing stopped an equivalent
+  flag from being added back. `tests/test_deploy_manifests.py` now asserts that
+  every path the sidecar args name under the mount point is one the documented
+  `--from-file=` command actually supplies.
+
 - **Two paths accepted a `Context` and dropped it (audit SDK-003).** Both fed
   `swisstopo_find_commune`, one of the two tools that finding named as the
   actually-slow ones. `_find_by_name` — which backs the `name=` mode, the

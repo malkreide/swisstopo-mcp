@@ -2,17 +2,14 @@
   "swisstopo_convert_coordinates": "6e8fc86bed0ccebf4b7f6fd2c6bc7a3c93a299788472d0a5ac9d888070ae1c10",
   "swisstopo_elevation_profile": "8210412fdc7e430582f103ba80f2b44927cae8a17ad746a2556766696db7f258",
   "swisstopo_find_commune": "fb6aa4d9a67921f1e66655b7ebe146b42a6c19fc8d9786ffc2836ec22e63b175",
-  "swisstopo_find_features": "04a8aaedf29350e6f52cd97ec4ccf98c605996321d46fbbfcfffa7deb622b637",
-  "swisstopo_geocode": "2891831cfc75e30fc0d9692df5cc58420ad3de22c0f9386e31388741c107bfd6",
+  "swisstopo_geocode": "fc3f6923a8c90a76921d7acf343d4d3d6a53d0d6bd62801e3c313454d7b8d08c",
   "swisstopo_get_collection": "bd742ae8b93dd691998276298637a4da2a4fc4782ba05189e835862b0d6dabaa",
   "swisstopo_get_egrid": "d341940ebc316aba64ebd5377070e260c66e5de6dd78b4f50b2e76cdc9824adb",
-  "swisstopo_get_feature": "7e9d50e2d35e6c472b74a5cf7255019bdbcdce93b77a60c24ae99e434941a9a8",
   "swisstopo_get_height": "cfa531790beda6f048a56bc967e18b8581feb5589c62d5a0450f3fc160d97054",
   "swisstopo_get_oereb_extract": "a6abfc1030a64ba9f97e919e8b3604b529112bf1e249806f2a1e97d4c1f1b9fb",
-  "swisstopo_identify_features": "bd18ed0d3310ad152cf671b102086a0931e9b954bca9dd525def5e897b5c6277",
-  "swisstopo_layer_info": "65169c275e35bd193a12a181fbbdc6eb347b8dcc8e63d9659c762faf97ac9ce6",
   "swisstopo_list_available_layers": "beb90469eccc6a239e63cbd53f3a4d00050f702aaf73b848a3793647bc524b19",
   "swisstopo_lookup_postal_code": "2df89e62af4614d83debd60af6c1b84ef75ae462e08565d06aca5dc57609c7ff",
+  "swisstopo_map_query": "c609fa00f53c0912cf6794649ad2fc76012484652fe65496cdb8d70fa327a4d5",
   "swisstopo_map_url": "873739ad2e02ef028e628d5712b0232bd6770ceb7a2404e8210286b4362f172d",
   "swisstopo_municipality_at": "a550cdcce755d66e87326de81bbe76904e0d6d8e146b55b0f879d83fce8402a8",
   "swisstopo_oereb_at": "27ff5bda0632123961f880a632433bd9d01968235462f1e6bb88ea435ab48342",
@@ -21,6 +18,5 @@
   "swisstopo_reverse_geocode": "aa2d0c03754db82ed013c500675f49f213a30d39ea40359990cff4a4681e5807",
   "swisstopo_search_address": "1c76e018ce920f81b164da6022242a1714cd12bc25f58f1824dbc165ccd79391",
   "swisstopo_search_geodata": "03bcea70e89c84666c4328122d2f2a634419d3d174e74626cc2720c263e736f9",
-  "swisstopo_search_layers": "754cf2adab47c5b5c76839137a3c78064574a214813e3063f7ba8c2cdf8990b0",
-  "swisstopo_zoning_at": "04ed1e0fb544f08a633ff523e9b5906d5c1680581141c8cde0ba0c0b6d3d25c4"
+  "swisstopo_zoning_at": "990e8f63f258714774ba9dab5ea8377b97d6c22703a87495c8e4f8c6c932e5c8"
 }

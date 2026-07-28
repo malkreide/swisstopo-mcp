@@ -93,13 +93,58 @@ class TestResolvedIpGuard:
         monkeypatch.setattr(api_client, "_resolve", lambda host: ("185.19.28.1",))
         api_client.assert_resolved_ip_public("api3.geo.admin.ch")
 
+
+class TestTheFailOpenOnResolutionError:
+    """SEC-004 asked for a decision here rather than an inherited default: the
+    guard returns instead of raising when the name will not resolve at all.
+
+    The decision is that it stays, and these tests pin its *boundary*, which is
+    the part that could rot. Fail-open is only defensible because it applies to
+    the absence of an answer — where there is no address for an attacker to have
+    supplied — and never to an answer that is merely partly bad.
+    """
+
     def test_resolution_failure_is_not_fatal(self, monkeypatch):
-        """httpx gives a better connection error than a masked PermissionError."""
+        """A name nothing can connect to is not an SSRF attempt. Raising here
+        would rewrite every DNS outage as 'blocked by the rebinding guard' and
+        send the reader hunting for an attack instead of a resolver."""
+
         def boom(host):
             raise socket.gaierror("no such host")
 
         monkeypatch.setattr(api_client, "_resolve", boom)
         api_client.assert_resolved_ip_public("api3.geo.admin.ch")
+
+    def test_one_private_answer_among_several_still_raises(self, monkeypatch):
+        """The boundary. A partial answer is an answer, and the split-horizon
+        case — one real address plus one pointing at loopback — is precisely
+        the shape a rebinding attack takes."""
+        monkeypatch.setattr(
+            api_client, "_resolve", lambda host: ("185.19.28.1", "127.0.0.1")
+        )
+        with pytest.raises(PermissionError, match="interne Adresse"):
+            api_client.assert_resolved_ip_public("api3.geo.admin.ch")
+
+    def test_an_empty_answer_is_not_treated_as_vetted(self, monkeypatch):
+        """Resolving to nothing is the same non-event as failing to resolve:
+        no connection follows, so there is nothing to have let through."""
+        monkeypatch.setattr(api_client, "_resolve", lambda host: ())
+        api_client.assert_resolved_ip_public("api3.geo.admin.ch")
+
+    def test_the_guard_is_not_the_only_thing_between_a_url_and_egress(
+        self, monkeypatch
+    ):
+        """Why the fail-open is affordable: an unresolvable host still had to
+        clear the scheme check and the frozenset before reaching it."""
+
+        def boom(host):
+            raise socket.gaierror("no such host")
+
+        monkeypatch.setattr(api_client, "_resolve", boom)
+        with pytest.raises(PermissionError, match="Allow-List"):
+            api_client.assert_host_allowed("https://attacker.example.com/x")
+        with pytest.raises(PermissionError, match="Nicht-HTTPS"):
+            api_client.assert_host_allowed("http://api3.geo.admin.ch/x")
 
 
 # ---------------------------------------------------------------------------

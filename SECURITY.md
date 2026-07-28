@@ -15,7 +15,7 @@ exploitable vulnerabilities.
 
 ## Posture summary
 
-This is a **read-only**, **no-PII**, **public-open-data** MCP server. All 24
+This is a **read-only**, **no-PII**, **public-open-data** MCP server. All 20
 tools only query a fixed allow-list of Swiss federal and cantonal geodata hosts.
 Hardening already in place:
 
@@ -24,7 +24,7 @@ Hardening already in place:
 | Egress | Code-layer allow-list (`ALLOWED_HOSTS` frozenset) enforcing HTTPS-only and a fixed host set. The authoritative list lives in [docs/network-egress.md](docs/network-egress.md) — it is deliberately not repeated here, so it cannot go stale (SEC-004 / SEC-021) |
 | Redirects | `follow_redirects=False` on the shared `httpx` client, so an upstream cannot redirect to an off-list host (SEC-004) |
 | SSRF | Scheme check plus a resolved-IP guard rejecting hosts that answer with a private or link-local address (SEC-004) |
-| DNS pinning | **Implemented, off by default** (SEC-005). `PinnedTransport` connects to the address the SSRF guard vetted while keeping Host and SNI on the hostname, so certificate validation is unchanged. Enable with `SWISSTOPO_PIN_DNS=true`; it is inert behind a forward proxy and disables itself there. **With it off — the shipped default — the rebinding window between the guard's lookup and httpx's own lookup stays open.** Mitigating factors: no authentication, no secrets in requests, public data only |
+| DNS pinning | **Implemented, on by default since 0.4.0** (SEC-005). `PinnedTransport` connects to the address the SSRF guard vetted while keeping Host and SNI on the hostname, so certificate validation is unchanged. This closes the rebinding window between the guard's lookup and httpx's own — the window that stayed open in every release up to 0.3.x, where pinning shipped off. Disable with `SWISSTOPO_PIN_DNS=0`. It is inert behind a forward proxy and disables itself there, so a cluster deployment using the egress proxy is unaffected either way |
 | TLS | Certificate verification on by default for all upstream requests |
 | Input | Pydantic v2 strict validation at every tool boundary (SEC-018) |
 | Secrets | Env-vars only; `.gitignore` guards `.env`; no hardcoded secrets (ARCH-005) |
@@ -39,7 +39,7 @@ for the hardening history.
 ## Read-only by design
 
 This server is in **Phase 2.5** (see [docs/roadmap.md](docs/roadmap.md), the
-single authority for phase state). It remains a read-only wrapper: all 24 tools
+single authority for phase state). It remains a read-only wrapper: all 20 tools
 are `readOnlyHint: true` / `destructiveHint: false`; there are no write or send
 capabilities. CI enforces both halves: `tests/test_tool_hygiene.py` fails if a
 tool drops `readOnlyHint`, **and** statically finds every outbound HTTP call in
@@ -88,7 +88,7 @@ fixed set of trusted public-data providers.
     [`src/swisstopo_mcp/api_client.py`](src/swisstopo_mcp/api_client.py), kept in
     sync with [docs/network-egress.md](docs/network-egress.md) by a test.
 
-  All 24 tools carry the `swisstopo_` prefix (SEC-022), so a future gateway
+  All 20 tools carry the `swisstopo_` prefix (SEC-022), so a future gateway
   allow-list can name them unambiguously.
 
 - **Cross-server tool-poisoning detection** (SEC-015) is a host/gateway

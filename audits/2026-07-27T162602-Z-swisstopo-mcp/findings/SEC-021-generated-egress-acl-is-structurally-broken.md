@@ -96,3 +96,56 @@ output. Combined with the missing config.yaml in the sidecar args, the
 network-layer half of SEC-021 is not actually deliverable as shipped.
 Code layer: solid pass. Network layer: present in intent, broken in fact.
 Partial, with a one-line fix available.
+
+---
+
+### Remediation Status (2026-07-28, follow-up PR)
+
+**Closed.** All four remediation items are in the tree; three landed with the
+audit commit itself (`dd15806`), and the fourth — a guard for item 3 — is added
+here.
+
+| # | Item | State |
+|---|---|---|
+| 1 | Indent at `render_egress_acl.py:25` | `scripts/render_egress_acl.py:29` emits six spaces. `yaml.safe_load` now yields one entry in `services` and `allowed_domains == sorted(ALLOWED_HOSTS)`. |
+| 2 | A test that parses the committed ACL | `tests/test_egress_allowlist.py:152-187`, including an explicit `allowed_domains is not None` assertion. |
+| 3 | The missing `config.yaml` | The `--config-file` flag was dropped; the sidecar reads only `--egress-acl-file`, which the documented ConfigMap does supply. |
+| 4 | `docs/network-egress.md` port claim | Corrected to TCP/443, with the earlier 80/443 wording named as wrong so it does not get "restored". |
+
+**What was still missing: nothing stopped item 3 from coming back.** Items 1 and
+2 are now mutually reinforcing — the renderer produces a structure and a test
+parses it — but item 3 was a deletion, and a deletion leaves no trace that
+anything was ever wrong. `test_deploy_manifests.py` already carried a coherence
+test for the *HAProxy* ConfigMap whose failure message cites "the same defect
+SEC-021 had in egress-proxy.yaml"; the manifest that actually had the defect had
+no such test.
+
+`TestTheEgressProxySidecarMountsWhatItReads` closes that. It asserts that every
+path the sidecar args name under the mount point is a file the documented
+`--from-file=` command supplies — generic rather than a blacklist of the one
+string that was wrong, so an equivalently-broken new flag fails too. Verified by
+re-adding `--config-file=/etc/smokescreen/config.yaml` and watching it fail with
+the reason spelled out, then reverting.
+
+**On the finding's structural point, which was the sharpest thing in it.** The
+observation that a byte-comparison gate "gates staleness, not validity" is the
+generalisable lesson, and it is not specific to YAML indentation: a generator
+diffed against its own output can only ever catch drift between two runs of
+itself. Every one of the four items here is a case where the artefact was
+checked against the wrong thing —
+
+- the ACL was checked against the renderer, not against a parser;
+- the sidecar args were checked against nothing, since no test read the manifest;
+- the docs were checked against intent, not against `kubernetes.yaml`.
+
+The tests added for items 2 and 3 both parse the artefact and compare it to an
+*independent* source of truth (`ALLOWED_HOSTS`; the documented create command).
+That is the property worth preserving if this file is extended.
+
+**Out of scope, and stated rather than left implicit.** Whether an operator
+applies `deploy/egress-proxy.yaml` at all is not something this repository can
+enforce — the shipped `deploy/kubernetes.yaml` NetworkPolicy remains CIDR+port
+only, exactly as `docs/network-egress.md` describes it. What the repository owes
+is an artefact that works when applied, and that is now what it ships. The
+finding's own framing agrees: "Code layer: solid pass. Network layer: present in
+intent, broken in fact." The intent is unchanged; the fact is fixed.

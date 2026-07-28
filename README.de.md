@@ -450,8 +450,10 @@ gebunden werden (Audit-Finding SEC-009).
 - **Ausführungsfehler** (Upstream-Fehler, ungültiger Wert) werden als
   `ToolResponse` mit `is_error: true` und menschenlesbarer `summary` zurückgegeben;
   unerwartete Exception-Texte werden maskiert und stattdessen auf stderr geloggt.
-  Zwei bekannte Lecks bestehen (`overpass.py`-Fehlertexte, Allow-List-Preisgabe
-  via `PermissionError`) — siehe OBS-002 im aktuellen Audit-Lauf.
+  Weder Upstream-Texte noch interne Konfiguration werden weitergereicht:
+  Overpass-Fehlerseiten werden gegen eine feste Signaturtabelle klassifiziert,
+  und eine Egress-Ablehnung liefert eine feste Meldung statt der Allow-List
+  (OBS-002).
 - **Protokollfehler** (unbekanntes Tool, ungültige Argumente) liefert das SDK als
   Tool-Resultat mit gesetztem Protokoll-Flag `isError` zurück — *nicht* als
   JSON-RPC-Fehlerobjekt. Gegen mcp 1.28.1 zur Laufzeit geprüft; eine frühere

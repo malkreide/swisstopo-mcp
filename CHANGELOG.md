@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed (OBS-002)
+- **Two paths handed the model text the server should not have forwarded.**
+  - `overpass.py` returned up to 300 characters of any upstream body containing
+    "error" straight into the tool summary. A real Overpass error page echoes
+    the submitted query and names server-side paths, so this disclosed
+    infrastructure *and* gave a third-party instance a channel into the model's
+    context window. The body is now classified against a fixed signature table
+    (timeout / out of memory / rate-limited / parse error, else a generic
+    message) and only those strings are returned; the body itself goes to
+    stderr. The HTTP-200 `remark` path got the same treatment — it was
+    forwarding upstream text too, which the audit did not name.
+  - A blocked-egress `PermissionError` was returned verbatim, disclosing the
+    complete ten-host allow-list or the internal address a name resolved to.
+    It now has its own branch in `handle_api_error`: detail to the log under
+    `egress_blocked`, a fixed "Ziel nicht erlaubt (Egress-Richtlinie)" message
+    to the caller. `ValueError` keeps its message — those are this server's own
+    validation strings and masking them would remove real guidance.
+
+  Nine regression tests, driven by a body shaped like a genuine Overpass error
+  page. `mask_error_details=True` remains unreachable: re-verified that
+  `FastMCP.__init__` has no such parameter in mcp 1.28.1, so it would require
+  switching to the standalone `fastmcp` package.
+
+- **OSM errors were labelled with the swisstopo licence (CH-004, partial).**
+  The six `ToolResponse.error(...)` sites in `overpass.py` now pass
+  `license=OSM_LICENSE`, so ODbL data is no longer attributed as Swiss OGD on
+  the error path. The equivalent sites in `openplz.py` and `oereb.py` are
+  untouched and CH-004 stays open.
+
 ### Fixed (SDK-001)
 - **The shared HTTP client was owned by an MCP session, not by the process.**
   Under `--http` the SDK runs the FastMCP lifespan once per **session**, not

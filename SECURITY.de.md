@@ -28,7 +28,7 @@ Bundes- und Kantonsgeodaten-Hosts ab. Bereits umgesetzte Härtung:
 | TLS | Zertifikatsprüfung standardmässig aktiv für alle Upstream-Requests |
 | Eingabe | Strikte Pydantic-v2-Validierung an jeder Tool-Grenze (SEC-018) |
 | Secrets | Nur Umgebungsvariablen; `.gitignore` schützt `.env`; keine hartcodierten Secrets (ARCH-005) |
-| Fehler | Unerwartete Exceptions werden zentral maskiert — Details auf stderr, feste Meldung an den Aufrufer (OBS-002). **Zwei bekannte Lecks bestehen:** `overpass.py` reicht bis zu 300 Zeichen eines Upstream-Fehlertexts durch, und ein `PermissionError` bei blockiertem Egress gibt die Allow-List preis. Verfolgt im Audit-Lauf `2026-07-27T162602-Z` |
+| Fehler | Weder Upstream-Texte noch interne Konfiguration erreichen den Aufrufer (OBS-002). Unerwartete Exceptions werden zentral maskiert; Overpass-Fehlerseiten werden gegen eine feste Signaturtabelle klassifiziert statt weitergereicht; Egress-Ablehnungen liefern eine feste Meldung. Alle Details gehen auf stderr. Ausserhalb der Kontrolle dieses Servers: Pydantic-Argumentfehler formatiert das SDK selbst, und `mask_error_details` existiert in mcp 1.28.1 nicht |
 | Stdout | Reserviert für den JSON-RPC-Stream; Logging auf stderr fixiert |
 | Trifecta | Höchstens 1 von 3 Lethal-Trifecta-Beinen vorhanden — read-only, öffentliche Daten, kein Write/Send (SEC-019) |
 | Container | Gehärtetes `Dockerfile` (non-root, read-only Root-Dateisystem, gedroppte Capabilities) für HTTP-Deployments (SEC-007) — siehe [docs/deployment.md](docs/deployment.md) |

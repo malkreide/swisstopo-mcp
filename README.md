@@ -446,9 +446,10 @@ validated user identity (audit finding SEC-009).
 
 - **Execution errors** (upstream failure, invalid value) are returned as a
   `ToolResponse` with `is_error: true` and a user-friendly `summary`; unexpected
-  exception text is masked and logged to stderr instead. Two known leaks remain
-  (`overpass.py` error bodies, `PermissionError` allow-list disclosure) — see
-  OBS-002 in the latest audit run.
+  exception text is masked and logged to stderr instead. No upstream body or
+  internal configuration is forwarded: Overpass error pages are classified
+  against a fixed signature table, and an egress refusal returns a fixed message
+  rather than the allow-list (OBS-002).
 - **Protocol errors** (unknown tool, malformed/invalid arguments) come back from
   the SDK as tool results with the protocol `isError` flag set — *not* as
   JSON-RPC error objects. Verified against mcp 1.28.1 by runtime probe; an

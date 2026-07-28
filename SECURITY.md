@@ -28,7 +28,7 @@ Hardening already in place:
 | TLS | Certificate verification on by default for all upstream requests |
 | Input | Pydantic v2 strict validation at every tool boundary (SEC-018) |
 | Secrets | Env-vars only; `.gitignore` guards `.env`; no hardcoded secrets (ARCH-005) |
-| Errors | Unexpected exceptions are masked centrally — detail to stderr, a fixed message to the caller (OBS-002). **Two known leaks remain:** `overpass.py` forwards up to 300 characters of an upstream error body, and a blocked-egress `PermissionError` discloses the allow-list. Tracked in the `2026-07-27T162602-Z` audit run |
+| Errors | No upstream body, URL or internal configuration reaches the caller (OBS-002). Unexpected exceptions are masked centrally; Overpass error pages are classified against a fixed signature table rather than forwarded; egress refusals return a fixed message. All detail goes to stderr. Residual, outside this server's control: the SDK formats Pydantic argument-validation errors itself, and `mask_error_details` does not exist in mcp 1.28.1 |
 | Stdout | Reserved for the JSON-RPC stream; logging pinned to stderr |
 | Trifecta | At most 1 of 3 lethal-trifecta legs present — read-only, public data, no write/send (SEC-019) |
 | Container | Hardened `Dockerfile` (non-root, read-only root FS, dropped capabilities) for HTTP deployments (SEC-007) — see [docs/deployment.md](docs/deployment.md) |

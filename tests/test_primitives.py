@@ -178,3 +178,66 @@ class TestEveryPromptOnlyNamesRealTools:
             referenced = set(re.findall(r"swisstopo_[a-z_]+", text))
             unknown = sorted(referenced - names)
             assert unknown == [], f"{prompt.name} names non-existent tools: {unknown}"
+
+
+class TestTheResourceDoesNotPublishAnOutageAsAnEmptyCatalogue:
+    """Raised in review of this PR, and correct.
+
+    The tool this resource wraps degrades gracefully: on an upstream failure it
+    returns an envelope with `is_error: true` and no results, which is right for
+    a tool call. Serialising that envelope's *results* published `count: 0` and
+    an empty list as ordinary JSON — so a geodienste outage was
+    indistinguishable from a genuinely empty catalogue.
+
+    That is the same defect class as ARCH-003 (a bare negative read as a
+    factual answer) and OBS-001 (an error that presents as success), arriving
+    on a surface added in the very commit that closed them. A resource is a
+    document; when there is no document, an error is the honest answer.
+    """
+
+    @staticmethod
+    def _break_upstream(monkeypatch):
+        from swisstopo_mcp import geodata as gd
+
+        async def unavailable(force=False):
+            raise RuntimeError("geodienste unreachable")
+
+        monkeypatch.setattr(gd, "load_geodienste_catalog", unavailable)
+
+    async def test_an_upstream_outage_raises(self, monkeypatch):
+        self._break_upstream(monkeypatch)
+        async with server_resources():
+            with pytest.raises(Exception) as excinfo:
+                list(await mcp.read_resource(CATALOGUE_URI))
+        assert "list_available_layers" in str(excinfo.value)
+
+    async def test_it_does_not_return_an_empty_document(self, monkeypatch):
+        """The specific failure: a well-formed JSON body claiming zero layers."""
+        self._break_upstream(monkeypatch)
+        async with server_resources():
+            try:
+                contents = list(await mcp.read_resource(CATALOGUE_URI))
+            except Exception:
+                return  # raising is the correct behaviour
+        payload = json.loads(contents[0].content)
+        pytest.fail(
+            "an upstream outage produced a document instead of an error: "
+            f"count={payload['count']}, layers={payload['layers']}"
+        )
+
+    async def test_a_genuinely_empty_catalogue_still_serves(self, monkeypatch):
+        """The distinction that has to survive: empty is not the same as
+        broken. An upstream that answers with nothing is a valid document."""
+        from swisstopo_mcp import geodata as gd
+
+        async def empty(force=False):
+            return []
+
+        monkeypatch.setattr(gd, "load_geodienste_catalog", empty)
+        async with server_resources():
+            contents = list(await mcp.read_resource(CATALOGUE_URI))
+        payload = json.loads(contents[0].content)
+        # The static façade layers are always present, so "empty upstream"
+        # still yields a catalogue — which is exactly why the outage case
+        # needed a different signal rather than a count of zero.
+        assert payload["count"] == len(payload["layers"])

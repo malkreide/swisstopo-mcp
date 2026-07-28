@@ -798,6 +798,115 @@ async def search_address_tool(params: SearchAddressInput) -> ToolResponse:
     return await search_address(params)
 
 
+# ---------------------------------------------------------------------------
+# Resources & Prompts (audit ARCH-008)
+#
+# ARCH-008 *passes* on the documented-justification route — every tool takes
+# parameters that make its result non-addressable by a static URI, and the
+# READMEs say so. But the passing check named two gaps, and both are real:
+#
+# 1. The façade layer catalogue is deterministic, idempotent and already served
+#    with `provenance="cached"`. It is the one thing here that behaves like a
+#    document rather than a query, so it is exposed as a Resource *in addition
+#    to* the tool. The tool still answers filtered questions; the resource is
+#    for a client that wants the catalogue itself, addressably.
+# 2. Two recurring workflows are prompt-shaped, and ARCH-007 showed that the
+#    precedence rule does not reliably reach the model through tool descriptions
+#    alone. A prompt is a place to state it where the model reads it as guidance.
+# ---------------------------------------------------------------------------
+
+
+@mcp.resource(
+    "swisstopo://catalogue/layers",
+    name="swisstopo_layer_catalogue",
+    title="Verfügbare Layer der Geodaten-Fassade",
+    description=(
+        "Der vollständige Katalog der Layer, die swisstopo_query_geodata "
+        "akzeptiert: die statischen Fassaden-Layer plus die geodienste.ch-Themen "
+        "mit der Zahl der Kantone, die sie frei anbieten. Entspricht "
+        "swisstopo_list_available_layers ohne Filter."
+    ),
+    mime_type="application/json",
+)
+async def layer_catalogue_resource() -> str:
+    """Serve the façade catalogue as an addressable document.
+
+    Deliberately the *unfiltered* catalogue: a resource has no parameters, and
+    the filtered views are what the tool is for.
+    """
+    import json
+
+    from swisstopo_mcp.geodata import ListLayersInput, list_available_layers
+
+    result = await list_available_layers(ListLayersInput())
+    return json.dumps(
+        {
+            "source": result.source,
+            "license": result.license,
+            "provenance": result.provenance,
+            "retrieved_at": result.retrieved_at,
+            "count": result.count,
+            "layers": result.results,
+        },
+        ensure_ascii=False,
+        indent=2,
+    )
+
+
+@mcp.prompt(
+    name="swisstopo_feature_lookup",
+    title="Kartenobjekte an einem Ort finden",
+    description=(
+        "Führt durch die Layer-Suche zur Feature-Abfrage und nennt dabei die "
+        "Präzedenzregel: für Bauzone und Gemeinde gibt es direkte Tools."
+    ),
+)
+def feature_lookup_prompt(ort: str, was: str) -> str:
+    """The chain plus the precedence rule, stated where a model reads it as
+    guidance rather than as one tool description among 24 (ARCH-007/ARCH-008)."""
+    return f"""Finde heraus: {was} bei «{ort}».
+
+Vorgehen:
+
+1. Wenn nötig, `swisstopo_geocode` für die Koordinaten des Orts.
+2. PRÄZEDENZ — nimm das direkte Tool, bevor du das generische nimmst:
+   - Bauzone → `swisstopo_zoning_at` (nicht rechtsverbindlich; die verbindliche
+     Nutzungsplanung liefert `swisstopo_query_geodata` mit
+     `geodienste:nutzungsplanung:<KANTON>`)
+   - Gemeinde/BFS-Nummer → `swisstopo_municipality_at`
+   - ÖREB-Beschränkungen → `swisstopo_oereb_at` (ein Aufruf; `swisstopo_get_egrid`
+     nur, wenn die Parzellen-ID selbst gebraucht wird)
+3. Sonst: `swisstopo_search_layers` für die Layer-ID, `swisstopo_layer_info` für
+   die abfragbaren Felder, dann `swisstopo_identify_features` (Punkt) oder
+   `swisstopo_find_features` (Attribut).
+
+Nenne bei jedem Resultat Quelle und Lizenz aus dem Envelope. Liefert ein Aufruf
+`match_type: "none"`, folge dem `note`-Hinweis, statt die Frage als
+unbeantwortbar zu melden."""
+
+
+@mcp.prompt(
+    name="swisstopo_geodata_download",
+    title="Herunterladbare Geodatensätze finden",
+    description="Führt von der STAC-Suche zu den Download-Links einer Collection.",
+)
+def geodata_download_prompt(thema: str) -> str:
+    """The second documented workflow (README 'Tool workflows')."""
+    return f"""Finde herunterladbare Geodaten zum Thema «{thema}».
+
+Vorgehen:
+
+1. `swisstopo_search_geodata` mit dem Thema als Suchbegriff.
+2. Für den passenden Treffer `swisstopo_get_collection` mit der `collection_id`
+   aus Schritt 1 — Collection-IDs sind vollqualifiziert (z.B.
+   `ch.swisstopo.swissalti3d`), rate sie nicht.
+3. Gib Download-Links, Aktualität und Lizenz an.
+
+Für kantonale Datensätze statt Bundesdaten zeigt
+`swisstopo_list_available_layers`, welche Themen geodienste.ch je Kanton frei
+anbietet."""
+
+
 def _install_session_manager() -> None:
     """Give the Streamable-HTTP session manager an explicit idle timeout.
 

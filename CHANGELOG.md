@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added (ARCH-008)
+- **One Resource and two Prompts.** ARCH-008 *passed* the audit — a Tools-only
+  surface is permitted when the README says why, and the reason given was true.
+  But the passing check recorded two gaps, and both were real:
+
+  - `swisstopo://catalogue/layers` serves the façade layer catalogue. It is the
+    one thing here that behaves like a document rather than a query:
+    deterministic, idempotent, already served with `provenance: "cached"`.
+    Deliberately unfiltered — a resource takes no parameters, and filtered views
+    are what `swisstopo_list_available_layers` is for. The tool stays.
+  - `swisstopo_feature_lookup(ort, was)` and
+    `swisstopo_geodata_download(thema)` encode the two workflows the READMEs
+    already document. The first states the precedence rule, which now lives in
+    three places — tool descriptions, server instructions, and this prompt.
+    That redundancy is the point: ARCH-007 was precisely a case of the rule
+    existing somewhere the model did not read it.
+
+  13 tests. Beyond registration they hold what makes these worth having: every
+  catalogue record carries a licence (the CH-004 property, on a new path for the
+  same data); the prompt states the `zoning_at` non-binding caveat, since
+  steering a model to a non-binding layer without saying so is worse than not
+  steering it; and every tool name a prompt mentions must exist — a prompt
+  naming a missing tool is a confident instruction to call nothing.
+
+  Both READMEs previously said "Tools only". That is no longer true, so both
+  sections were rewritten to describe what is actually exposed.
+
 ### Added (ARCH-006)
 - **The tool budget is now a gate, not an assertion.** The README declared a
   ceiling of 25 and nothing enforced it — "nothing fails if tool 26 is

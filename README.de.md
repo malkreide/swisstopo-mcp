@@ -497,10 +497,25 @@ gebunden werden (Audit-Finding SEC-009).
 
 ## MCP-Primitive
 
-Dieser Server exponiert bewusst **nur Tools** (keine Resources/Prompts):
-Er ist ein Read-only-Wrapper, und jedes Resultat ist eine
+**Tools** sind die Oberfläche und fast alles davon: jedes Resultat ist eine
 parametrisierte Live-API-Abfrage statt ein statisches, adressierbares Dokument.
-Resources/Prompts können in einer späteren Phase ergänzt werden.
+
+**Eine Resource** — `swisstopo://catalogue/layers` — liefert den Layer-Katalog
+der Fassade. Sie ist das Einzige hier, was sich wie ein Dokument verhält:
+deterministisch, idempotent und ohnehin mit `provenance: "cached"` ausgeliefert.
+`swisstopo_list_available_layers` bleibt für gefilterte Abfragen; die Resource
+ist für Clients, die den Katalog selbst adressierbar wollen.
+
+**Zwei Prompts** kodieren die unten dokumentierten Workflows samt der
+Präzedenzregel für Punktfragen. Diese Regel steht auch in den Tool-Beschreibungen
+und in den Server-Instructions — aber ein Prompt ist die eine Stelle, an der ein
+Modell sie als Anleitung liest statt als eine von 24 Beschreibungen (Audit
+ARCH-007/ARCH-008):
+
+| Prompt | Argumente |
+|---|---|
+| `swisstopo_feature_lookup` | `ort`, `was` |
+| `swisstopo_geodata_download` | `thema` |
 
 ### Tool-Workflows
 

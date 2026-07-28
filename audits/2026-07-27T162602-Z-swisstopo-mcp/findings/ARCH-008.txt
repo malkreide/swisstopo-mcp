@@ -1,0 +1,35 @@
+
+# --- Follow-up (2026-07-28) ---
+#
+# ARCH-008 PASSED this run; this is not a remediation. The check permits a
+# Tools-only surface with a documented reason, and the reason given was true.
+# What follows addresses the two gaps the *passing* check recorded.
+#
+# Gap 1 — "the list_available_layers catalogue is the strongest Resource
+# candidate and still a tool". Now `swisstopo://catalogue/layers`, serving the
+# unfiltered façade catalogue with its source, licence, provenance and
+# retrieval time. Deliberately unfiltered: a resource takes no parameters, and
+# filtered views are what the tool is for. The tool stays.
+#
+# Gap 2 — "no Prompts despite two documented recurring workflows that are
+# prompt-shaped ... a feature_lookup prompt would encode the precedence rule
+# that ARCH-007 shows is not reliably reaching the model through descriptions
+# alone". Both workflows are now prompts:
+#   swisstopo_feature_lookup(ort, was)  — the chain plus the precedence rule
+#   swisstopo_geodata_download(thema)   — the STAC search -> collection chain
+#
+# The precedence rule now lives in three places (tool descriptions, server
+# instructions, this prompt). That is redundancy on purpose: ARCH-007 was
+# precisely a case of the rule existing somewhere the model did not read it.
+#
+# 13 tests in tests/test_primitives.py. Beyond registration, they hold the
+# properties that make these worth having: the resource's records each carry a
+# licence (the CH-004 property, on a new egress path for the same data); the
+# prompt states the zoning caveat, since steering a model to a non-binding
+# layer without saying so is worse than not steering it; and every tool name
+# any prompt mentions must actually exist — a prompt naming a missing tool is a
+# confident instruction to call nothing.
+#
+# The check's own escape clause no longer applies as written, since the surface
+# is no longer Tools-only. Both READMEs were rewritten to describe what is
+# actually exposed.

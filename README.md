@@ -489,10 +489,24 @@ validated user identity (audit finding SEC-009).
 
 ## MCP Primitives
 
-This server intentionally exposes **Tools only** (no Resources or Prompts):
-it is a read-only wrapper, and every result is a live, parameterised
-API query rather than a static addressable document. Resources/Prompts may be
-added in a later phase if stable URI schemes emerge.
+**Tools** are the surface, and almost all of it: every result is a live,
+parameterised API query rather than a static addressable document.
+
+**One Resource** — `swisstopo://catalogue/layers` — serves the façade layer
+catalogue. It is the one thing here that behaves like a document: deterministic,
+idempotent, and already served with `provenance: "cached"`. `swisstopo_list_available_layers`
+remains for filtered queries; the resource is for a client that wants the
+catalogue itself, addressably.
+
+**Two Prompts** encode the workflows below, including the precedence rule for
+point questions. That rule lives in the tool descriptions and in the server
+instructions too, but a prompt is the one place a model reads it as guidance
+rather than as one of 24 descriptions (audit ARCH-007/ARCH-008):
+
+| Prompt | Arguments |
+|---|---|
+| `swisstopo_feature_lookup` | `ort`, `was` |
+| `swisstopo_geodata_download` | `thema` |
 
 ### Tool workflows
 

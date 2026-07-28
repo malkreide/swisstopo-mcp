@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed (SDK-001)
+- **The shared HTTP client was owned by an MCP session, not by the process.**
+  Under `--http` the SDK runs the FastMCP lifespan once per **session**, not
+  once per process — measured on a running server: 0 startups at boot, 3 after
+  three `initialize` POSTs, and 1 shutdown after a single `DELETE /mcp` while
+  two sessions were still open. Two consequences, both reachable with two
+  concurrent clients: each new session overwrote the previous session's client,
+  and the first session to disconnect closed that client and shut tracing down
+  for everyone still connected, silently degrading them to a fresh
+  `httpx.AsyncClient` per tool call — the exact anti-pattern the shared client
+  exists to avoid.
+
+  The client and tracing now live behind a reference-counted
+  `server_resources()` context. The session lifespan enters it, so N sessions
+  build the resources once; `build_http_app` wraps the Starlette lifespan in the
+  same context, so the process holds one reference for as long as it is serving
+  and no session teardown can reach zero. Same server after the change: **1
+  startup at boot, still 1 after three sessions and a `DELETE`, 1 shutdown on
+  SIGTERM.**
+
+  This also closes the `setup_tracing`/`shutdown_tracing` idempotency gap by
+  construction, and corrects the lifespan docstring, which asserted a
+  per-process invariant the HTTP transport does not provide. Four regression
+  tests added; three verified to fail against the previous implementation.
+
 ### Added
 - **DNS-pinning transport, opt-in (SEC-005).** `SWISSTOPO_PIN_DNS=true` makes
   the client connect to the address the SSRF guard already vetted, closing the

@@ -6,6 +6,7 @@ import html
 import re
 from typing import Any
 
+from mcp.server.fastmcp import Context
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from swisstopo_mcp.api_client import (
@@ -18,7 +19,7 @@ from swisstopo_mcp.api_client import (
     validate_sr,
 )
 from swisstopo_mcp.coords import SwissPointInput, check_deprecated_sr
-from swisstopo_mcp.logging_config import log_tool_call
+from swisstopo_mcp.logging_config import get_logger, log_tool_call
 from swisstopo_mcp.models import (
     ARE_LICENSE,
     ARE_SOURCE,
@@ -27,6 +28,8 @@ from swisstopo_mcp.models import (
     SWISSBOUNDARIES_SOURCE,
     ToolResponse,
 )
+
+_log = get_logger("swisstopo_mcp.rest_api")
 
 # --- Named layers backing the convenience lookups ---
 # swissBOUNDARIES3D municipality polygons (one per historical year).
@@ -536,10 +539,14 @@ async def municipality_at(params: MunicipalityAtInput) -> ToolResponse:
 
 
 @log_tool_call("swisstopo_layer_info")
-async def layer_info(params: LayerInfoInput) -> ToolResponse:
+async def layer_info(
+    params: LayerInfoInput, ctx: Context | None = None
+) -> ToolResponse:
     """Return the queryable fields and the legend of a layer."""
     try:
-        data = await geo_admin_request(f"/rest/services/api/MapServer/{params.layer}")
+        data = await geo_admin_request(
+            f"/rest/services/api/MapServer/{params.layer}", ctx=ctx
+        )
         if not isinstance(data, dict):
             return ToolResponse.error(
                 f"Fehler bei Layer-Info: Unerwartetes Antwortformat für '{params.layer}'."
@@ -559,14 +566,32 @@ async def layer_info(params: LayerInfoInput) -> ToolResponse:
 
         # The legend is a separate endpoint and a nice-to-have: a layer without
         # one must still return its fields rather than failing the whole call.
+        # But swallowing the failure silently left the caller unable to tell
+        # "this layer has no legend" from "the legend fetch broke", which are
+        # different facts (audit SDK-003). The distinction now travels in
+        # `legend_status`, and — when a context is available — as a warning.
         try:
             response = await geo_admin_request_text(
                 f"/rest/services/all/MapServer/{params.layer}/legend",
                 {"lang": params.lang},
+                ctx=ctx,
             )
             meta["legend"] = html_to_text(response)
-        except Exception:
+            meta["legend_status"] = "ok" if meta["legend"] else "empty"
+        except Exception as exc:  # noqa: BLE001 - the legend is optional
             meta["legend"] = None
+            meta["legend_status"] = "unavailable"
+            _log.warning(
+                "legend_fetch_failed", layer=params.layer, error_type=type(exc).__name__
+            )
+            if ctx is not None:
+                try:
+                    await ctx.warning(
+                        f"Legende für '{params.layer}' konnte nicht geladen werden — "
+                        "die Feldliste ist vollständig, die Legende fehlt."
+                    )
+                except Exception:  # noqa: BLE001 - reporting is best-effort
+                    pass
 
         return ToolResponse.ok(format_layer_info(meta), [meta], match_type="exact")
     except Exception as e:

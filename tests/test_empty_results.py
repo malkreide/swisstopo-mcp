@@ -101,7 +101,7 @@ class TestFuzzyIsNoLongerADeadBranch:
 
         calls: list[str] = []
 
-        async def fake(path, params=None):
+        async def fake(path, params=None, **_):
             calls.append(params["searchText"])
             return responses.pop(0)
 
@@ -145,7 +145,7 @@ class TestFuzzyIsNoLongerADeadBranch:
 
         calls: list[str] = []
 
-        async def fake(path, params=None):
+        async def fake(path, params=None, **_):
             calls.append(params["searchText"])
             return {"results": []}
 
@@ -200,7 +200,7 @@ class TestTheToolsThatMostOftenReturnNothing:
     async def test_zoning_outside_a_building_zone_explains_and_redirects(self, monkeypatch):
         from swisstopo_mcp.rest_api import ZoningAtInput, zoning_at
 
-        async def empty(path, params=None):
+        async def empty(path, params=None, **_):
             return {"results": []}
 
         monkeypatch.setattr("swisstopo_mcp.rest_api.geo_admin_request", empty)

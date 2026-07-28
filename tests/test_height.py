@@ -210,7 +210,7 @@ class TestFormatElevationProfile:
 
 class TestGetHeightHandler:
     async def test_returns_height_string(self, monkeypatch):
-        async def mock_request(path, params=None):
+        async def mock_request(path, params=None, **_):
             return {"height": "553.6"}
 
         monkeypatch.setattr("swisstopo_mcp.height.geo_admin_request", mock_request)
@@ -221,7 +221,7 @@ class TestGetHeightHandler:
     async def test_passes_correct_params(self, monkeypatch):
         captured = {}
 
-        async def mock_request(path, params=None):
+        async def mock_request(path, params=None, **_):
             captured["path"] = path
             captured["params"] = params
             return {"height": "500.0"}
@@ -239,7 +239,7 @@ class TestGetHeightHandler:
     async def test_api_error_returns_error_message(self, monkeypatch):
         import httpx
 
-        async def mock_request(path, params=None):
+        async def mock_request(path, params=None, **_):
             resp = httpx.Response(500, request=httpx.Request("GET", "http://test"))
             raise httpx.HTTPStatusError("Server error", request=resp.request, response=resp)
 
@@ -250,7 +250,7 @@ class TestGetHeightHandler:
     async def test_timeout_error(self, monkeypatch):
         import httpx
 
-        async def mock_request(path, params=None):
+        async def mock_request(path, params=None, **_):
             raise httpx.TimeoutException("timeout")
 
         monkeypatch.setattr("swisstopo_mcp.height.geo_admin_request", mock_request)
@@ -260,7 +260,7 @@ class TestGetHeightHandler:
 
 class TestElevationProfileHandler:
     async def test_returns_table(self, monkeypatch):
-        async def mock_request(path, params=None):
+        async def mock_request(path, params=None, **_):
             return [
                 {"dist": 0.0, "alts": {"COMB": 553.6}, "easting": 600000, "northing": 200000},
                 {"dist": 100.0, "alts": {"COMB": 560.0}, "easting": 600100, "northing": 200000},
@@ -278,7 +278,7 @@ class TestElevationProfileHandler:
 
         captured = {}
 
-        async def mock_request(path, params=None):
+        async def mock_request(path, params=None, **_):
             captured["path"] = path
             captured["params"] = params
             return []
@@ -296,7 +296,7 @@ class TestElevationProfileHandler:
         assert captured["params"]["sr"] == 2056
 
     async def test_invalid_coordinates_returns_error(self, monkeypatch):
-        async def mock_request(path, params=None):
+        async def mock_request(path, params=None, **_):
             return []
 
         monkeypatch.setattr("swisstopo_mcp.height.geo_admin_request", mock_request)
@@ -310,7 +310,7 @@ class TestElevationProfileHandler:
     async def test_nb_points_passed_correctly(self, monkeypatch):
         captured = {}
 
-        async def mock_request(path, params=None):
+        async def mock_request(path, params=None, **_):
             captured["params"] = params
             return []
 
@@ -323,7 +323,7 @@ class TestElevationProfileHandler:
     async def test_api_error_returns_error_message(self, monkeypatch):
         import httpx
 
-        async def mock_request(path, params=None):
+        async def mock_request(path, params=None, **_):
             resp = httpx.Response(404, request=httpx.Request("GET", "http://test"))
             raise httpx.HTTPStatusError("Not found", request=resp.request, response=resp)
 
@@ -335,7 +335,7 @@ class TestElevationProfileHandler:
 
     async def test_single_coordinate_pair_rejected(self, monkeypatch):
         # parse_coordinate_string requires >= 2 pairs
-        async def mock_request(path, params=None):
+        async def mock_request(path, params=None, **_):
             return []
 
         monkeypatch.setattr("swisstopo_mcp.height.geo_admin_request", mock_request)

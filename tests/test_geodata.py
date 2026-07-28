@@ -102,7 +102,7 @@ class TestQueryGeodataDispatch:
         assert r.is_error
 
     async def test_streets_happy_path(self, monkeypatch):
-        async def fake_request(path, params=None):
+        async def fake_request(path, params=None, **_):
             return {
                 "results": [
                     {
@@ -131,7 +131,7 @@ class TestQueryGeodataDispatch:
         assert "swisstopo" in r.source.lower()
 
     async def test_oereb_availability_happy(self, monkeypatch):
-        async def fake_request(path, params=None):
+        async def fake_request(path, params=None, **_):
             return {
                 "results": [
                     {

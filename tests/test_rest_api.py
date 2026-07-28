@@ -248,7 +248,7 @@ class TestFormatFeatureDetail:
 
 class TestSearchLayersHandler:
     async def test_search_layers_mocked(self, monkeypatch):
-        async def mock_request(path, params=None):
+        async def mock_request(path, params=None, **_):
             return {
                 "results": [
                     {
@@ -266,7 +266,7 @@ class TestSearchLayersHandler:
         assert "ch.bfs.gebaeude_wohnungs_register" in result.summary
 
     async def test_search_layers_empty(self, monkeypatch):
-        async def mock_request(path, params=None):
+        async def mock_request(path, params=None, **_):
             return {"results": []}
 
         monkeypatch.setattr("swisstopo_mcp.rest_api.geo_admin_request", mock_request)
@@ -276,7 +276,7 @@ class TestSearchLayersHandler:
 
 class TestIdentifyFeaturesHandler:
     async def test_identify_mocked(self, monkeypatch):
-        async def mock_request(path, params=None):
+        async def mock_request(path, params=None, **_):
             return {
                 "results": [
                     {
@@ -295,7 +295,7 @@ class TestIdentifyFeaturesHandler:
         assert "9999" in result.summary
 
     async def test_identify_empty(self, monkeypatch):
-        async def mock_request(path, params=None):
+        async def mock_request(path, params=None, **_):
             return {"results": []}
 
         monkeypatch.setattr("swisstopo_mcp.rest_api.geo_admin_request", mock_request)
@@ -307,7 +307,7 @@ class TestIdentifyFeaturesHandler:
 
 class TestFindFeaturesHandler:
     async def test_find_mocked(self, monkeypatch):
-        async def mock_request(path, params=None):
+        async def mock_request(path, params=None, **_):
             return {
                 "results": [
                     {
@@ -328,7 +328,7 @@ class TestFindFeaturesHandler:
 
 class TestGetFeatureHandler:
     async def test_get_feature_mocked(self, monkeypatch):
-        async def mock_request(path, params=None):
+        async def mock_request(path, params=None, **_):
             return {
                 "feature": {
                     "featureId": "42",
@@ -345,7 +345,7 @@ class TestGetFeatureHandler:
     async def test_get_feature_error(self, monkeypatch):
         import httpx
 
-        async def mock_request(path, params=None):
+        async def mock_request(path, params=None, **_):
             resp = httpx.Response(404, request=httpx.Request("GET", "http://test"))
             raise httpx.HTTPStatusError("Not found", request=resp.request, response=resp)
 

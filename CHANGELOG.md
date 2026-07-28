@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed (SDK-003)
+- **Long-running tools were silent.** Four gaps, all of which the previous
+  remediation plan listed and none of which had been applied:
+  - **The two slowest tools took no `Context` at all.**
+    `swisstopo_query_osm_features` (25 s server timeout behind a 30 s client
+    timeout) now announces the wait before it starts, and reports geocoding an
+    area name separately. `swisstopo_find_commune` threads `ctx` into
+    `_fetch_all_pages`, which reports **per page** — that loop can issue up to
+    40 sequential upstream requests, so it has a natural cadence.
+  - **Progress fired after the wait.** `elevation_profile` sent
+    `progress=1, total=1` once the upstream call had already returned — a
+    completion marker, not a cadence. It now reports before the call and
+    confirms after.
+  - **A swallowed legend failure.** `layer_info` caught every exception and set
+    `legend = None`, so a caller could not tell "this layer has no legend" from
+    "the legend fetch broke". A `legend_status` field now distinguishes `ok` /
+    `empty` / `unavailable`, the failure is logged, and `ctx.warning()` fires
+    when a context is available.
+  - **Retries were silent, and that is the amplifier.** No `ctx` reached
+    `api_client`, so even the context-aware tools said nothing during 2+4+8 s of
+    backoff — the largest source of unexplained latency in this server. From the
+    client's side that is indistinguishable from a hang, and the usual response
+    to a hang is to cancel and retry, multiplying load on an upstream that is
+    already struggling. `request_with_retry` now warns before each retry, and
+    every per-source helper threads the context, so this covers every tool that
+    passes one rather than only the ones edited by hand.
+
+  All reporting is best-effort: a context whose session has gone away raises,
+  and a test asserts that does not turn a recoverable blip into a failed call.
+
+  **The old test was the reason none of this was caught** — it asserted only
+  that `ctx.info` and `ctx.report_progress` were awaited *at all*, so it passed
+  throughout. Nine tests now assert ordering relative to the upstream call, one
+  progress event per page, one warning per retry, and the legend distinction.
+
 ### Added (SEC-009)
 - **`SWISSTOPO_SESSION_IDLE_TIMEOUT`, default 1800 s.** The MCP SDK defaults to
   *no* session timeout, so every Streamable-HTTP client that disconnects without

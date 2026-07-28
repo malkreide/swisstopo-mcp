@@ -94,7 +94,7 @@ class TestSuccessIsUnaffected:
         """`match_type: "none"` is a valid answer, not a failure — the
         distinction the flag exists to preserve (ARCH-003)."""
         async with session() as s:
-            async def empty(path, params=None):
+            async def empty(path, params=None, **_):
                 return {"results": []}
 
             monkeypatch.setattr("swisstopo_mcp.geocoding.geo_admin_request", empty)

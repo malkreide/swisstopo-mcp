@@ -38,6 +38,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from mcp.server.fastmcp import Context
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from swisstopo_mcp.api_client import TEXT_PATTERN, handle_api_error, openplz_request
@@ -151,13 +152,19 @@ async def _resolve_canton_key(value: str) -> str:
 
 
 async def _fetch_all_pages(
-    path: str, params: dict[str, Any] | None = None
+    path: str, params: dict[str, Any] | None = None, ctx: Any | None = None
 ) -> tuple[list[dict[str, Any]], int, bool]:
     """Fetch every page of a paginated list endpoint (pageSize=50).
 
     Returns ``(records, total_count, truncated)``. ``total_count`` comes from the
     ``x-total-count`` header; ``truncated`` is True if the safety cap stopped us
     before all pages were read.
+
+    This loop is the slowest thing `swisstopo_find_commune` does: bounded by
+    OPENPLZ_MAX_RECORDS at pageSize 50, it can issue up to 40 sequential upstream
+    requests. Each page is reported through `ctx` when one is supplied, which is
+    the natural cadence the check asks for — progress arrives *during* the wait
+    rather than after it (audit SDK-003).
     """
     query = dict(params or {})
     query["pageSize"] = OPENPLZ_MAX_PAGE_SIZE
@@ -167,7 +174,7 @@ async def _fetch_all_pages(
     truncated = False
     while True:
         query["page"] = page
-        resp = await openplz_request(path, query)
+        resp = await openplz_request(path, query, ctx=ctx)
         batch = resp.json()
         if not isinstance(batch, list):
             break
@@ -177,6 +184,7 @@ async def _fetch_all_pages(
                 total = int(resp.headers.get("x-total-count", len(batch)))
             except (TypeError, ValueError):
                 total = len(batch)
+        await _report_page(ctx, len(records), total)
         if not batch or len(records) >= total:
             break
         if len(records) >= OPENPLZ_MAX_RECORDS:
@@ -184,6 +192,20 @@ async def _fetch_all_pages(
             break
         page += 1
     return records, total if total is not None else len(records), truncated
+
+
+async def _report_page(ctx: Any | None, fetched: int, total: int | None) -> None:
+    """Emit page progress. Best-effort — never fail a request over reporting."""
+    if ctx is None:
+        return
+    try:
+        await ctx.report_progress(
+            progress=fetched,
+            total=total,
+            message=f"{fetched} von {total} Gemeinden geladen",
+        )
+    except Exception:  # noqa: BLE001 - progress reporting is best-effort
+        pass
 
 
 # --- Record flattening (bfs_commune_number always top-level) ------------------
@@ -418,7 +440,7 @@ async def lookup_postal_code(params: LookupPostalCodeInput) -> ToolResponse:
         )
 
 
-async def _find_by_name(name: str) -> ToolResponse:
+async def _find_by_name(name: str, ctx: Any | None = None) -> ToolResponse:
     resp = await openplz_request("/Localities", {"name": name})
     localities = resp.json()
     # A commune can back several localities — dedupe by BFS number.
@@ -452,7 +474,7 @@ async def _find_by_name(name: str) -> ToolResponse:
     )
 
 
-async def _find_by_bfs(bfs_number: int) -> ToolResponse:
+async def _find_by_bfs(bfs_number: int, ctx: Any | None = None) -> ToolResponse:
     canton_key = _canton_key_for_bfs(bfs_number)
     if canton_key is None:
         return ToolResponse.ok(
@@ -472,7 +494,9 @@ async def _find_by_bfs(bfs_number: int) -> ToolResponse:
             source=OPENPLZ_SOURCE,
             license=OPENPLZ_LICENSE,
         )
-    communes, _total, truncated = await _fetch_all_pages(f"/Cantons/{canton_key}/Communes")
+    communes, _total, truncated = await _fetch_all_pages(
+        f"/Cantons/{canton_key}/Communes", ctx=ctx
+    )
     match = [c for c in communes if str(c.get("key")) == str(bfs_number)]
     records = [_commune_record(c) for c in match]
     note = ""
@@ -494,9 +518,11 @@ async def _find_by_bfs(bfs_number: int) -> ToolResponse:
     )
 
 
-async def _list_by_canton(canton: str) -> ToolResponse:
+async def _list_by_canton(canton: str, ctx: Any | None = None) -> ToolResponse:
     canton_key = await _resolve_canton_key(canton)
-    communes, total, truncated = await _fetch_all_pages(f"/Cantons/{canton_key}/Communes")
+    communes, total, truncated = await _fetch_all_pages(
+        f"/Cantons/{canton_key}/Communes", ctx=ctx
+    )
     records = [_commune_record(c) for c in communes]
     note = ""
     if not records:
@@ -517,8 +543,10 @@ async def _list_by_canton(canton: str) -> ToolResponse:
     )
 
 
-async def _list_by_district(district: str) -> ToolResponse:
-    communes, total, truncated = await _fetch_all_pages(f"/Districts/{district}/Communes")
+async def _list_by_district(district: str, ctx: Any | None = None) -> ToolResponse:
+    communes, total, truncated = await _fetch_all_pages(
+        f"/Districts/{district}/Communes", ctx=ctx
+    )
     records = [_commune_record(c) for c in communes]
     note = ""
     if not records:
@@ -540,16 +568,18 @@ async def _list_by_district(district: str) -> ToolResponse:
 
 
 @log_tool_call("swisstopo_find_commune")
-async def find_commune(params: FindCommuneInput) -> ToolResponse:
+async def find_commune(
+    params: FindCommuneInput, ctx: Context | None = None
+) -> ToolResponse:
     """Resolve a commune both directions (name↔BFS number) or list a unit's communes."""
     try:
         if params.name is not None:
-            return await _find_by_name(params.name)
+            return await _find_by_name(params.name, ctx)
         if params.bfs_number is not None:
-            return await _find_by_bfs(params.bfs_number)
+            return await _find_by_bfs(params.bfs_number, ctx)
         if params.canton is not None:
-            return await _list_by_canton(params.canton)
-        return await _list_by_district(str(params.district))
+            return await _list_by_canton(params.canton, ctx)
+        return await _list_by_district(str(params.district), ctx)
     except Exception as e:  # noqa: BLE001 — degrade gracefully
         return ToolResponse.error(handle_api_error(e, "Gemeinde-Auflösung"), source=OPENPLZ_SOURCE)
 

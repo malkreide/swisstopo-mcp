@@ -508,16 +508,20 @@ async def swisstopo_municipality_at(params: MunicipalityAtInput) -> ToolResponse
         openWorldHint=True,
     ),
 )
-async def swisstopo_layer_info(params: LayerInfoInput) -> ToolResponse:
+async def swisstopo_layer_info(
+    params: LayerInfoInput, ctx: Context | None = None
+) -> ToolResponse:
     """Listet die abfragbaren Felder und die Legende eines Layers auf.
 
     <use_case>Bindeglied zwischen swisstopo_search_layers und
     swisstopo_find_features: zeigt, welche Feldnamen als search_field zulässig
     sind, statt sie raten zu müssen.</use_case>
     <important_notes>Fehlt die Legende, werden die Felder trotzdem
-    zurückgegeben (legend = null).</important_notes>
+    zurückgegeben (legend = null). Das Feld legend_status unterscheidet dabei
+    "ok", "empty" (Layer hat keine Legende) und "unavailable" (Abruf
+    fehlgeschlagen).</important_notes>
     """
-    return await layer_info(params)
+    return await layer_info(params, ctx)
 
 
 # --- Coordinate Tools ---
@@ -694,7 +698,9 @@ from swisstopo_mcp.overpass import QueryOsmFeaturesInput, query_osm_features  # 
         openWorldHint=True,
     ),
 )
-async def query_osm_features_tool(params: QueryOsmFeaturesInput) -> ToolResponse:
+async def query_osm_features_tool(
+    params: QueryOsmFeaturesInput, ctx: Context | None = None
+) -> ToolResponse:
     """Findet OpenStreetMap-POIs (Schulen, Spielplätze, Apotheken …) im Umkreis.
 
     <use_case>Beantwortet «Welche Schulhäuser/Spielplätze liegen im Umkreis von R
@@ -704,7 +710,7 @@ async def query_osm_features_tool(params: QueryOsmFeaturesInput) -> ToolResponse
     nicht swisstopo. Overpass hat Rate-Limits/Timeouts — kleiner Radius bevorzugt;
     bei Überlastung kommt eine sprechende Fehlermeldung statt Daten.</important_notes>
     """
-    return await query_osm_features(params)
+    return await query_osm_features(params, ctx)
 
 
 # --- OpenPLZ: administrative address level (PLZ → Gemeinde/BFS → Bezirk → Kanton) ---
@@ -751,7 +757,9 @@ async def lookup_postal_code_tool(params: LookupPostalCodeInput) -> ToolResponse
         openWorldHint=True,
     ),
 )
-async def find_commune_tool(params: FindCommuneInput) -> ToolResponse:
+async def find_commune_tool(
+    params: FindCommuneInput, ctx: Context | None = None
+) -> ToolResponse:
     """Löst Gemeinden auf: Name→BFS-Nummer, BFS-Nummer→Name, oder alle Gemeinden eines Kantons/Bezirks.
 
     <use_case>Vier Modi (genau einen Parameter angeben): `name` (Name →
@@ -765,7 +773,7 @@ async def find_commune_tool(params: FindCommuneInput) -> ToolResponse:
     weil der Pfad sonst still eine leere Liste liefert. Gemeindelisten sind
     vollständig (interne Pagination), nicht auf 10 Einträge gekürzt.</important_notes>
     """
-    return await find_commune(params)
+    return await find_commune(params, ctx)
 
 
 @mcp.tool(

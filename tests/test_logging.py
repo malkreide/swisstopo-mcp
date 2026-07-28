@@ -68,7 +68,7 @@ class TestLogToolCall:
         assert ("tool_failed", "error") in events
 
     async def test_decorator_is_transparent_for_real_handler(self, monkeypatch):
-        async def mock_request(path, params=None):
+        async def mock_request(path, params=None, **_):
             return {"results": []}
 
         monkeypatch.setattr("swisstopo_mcp.geocoding.geo_admin_request", mock_request)

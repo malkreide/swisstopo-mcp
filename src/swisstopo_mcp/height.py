@@ -190,6 +190,18 @@ async def elevation_profile(
         }
         geojson_str = json.dumps(geojson, separators=(",", ":"))
 
+        # Report *before* the await, not after it. The previous call fired
+        # progress=1/total=1 once `geo_admin_request` had already returned — a
+        # completion marker, not a cadence, so the actual wait was unreported
+        # (audit SDK-003). The upstream call is a single request with no
+        # intermediate signal, so the honest thing is to announce it, then
+        # confirm on return.
+        if ctx is not None:
+            await ctx.report_progress(
+                progress=0,
+                total=params.nb_points,
+                message=f"Fordere {params.nb_points} Profilpunkte an …",
+            )
         data = await geo_admin_request(
             "/rest/services/profile.json",
             {
@@ -197,11 +209,15 @@ async def elevation_profile(
                 "nb_points": params.nb_points,
                 "sr": 2056,
             },
+            ctx=ctx,
         )
         # data is a list of profile points
         if isinstance(data, list):
             if ctx is not None:
-                await ctx.report_progress(progress=1, total=1, message=f"{len(data)} Punkte")
+                await ctx.report_progress(
+                    progress=len(data), total=params.nb_points,
+                    message=f"{len(data)} Punkte",
+                )
             return ToolResponse.ok(
                 format_elevation_profile(data),
                 data,

@@ -79,3 +79,53 @@ of the check (no print, stderr-bound logging) is solid, so it is not a fail. But
 the substantive criteria — ctx on tools >2s, progress every 1-2s, warnings for
 swallowed errors — are all still unmet on the tools that actually keep a client
 waiting. Partial.
+
+---
+
+### Remediation Status (2026-07-28, follow-up PR)
+
+**Closed.** All four unapplied items from the previous plan, plus the one the
+finding identified as the real amplifier.
+
+**1. `ctx` on the tools with expected runtime > 2 s.**
+`swisstopo_query_osm_features` announces the wait before it starts — a 25 s
+server timeout behind a 30 s client timeout is the difference between "slow" and
+"hung" from the client's side — and geocoding an area name is reported
+separately. `swisstopo_find_commune` threads `ctx` into `_fetch_all_pages`,
+which reports **per page**: that loop can issue up to 40 sequential upstream
+requests, so it has a natural cadence and now uses it.
+
+**2. Progress before the wait, not after.** `height.py` fired
+`progress=1, total=1` *after* `geo_admin_request` had returned — a completion
+marker. It now reports `0/nb_points` before the call and `len(data)/nb_points`
+after. The upstream is a single request with no intermediate signal, so
+announcing then confirming is the honest shape.
+
+**3. The swallowed legend failure.** `except Exception: meta["legend"] = None`
+left a caller unable to tell "this layer has no legend" from "the legend fetch
+broke". `layer_info` now sets `legend_status` (`ok` / `empty` / `unavailable`),
+logs the failure, and emits `ctx.warning()` when a context is available. The
+tool description documents the new field.
+
+**4. The amplifier the finding named: retries were silent.** No `ctx` reached
+`api_client` at all, so even the three context-aware tools said nothing during
+2+4+8 s of backoff — the single largest source of unexplained latency here.
+`request_with_retry` now takes an optional `ctx` and warns before each retry,
+naming the host and the wait, and every per-source helper
+(`geo_admin_request`, `geo_admin_request_text`, `stac_request`,
+`openplz_request`) threads it. That covers *every* tool that passes a context,
+not only the ones changed by hand.
+
+All reporting is best-effort: a context whose session has gone away raises on
+`warning()`, and a test asserts that does not turn a recoverable upstream blip
+into a failed tool call.
+
+**The test gap was the point.** `tests/test_context.py` asserted only that
+`ctx.info` and `ctx.report_progress` were awaited *at all* — it passed
+throughout every defect above. Nine tests now assert ordering relative to the
+upstream call, one progress event per page, one warning per retry, and the
+legend distinction. An assertion that cannot fail on the defect it names is not
+a regression test, which is what the finding correctly said about the old one.
+
+**Not changed:** the stdio-safety half of the check was already solid (no
+`print()` in `src/`, structlog bound to stderr) and remains so.

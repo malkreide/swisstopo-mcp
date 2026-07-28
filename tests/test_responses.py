@@ -31,7 +31,7 @@ class TestToolResponseModel:
 
 class TestHandlerEnvelopes:
     async def test_geocode_populates_structured_results(self, monkeypatch):
-        async def mock_request(path, params=None):
+        async def mock_request(path, params=None, **_):
             return {"results": [{"attrs": {"label": "Bern", "lat": 46.9, "lon": 7.4}}]}
 
         monkeypatch.setattr("swisstopo_mcp.geocoding.geo_admin_request", mock_request)
@@ -43,7 +43,7 @@ class TestHandlerEnvelopes:
         assert "Bern" in r.summary
 
     async def test_geocode_empty_is_match_none(self, monkeypatch):
-        async def mock_request(path, params=None):
+        async def mock_request(path, params=None, **_):
             return {"results": []}
 
         monkeypatch.setattr("swisstopo_mcp.geocoding.geo_admin_request", mock_request)
@@ -51,7 +51,7 @@ class TestHandlerEnvelopes:
         assert r.count == 0 and r.match_type == "none" and r.is_error is False
 
     async def test_height_has_single_structured_record(self, monkeypatch):
-        async def mock_request(path, params=None):
+        async def mock_request(path, params=None, **_):
             return {"height": "553.6"}
 
         monkeypatch.setattr("swisstopo_mcp.height.geo_admin_request", mock_request)
@@ -69,7 +69,7 @@ class TestHandlerEnvelopes:
 
 class TestFastMCPStructuredOutput:
     async def test_tool_emits_structured_content_and_schema(self, monkeypatch):
-        async def mock_request(path, params=None):
+        async def mock_request(path, params=None, **_):
             return {"results": [{"attrs": {"label": "Bern", "lat": 46.9, "lon": 7.4}}]}
 
         monkeypatch.setattr("swisstopo_mcp.geocoding.geo_admin_request", mock_request)

@@ -1,3 +1,47 @@
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+
+### Fixed
+- **The catalogue resource published an upstream outage as an empty catalogue.**
+  Raised in review of PR #41 by an automated reviewer, and correct. The tool
+  that `swisstopo://catalogue/layers` wraps degrades gracefully — on a
+  geodienste failure it returns an envelope with `is_error: true` and no
+  results, which is right for a *tool* call. Serialising that envelope's results
+  into the resource dropped both the flag and the summary, publishing
+  `count: 0` and an empty list as ordinary JSON, so a client could not
+  distinguish an outage from a genuinely empty catalogue.
+
+  The resource now raises, which the SDK surfaces as a `ResourceError` carrying
+  the masked summary. A resource is a document; when there is no document, an
+  error is the honest answer rather than an empty one.
+
+  Same defect class as ARCH-003 (a bare negative read as a factual answer) and
+  OBS-001 (an error presenting as success) — on a surface added in the very
+  commit that closed them.
+
+- **Restored the changelog header.** The merge `a9f6bc4` resolved a conflict by
+  dropping 70 lines, including the document title, the Keep-a-Changelog
+  preamble, the `## [Unreleased]` heading and the User-Agent entry below. Both
+  merge parents had them; this is a merge-resolution accident, not an edit.
+
+### Fixed (User-Agent version drift)
+- **User-Agent no longer reports a version that was never current.** Three
+  numbers had drifted apart: `pyproject.toml` said `0.3.0`,
+  `__init__.__version__` said `0.2.0`, and the hard-coded `USER_AGENT` in
+  `api_client.py` said `0.1` — a value that has not matched a release since the
+  very first one. Every request to geo.admin.ch, REFRAME, STAC, Overpass and
+  OpenPLZ carried it. `__version__` now comes from the installed distribution
+  metadata (`importlib.metadata`, generated from `pyproject.toml`) and the
+  User-Agent is derived from it, so no literal has to be remembered. Running
+  from a bare source checkout yields `0.0.0+source` rather than a
+  plausible-looking wrong number. Guarded by `tests/test_version.py`.
+
 ### Changed (ARCH-007)
 - **`swisstopo_query_geodata` fans out over collections concurrently.** The loop
   was strictly sequential — the check's named anti-pattern for an aggregation

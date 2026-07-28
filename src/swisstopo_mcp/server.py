@@ -790,6 +790,39 @@ async def search_address_tool(params: SearchAddressInput) -> ToolResponse:
     return await search_address(params)
 
 
+def _install_session_manager() -> None:
+    """Give the Streamable-HTTP session manager an explicit idle timeout.
+
+    The SDK's default is `session_idle_timeout=None`: a session lives until the
+    process restarts. Every client that disconnects without sending
+    `DELETE /mcp` — a crash, a closed laptop, a killed container — therefore
+    leaks one for the lifetime of the pod. Nothing about that is a
+    confidentiality problem here (all 24 tools are stateless reads over public
+    data), but unbounded growth is still unbounded (audit SEC-009).
+
+    FastMCP exposes no setting for it and builds the manager lazily —
+    `streamable_http_app()` only constructs one `if self._session_manager is
+    None` — so pre-populating it is how the timeout gets in. Measured against a
+    running server: with the timeout set, an idle session is reaped and returns
+    404, while activity pushes the deadline back.
+
+    `SWISSTOPO_SESSION_IDLE_TIMEOUT=0` restores the SDK's unbounded behaviour.
+    """
+    from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
+
+    if mcp._session_manager is not None:  # pragma: no cover - built once
+        return
+
+    timeout = settings.session_idle_timeout
+    mcp._session_manager = StreamableHTTPSessionManager(
+        app=mcp._mcp_server,
+        json_response=mcp.settings.json_response,
+        stateless=mcp.settings.stateless_http,
+        security_settings=mcp.settings.transport_security,
+        session_idle_timeout=timeout if timeout > 0 else None,
+    )
+
+
 def build_http_app(allowed_origins: list[str] | None = None):
     """Build the Streamable-HTTP ASGI app with CORS configured (SDK-004).
 
@@ -812,6 +845,7 @@ def build_http_app(allowed_origins: list[str] | None = None):
     async def _healthz(_request):
         return JSONResponse({"status": "ok"})
 
+    _install_session_manager()
     app = mcp.streamable_http_app()
 
     sdk_lifespan = app.router.lifespan_context

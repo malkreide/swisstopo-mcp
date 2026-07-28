@@ -48,11 +48,23 @@ Eigenschaft — siehe SEC-014 im aktuellen Audit-Lauf.
 ## Sessions & Authentifizierung
 
 Der Server ist bewusst nicht authentifiziert — er liefert ausschliesslich
-öffentliche Open Data. Über HTTP werden Session-IDs vollständig vom FastMCP-
-Framework verwaltet; es gibt keinen benutzerspezifischen Zustand, also nichts,
-woran eine Session gebunden werden müsste. Würde später eine authentifizierte
-Variante eingeführt, müssen Session-IDs an die validierte Benutzeridentität
-gebunden werden (Audit-Finding SEC-009).
+öffentliche Open Data. Über HTTP erzeugt das SDK die Session-IDs (`uuid4().hex`,
+128 Bit aus `os.urandom`); es gibt keinen benutzerspezifischen Zustand, also
+nichts, woran eine Session gebunden werden müsste. Würde später eine
+authentifizierte Variante eingeführt, müssen Session-IDs an die validierte
+Benutzeridentität gebunden werden (Audit-Finding SEC-009).
+
+Zwei Kontrollen, die kein Auth-Modell voraussetzen, sind aktiv:
+
+- **Idle-Timeout.** `SWISSTOPO_SESSION_IDLE_TIMEOUT` (Standard 1800 s) beendet
+  Sessions ohne Anfragen. Der SDK-Standard ist *kein* Timeout — ein Client, der
+  sich ohne Session-Abbau trennt, hinterlässt eine Session für die gesamte
+  Prozesslaufzeit. Aktivität verschiebt die Frist; `0` stellt das unbegrenzte
+  Verhalten wieder her.
+- **Serverseitige Invalidierung.** `DELETE /mcp` mit der Session-ID beendet sie
+  sofort — verifiziert: die nächste Anfrage erhält `404`. Das ist der Mechanismus
+  des Protokolls selbst, eine eigene Logout-Route existiert daher nicht und
+  wird nicht gebraucht.
 
 ## Kontrollen auf Portfolio-Ebene
 

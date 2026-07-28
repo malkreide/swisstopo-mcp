@@ -70,3 +70,49 @@ met via the SDK's uuid4.
 Partial rather than pass on the two unmet criteria; partial rather than
 fail because the server holds no session-scoped state and serves only
 public data, so the exploit value of a stolen session id is close to zero.
+
+---
+
+### Remediation Status (2026-07-28, follow-up PR)
+
+**Closed.** Both criteria the finding correctly identified as independent of the
+auth model are now met — and one of the two turned out already to be.
+
+**1. Session TTL — implemented.** `SWISSTOPO_SESSION_IDLE_TIMEOUT`, default
+**1800 s**, the value the SDK's own docstring recommends. FastMCP exposes no
+setting for it and builds the manager lazily (`streamable_http_app()` constructs
+one only `if self._session_manager is None`), so `_install_session_manager()`
+pre-populates it. `0` restores the SDK's unbounded behaviour for an operator who
+wants it.
+
+Verified against a running server, both directions:
+
+| | result |
+|---|---|
+| session idle past the TTL | `404` — reaped, and the SDK logs `Session … idle timeout` |
+| session kept active past the TTL | `200` — the deadline is pushed back on each request |
+
+A test also asserts the custom manager still carries the transport-security
+settings, since building it by hand could silently drop the DNS-rebinding
+protection the SDK would otherwise wire up (SDK-004 / SEC-005).
+
+**2. Server-side invalidation — the finding is incorrect on this point.** It
+reads *"There is no server-side logout/invalidation endpoint.
+`src/swisstopo_mcp/server.py:708-734` adds only `/healthz`"* — true as written,
+but it looks for a custom route and misses the protocol's own mechanism.
+`DELETE /mcp` with the session id is the MCP session-termination method and the
+SDK implements it. Measured: `DELETE` returns `200`, and the next request on
+that session id returns `404`. The criterion was already satisfied; what was
+missing was documentation, now in `SECURITY.md` and `SECURITY.de.md`.
+
+**3. Owner binding** stays genuinely inapplicable — no auth model means no
+requestor to bind to. The `SECURITY.md` trigger for an authenticated deployment
+is unchanged.
+
+The residual risk assessment in the finding stands and is worth repeating: all
+24 tools are stateless reads over public open data, so a stolen session id
+confers no privilege the caller did not already have. What the TTL fixes is
+resource growth, not confidentiality.
+
+Documented in `.env.example`, `deploy/kubernetes.yaml` and both security
+policies. Five tests added.

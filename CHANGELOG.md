@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added (SEC-009)
+- **`SWISSTOPO_SESSION_IDLE_TIMEOUT`, default 1800 s.** The MCP SDK defaults to
+  *no* session timeout, so every Streamable-HTTP client that disconnects without
+  sending `DELETE /mcp` — a crash, a closed laptop, a killed container — leaked
+  a session for the lifetime of the process. Not a confidentiality problem here
+  (all 24 tools are stateless reads over public data, so a stolen session id
+  confers no privilege), but unbounded growth is still unbounded.
+
+  FastMCP exposes no setting for it and builds the session manager lazily, so
+  `_install_session_manager()` pre-populates it. Verified against a running
+  server both ways: an idle session is reaped and returns `404`, while activity
+  pushes the deadline back. A test also asserts the hand-built manager still
+  carries the transport-security settings, since dropping them would silently
+  disable DNS-rebinding protection.
+
+  Documented in `.env.example`, `deploy/kubernetes.yaml` and both security
+  policies. `0` restores the SDK's unbounded behaviour.
+
+### Documentation (SEC-009)
+- **Server-side session invalidation was already present; only the
+  documentation was missing.** The audit reported no invalidation endpoint,
+  which is true of custom routes but misses the protocol's own mechanism:
+  `DELETE /mcp` with the session id terminates it, and the SDK implements it.
+  Measured — `DELETE` returns `200` and the next request on that id returns
+  `404`. Both security policies now say so.
+
 ### Added (ARCH-003)
 - **`swisstopo_geocode` now relaxes a failed query instead of reporting a bare
   negative.** `match_type: "fuzzy"` was a member of the `Literal` that no code

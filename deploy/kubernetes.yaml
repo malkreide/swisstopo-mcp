@@ -47,6 +47,11 @@ spec:
             # readiness probe stays green and hides it (audit SCALE-001).
             - name: SWISSTOPO_ALLOWED_HOSTS
               value: "" # <-- set to the ingress hostname, e.g. swisstopo-mcp.example.com
+            # Idle timeout for Streamable-HTTP sessions (SEC-009). The SDK
+            # default is no timeout, so every client that disconnects without
+            # terminating its session leaks one for the pod's lifetime.
+            - name: SWISSTOPO_SESSION_IDLE_TIMEOUT
+              value: "1800"
             # Tracing (OBS-006). Leave the endpoint empty to disable entirely.
             - name: OTEL_SERVICE_NAME
               value: "swisstopo-mcp"

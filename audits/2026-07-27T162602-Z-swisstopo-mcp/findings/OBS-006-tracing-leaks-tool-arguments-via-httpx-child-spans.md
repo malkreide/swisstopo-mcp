@@ -76,3 +76,51 @@ puts `?searchText=Seilergraben+76,+Zürich&lat=47.3769` into an exported
 span attribute. Since this only bites when tracing is switched on — i.e.
 precisely in the cloud deployment this check applies to — it is a real
 defect rather than a documentation nit. Partial.
+
+---
+
+### Remediation Status (2026-07-28, follow-up PR)
+
+**Closed.** Reproduced first: with the instrumentation enabled, the child span
+carried
+`http.url = https://api3.geo.admin.ch/rest/services/ech/SearchServer?searchText=Seilergraben+76%2C+Z%C3%BCrich&lat=47.3769`
+— the finding's measurement exactly.
+
+`_install_url_scrubber` now attaches a hook that rewrites every URL-bearing span
+attribute through `_scrub_url`, which drops the query string, the fragment and
+any userinfo. Scheme, host and path survive, so the span still answers *which*
+upstream was called and how long it took. Both the sync and async hook variants
+are registered — `httpx.AsyncClient` uses the async ones and `httpx.Client` the
+sync ones, so the choice of client cannot reopen the leak — and `http.url`,
+`url.full` and `url.query` are all handled, since which of them the
+instrumentation emits depends on the active semantic-convention mode.
+
+**The request hook, not the response hook, and that was measured rather than
+assumed.** A comparison run showed the response hook never fires when no
+response arrives, so a connection error would have exported its query string
+intact:
+
+| hook | success path | connection-error path |
+|---|---|---|
+| response only | scrubbed | **leaked** |
+| request only | scrubbed | scrubbed |
+
+Verified end to end against the real `setup_tracing()` and a real
+`geo_admin_request`: `http.url` comes out as
+`https://api3.geo.admin.ch/rest/services/ech/SearchServer`.
+
+**The test gap is the substantive half of this fix.**
+`test_arguments_never_reach_span_attributes` passed throughout the leak, because
+it asserts on the span this module *writes* and never enables the
+instrumentation this module *configures*. Eight tests added that do enable it,
+including one on the connection-error path and one asserting the upstream is
+still identifiable — scrubbing that made the span useless would be a different
+kind of failure. Two were verified to fail against the previous implementation,
+and each asserts a span was actually recorded first, so they cannot pass
+vacuously.
+
+**Residual, stated deliberately:** the path is kept, and it can still carry a
+caller-supplied identifier (`collection_id`, a feature id). This narrows the
+exposure rather than eliminating it; the docstring says so and names path
+templating as the next step if that is ever needed. The absent `mcp.user.id`
+attribute remains inapplicable — there is no auth model, so no identity exists.

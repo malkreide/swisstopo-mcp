@@ -7,6 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed (OBS-006)
+- **Tracing exported tool arguments via the httpx child spans.** The tool span
+  this server writes never carried arguments — but the httpx auto-instrumentation
+  it *enables* exported `http.url` complete with the query string, so every
+  argument that becomes a parameter (search text, coordinates, canton, PLZ, the
+  Overpass area) reached the observability backend verbatim. True of the span we
+  write, false of the system we configure. It only bites when tracing is on,
+  which is precisely the cloud deployment.
+
+  A hook now rewrites every URL-bearing span attribute through `_scrub_url`,
+  dropping the query string, fragment and userinfo. Scheme, host and path
+  survive, so the span still answers which upstream was called and how long it
+  took.
+
+  It is the *request* hook, and that was measured rather than assumed: the
+  response hook never fires when no response arrives, so a connection error
+  would have exported its query string intact.
+
+  | hook | success | connection error |
+  |---|---|---|
+  | response only | scrubbed | **leaked** |
+  | request only | scrubbed | scrubbed |
+
+  **The test gap was the substantive half.**
+  `test_arguments_never_reach_span_attributes` passed throughout the leak
+  because it never enabled the instrumentation. Eight tests added that do,
+  including the error path and one asserting the upstream is still identifiable
+  — scrubbing that made spans useless would be a different failure. Each asserts
+  a span was recorded first, so none can pass vacuously.
+
+  Residual, stated deliberately: the path is kept and can still carry a
+  caller-supplied identifier (`collection_id`, a feature id). This narrows the
+  exposure rather than eliminating it.
+
 ### Fixed (OBS-001)
 - **The protocol `isError` flag was never set.** Handled execution errors are
   returned as a `ToolResponse` with `is_error: true` rather than raised — which

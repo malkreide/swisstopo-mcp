@@ -13,11 +13,19 @@ default install pays no runtime cost and emits nothing.
 coordinates, addresses and search terms typed by a user, and an observability
 backend is the wrong place for them. The finding calls this out explicitly and
 it holds regardless of how convenient the debugging would be.
+
+That exclusion has to be enforced in two places, which is what the re-audit
+caught: the tool span this module writes never carried arguments, but the httpx
+auto-instrumentation it *enables* exported `http.url` complete with the query
+string — `?searchText=Seilergraben+76,+Zürich&lat=47.3769`. True of the span we
+write, false of the system we configure. `_scrub_url` and the request hook below
+close that; see `_install_url_scrubber`.
 """
 from __future__ import annotations
 
 import os
 from typing import Any
+from urllib.parse import urlsplit, urlunsplit
 
 from swisstopo_mcp.logging_config import get_logger
 
@@ -29,6 +37,88 @@ DEFAULT_SERVICE_NAME = "swisstopo-mcp"
 # below must stay out of the way entirely.
 _tracer: Any | None = None
 _instrumented = False
+
+
+# Span attributes that carry a full request URL. The name depends on which HTTP
+# semantic-convention version the instrumentation emits (`http.url` in the
+# stable-legacy mode, `url.full`/`url.query` in the newer one), so all of them
+# are scrubbed rather than guessing which is active.
+_URL_ATTRIBUTES = ("http.url", "url.full")
+_QUERY_ATTRIBUTES = ("url.query",)
+
+
+def _scrub_url(url: str) -> str:
+    """Drop the query string, fragment and any userinfo from a URL.
+
+    What survives is scheme, host and path — enough to see *which* upstream was
+    called and how long it took, which is the whole point of the child span.
+    What goes is the query string, where every tool argument that becomes a
+    parameter ends up: search text, coordinates, canton, PLZ, the Overpass area.
+
+    The path is deliberately kept. It can still carry an identifier the caller
+    supplied (`collection_id`, a feature id), so this narrows the exposure
+    rather than eliminating it — a trade against making the span useless. If
+    that ever needs to go too, template the path here.
+    """
+    try:
+        parts = urlsplit(url)
+    except ValueError:  # pragma: no cover - urlsplit is very permissive
+        return "<unparseable>"
+    # netloc without userinfo: hostname[:port]
+    netloc = parts.hostname or ""
+    if parts.port:
+        netloc = f"{netloc}:{parts.port}"
+    return urlunsplit((parts.scheme, netloc, parts.path, "", ""))
+
+
+def _scrub_span_urls(span: Any) -> None:
+    """Overwrite any URL-bearing attribute the instrumentation already set."""
+    if span is None or not span.is_recording():
+        return
+    attributes = span.attributes or {}
+    for key in _URL_ATTRIBUTES:
+        value = attributes.get(key)
+        if isinstance(value, str):
+            span.set_attribute(key, _scrub_url(value))
+    for key in _QUERY_ATTRIBUTES:
+        if key in attributes:
+            span.set_attribute(key, "")
+
+
+async def _async_request_hook(span: Any, request: Any) -> None:
+    _scrub_span_urls(span)
+
+
+def _sync_request_hook(span: Any, request: Any) -> None:
+    _scrub_span_urls(span)
+
+
+def _install_url_scrubber(instrumentor: Any, tracer_provider: Any | None = None) -> None:
+    """Instrument httpx with the URL scrubber attached.
+
+    `tracer_provider` is for tests: the global provider can only be set once per
+    process, so a test that needs its own exporter passes it here rather than
+    fighting `set_tracer_provider`. Production leaves it None and the
+    instrumentation resolves the global provider itself.
+
+    The *request* hook, not the response hook: measured against this
+    instrumentation version, the request hook fires on both the success and the
+    connection-error path, while the response hook never runs when no response
+    arrives — so a failed upstream call would export its query string intact.
+    `tests/test_observability.py` covers both paths, so an instrumentation
+    upgrade that reorders this fails the build rather than silently reopening
+    the leak.
+
+    `httpx.AsyncClient` uses the async hooks and `httpx.Client` the sync ones;
+    both are registered so the choice of client cannot reopen it either.
+    """
+    kwargs: dict[str, Any] = {
+        "request_hook": _sync_request_hook,
+        "async_request_hook": _async_request_hook,
+    }
+    if tracer_provider is not None:
+        kwargs["tracer_provider"] = tracer_provider
+    instrumentor.instrument(**kwargs)
 
 
 def tracing_enabled() -> bool:
@@ -76,7 +166,7 @@ def setup_tracing() -> bool:
     trace.set_tracer_provider(provider)
 
     if not _instrumented:
-        HTTPXClientInstrumentor().instrument()
+        _install_url_scrubber(HTTPXClientInstrumentor())
         _instrumented = True
 
     _tracer = trace.get_tracer("swisstopo_mcp")

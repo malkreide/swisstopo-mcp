@@ -27,7 +27,10 @@ authoritative, which meant neither was (audit `2026-07-27T162602-Z`, OPS-003).
 - [x] Structured logging via structlog on stderr (OBS-003)
 - [x] `match_type` on search-style tools; empty results are reported as
       `match_type: "none"` rather than as errors (ARCH-003)
-- [ ] Suggestion mechanism for empty results — still open (ARCH-003)
+- [x] Suggestion mechanism for empty results (ARCH-003): every
+      `match_type: "none"` path names a concrete next step, enforced by the
+      envelope and by an AST sweep over the call sites; `swisstopo_geocode`
+      relaxes a failed query and reports the retry as `match_type: "fuzzy"`
 - [ ] Resources for static catalogs (e.g. notable map layers) (ARCH-008)
 - [x] OpenTelemetry tracing, opt-in via `OTEL_EXPORTER_OTLP_ENDPOINT`, with
       httpx auto-instrumentation so upstream calls nest under the tool span

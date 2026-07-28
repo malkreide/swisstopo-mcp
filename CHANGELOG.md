@@ -7,6 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added (ARCH-003)
+- **`swisstopo_geocode` now relaxes a failed query instead of reporting a bare
+  negative.** `match_type: "fuzzy"` was a member of the `Literal` that no code
+  produced. On zero results the tool drops the trailing token and retries once,
+  reporting hits as `fuzzy` with a note naming both the original and the
+  relaxed query — silently answering a different question would be worse than
+  answering none. Two failure modes this recovers: a house number absent from
+  the register, and a street spelled differently from the official entry where
+  the municipality alone resolves. A single-token query is not retried, since
+  that repeats the same search.
+
+### Fixed (ARCH-003)
+- **Empty results always carry a next step.** The `note` field reached 5 of ~25
+  sites that can report `match_type: "none"`, and nothing enforced it — so the
+  coverage could regress silently, and did not grow between two audit runs. All
+  ~25 sites now supply their own note, held there by two layers:
+  - a `model_validator` fills a fallback whenever `match_type == "none"` and no
+    note was given, so a bare negative is impossible by construction. Filling
+    rather than raising is deliberate — turning a missing hint into an exception
+    would replace a mildly unhelpful answer with a masked internal error;
+  - an AST sweep asserts no call site *relies* on that fallback, since a generic
+    hint is not a next step. It asserts it found ≥20 sites first, so it cannot
+    pass vacuously.
+
+  The sharpest case is the ÖREB cluster: only ZH is enabled by default, so an
+  empty answer is the normal answer almost everywhere in Switzerland, and a bare
+  negative there reads as "no restrictions exist" — a materially wrong statement
+  about a legally binding cadastre. It now names `swisstopo_municipality_at`.
+
+- **The OpenPLZ hints now populate the structured field, not only the summary
+  markdown**, so one contract holds across modules.
+
+- 18 tests added (`tests/test_empty_results.py`), two verified to fail against
+  the previous implementation. The invariant test was item 4 of the previous
+  remediation plan and was never delivered, which is why the coverage could not
+  grow.
+
 ### Fixed (OBS-006)
 - **Tracing exported tool arguments via the httpx child spans.** The tool span
   this server writes never carried arguments — but the httpx auto-instrumentation

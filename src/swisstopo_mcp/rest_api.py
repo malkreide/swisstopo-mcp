@@ -413,6 +413,13 @@ async def get_feature(params: GetFeatureInput) -> ToolResponse:
             format_feature_detail(data),
             records,
             match_type="exact" if records else "none",
+            note=(
+                None if records else
+                f"Feature '{params.feature_id}' existiert im Layer "
+                f"'{params.layer}' nicht. Feature-IDs mit "
+                "swisstopo_identify_features oder swisstopo_find_features "
+                "ermitteln — sie sind layer-spezifisch."
+            ),
         )
     except Exception as e:
         return ToolResponse.error(handle_api_error(e, "Feature-Abruf"))
@@ -466,6 +473,15 @@ async def zoning_at(params: ZoningAtInput) -> ToolResponse:
             format_zoning(zones),
             zones,
             match_type="exact" if zones else "none",
+            note=(
+                None if zones else
+                "Keine Bauzone an dieser Position — der Punkt liegt ausserhalb "
+                "der Bauzone (Landwirtschafts-/Schutzgebiet) oder ausserhalb der "
+                "Schweiz. swisstopo_municipality_at zeigt, ob der Punkt überhaupt "
+                "in einer Gemeinde liegt; die rechtsverbindliche Nutzungsplanung "
+                "gibt es via swisstopo_query_geodata "
+                "(geodienste:nutzungsplanung:<KANTON>)."
+            ),
             source=ARE_SOURCE,
             license=ARE_LICENSE,
         )
@@ -502,6 +518,12 @@ async def municipality_at(params: MunicipalityAtInput) -> ToolResponse:
             format_municipality(records[0] if records else None),
             records,
             match_type="exact" if records else "none",
+            note=(
+                None if records else
+                "Keine Gemeinde an dieser Position — der Punkt liegt ausserhalb "
+                "der Schweiz oder auf einem See ohne Gemeindezuordnung. "
+                "Koordinaten prüfen (lat/lon, nicht LV95)."
+            ),
             source=SWISSBOUNDARIES_SOURCE,
             license=SWISSBOUNDARIES_LICENSE,
         )

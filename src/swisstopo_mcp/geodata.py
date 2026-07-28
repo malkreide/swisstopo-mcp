@@ -287,6 +287,12 @@ async def _query_streets(params: QueryGeodataInput) -> ToolResponse:
         )
         return ToolResponse.ok(
             summary, name_hits, match_type="exact" if name_hits else "none",
+            note=(
+                None if name_hits else
+                f"Keine Strasse in '{params.commune}' gefunden. Gemeindename mit "
+                "swisstopo_find_commune in amtlicher Schreibweise ermitteln, oder "
+                "den Strassennamen weglassen, um alle Strassen der Gemeinde zu sehen."
+            ),
             source=SWISSTOPO_SOURCE, license=SWISSTOPO_LICENSE,
         )
 
@@ -340,6 +346,11 @@ async def _query_streets(params: QueryGeodataInput) -> ToolResponse:
     )
     return ToolResponse.ok(
         summary, records, match_type="exact" if records else "none",
+        note=(
+            None if records else
+            "Keine Strasse im Umkreis. radius_m erhöhen, oder mit "
+            "swisstopo_municipality_at prüfen, ob der Punkt in der Schweiz liegt."
+        ),
         source=SWISSTOPO_SOURCE, license=SWISSTOPO_LICENSE,
     )
 
@@ -389,7 +400,14 @@ async def _query_oereb_availability(params: QueryGeodataInput) -> ToolResponse:
     if not records:
         return ToolResponse.ok(
             f"Keine ÖREB-Verfügbarkeitsinformation für {lat:.5f},{lon:.5f}.",
-            [], match_type="none", source=OEREB_SOURCE, license=OEREB_LICENSE,
+            [], match_type="none",
+            note=(
+                "Der Bundesdienst kennt für diesen Punkt keinen Eintrag — er liegt "
+                "womöglich ausserhalb der Schweiz. swisstopo_municipality_at nennt "
+                "die Gemeinde, swisstopo_oereb_at liefert den Auszug direkt, wo "
+                "der Kanton unterstützt wird."
+            ),
+            source=OEREB_SOURCE, license=OEREB_LICENSE,
         )
     lines = [f"**ÖREB-Kataster-Verfügbarkeit** ({lat:.5f},{lon:.5f})", ""]
     for rec in records:
@@ -460,7 +478,13 @@ async def _query_geodienste(params: QueryGeodataInput) -> ToolResponse:
     if not collections:
         return ToolResponse.ok(
             f"Datensatz '{topic}' ({canton.upper()}) enthält keine Collections.",
-            [], match_type="none", source=GEODIENSTE_SOURCE, license=GEODIENSTE_LICENSE,
+            [], match_type="none",
+            note=(
+                f"Der Kanton {canton.upper()} publiziert für '{topic}' keine "
+                "abfragbaren Collections. swisstopo_list_available_layers zeigt, "
+                "welche Kantone das Thema mit OGC-API frei anbieten."
+            ),
+            source=GEODIENSTE_SOURCE, license=GEODIENSTE_LICENSE,
         )
     all_records: list[dict[str, Any]] = []
     features_out: list[dict[str, Any]] = []
@@ -496,6 +520,12 @@ async def _query_geodienste(params: QueryGeodataInput) -> ToolResponse:
         payload_records = all_records
     return ToolResponse.ok(
         summary, payload_records, match_type="exact" if all_records else "none",
+        note=(
+            None if all_records else
+            "Keine Features im abgefragten Bereich. bbox vergrössern oder einen "
+            "anderen Punkt wählen; swisstopo_list_available_layers zeigt, ob der "
+            "Datensatz für diesen Kanton überhaupt Daten führt."
+        ),
         source=f"{GEODIENSTE_SOURCE} / {entry.get('canton', canton.upper())}",
         license=GEODIENSTE_LICENSE,
     )
@@ -544,6 +574,11 @@ async def list_available_layers(params: ListLayersInput) -> ToolResponse:
 
         return ToolResponse.ok(
             summary, records, match_type="exact" if records else "none",
+            note=(
+                None if records else
+                "Keine Layer für diesen Filter. source/topic/canton weglassen, um "
+                "den vollständigen Katalog zu sehen, oder free_only abschalten."
+            ),
             source=f"{SWISSTOPO_SOURCE} + {GEODIENSTE_SOURCE}",
             license="gemischt — siehe je Layer (Feld `license` pro Record)",
             provenance="cached",

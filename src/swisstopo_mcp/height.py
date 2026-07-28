@@ -206,6 +206,13 @@ async def elevation_profile(
                 format_elevation_profile(data),
                 data,
                 match_type="exact" if data else "none",
+                note=(
+                    None
+                    if data
+                    else "Kein Höhenprofil — die Linie liegt vermutlich ausserhalb "
+                    "der Schweiz oder ganz im Bereich ohne Höhenmodell. Einzelpunkte "
+                    "mit swisstopo_get_height prüfen."
+                ),
             )
         return ToolResponse.error(f"Fehler bei Höhenprofil: Unerwartetes Antwortformat: {type(data).__name__}")
     except ValueError as e:

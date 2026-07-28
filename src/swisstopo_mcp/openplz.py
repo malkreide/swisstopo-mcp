@@ -403,6 +403,12 @@ async def lookup_postal_code(params: LookupPostalCodeInput) -> ToolResponse:
             _format_localities(params.postal_code, records),
             records,
             match_type="exact" if records else "none",
+            note=(
+                None if records else
+                f"PLZ {params.postal_code} ist im BFS-Verzeichnis unbekannt. "
+                "Vierstellige Schweizer PLZ prüfen, oder den Ortsnamen mit "
+                "swisstopo_find_commune bzw. swisstopo_search_address suchen."
+            ),
             source=OPENPLZ_SOURCE,
             license=OPENPLZ_LICENSE,
         )
@@ -435,6 +441,12 @@ async def _find_by_name(name: str) -> ToolResponse:
         _format_communes(f"Gemeinde-Auflösung «{name}»", records),
         records,
         match_type="exact" if records else "none",
+        note=(
+            None if records else
+            f"Keine Gemeinde namens «{name}». Schreibweise prüfen (Umlaute, "
+            "Bindestriche), oder mit swisstopo_search_address nach der amtlichen "
+            "Bezeichnung suchen."
+        ),
         source=OPENPLZ_SOURCE,
         license=OPENPLZ_LICENSE,
     )
@@ -452,6 +464,11 @@ async def _find_by_bfs(bfs_number: int) -> ToolResponse:
             ),
             [],
             match_type="none",
+            note=(
+                f"BFS-Nummer {bfs_number} liegt ausserhalb der bekannten "
+                "Kantonsblöcke (1–6810). Nummer prüfen, oder die Gemeinde über "
+                "ihren Namen mit swisstopo_find_commune suchen."
+            ),
             source=OPENPLZ_SOURCE,
             license=OPENPLZ_LICENSE,
         )
@@ -471,6 +488,7 @@ async def _find_by_bfs(bfs_number: int) -> ToolResponse:
         _format_communes(f"BFS-Nummer {bfs_number}", records, note=note),
         records,
         match_type="exact" if records else "none",
+        note=note or None,
         source=OPENPLZ_SOURCE,
         license=OPENPLZ_LICENSE,
     )
@@ -493,6 +511,7 @@ async def _list_by_canton(canton: str) -> ToolResponse:
         _format_communes(f"Gemeinden im Kanton {canton.upper()}", records, note=note),
         records,
         match_type="exact" if records else "none",
+        note=note or None,
         source=OPENPLZ_SOURCE,
         license=OPENPLZ_LICENSE,
     )
@@ -514,6 +533,7 @@ async def _list_by_district(district: str) -> ToolResponse:
         _format_communes(f"Gemeinden im Bezirk {district}", records, note=note),
         records,
         match_type="exact" if records else "none",
+        note=note or None,
         source=OPENPLZ_SOURCE,
         license=OPENPLZ_LICENSE,
     )
@@ -552,6 +572,12 @@ async def search_address(params: SearchAddressInput) -> ToolResponse:
             _format_addresses(params.query, records, total),
             records,
             match_type="exact" if records else "none",
+            note=(
+                None if records else
+                f"Keine Treffer für «{params.query}». Kürzeren Suchbegriff "
+                "versuchen (nur Strassen- oder Ortsname), oder swisstopo_geocode "
+                "für die Adresssuche über das Bundes-SearchServer nutzen."
+            ),
             source=OPENPLZ_SOURCE,
             license=OPENPLZ_LICENSE,
         )

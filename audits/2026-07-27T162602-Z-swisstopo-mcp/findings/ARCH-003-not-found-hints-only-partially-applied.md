@@ -76,3 +76,51 @@ fallback (criterion 1, and item 2 of the prior remediation plan) was not
 implemented at all — confirmed by the repo's own unticked roadmap entry.
 Real progress was made on the highest-traffic discovery entry points, which
 is why this is partial rather than fail.
+
+---
+
+### Remediation Status (2026-07-28, follow-up PR)
+
+**Closed, all three criteria.**
+
+**Criterion 3 — an actionable hint at every `match_type: "none"` path.** All ~25
+sites now pass their own `note`, up from 5. Two layers hold it there:
+
+1. A `model_validator` on `ToolResponse` fills `FALLBACK_NOTE` whenever
+   `match_type == "none"` and no note was given, so a bare negative is
+   impossible by construction. Filling rather than raising is deliberate: an
+   unhandled empty path is a missing hint, and turning it into an exception
+   would replace a mildly unhelpful answer with a masked internal error — worse
+   for the caller than the defect being fixed.
+2. Because that floor would also hide the problem, an AST sweep asserts no call
+   site *relies* on it. A generic hint is not a next step; the sweep forces each
+   site to name the tool or parameter to try. It asserts it found ≥20 sites
+   first, so it cannot pass vacuously.
+
+The ÖREB cluster the finding singled out is covered end to end, including the
+case that matters most: an empty ÖREB answer outside ZH now names
+`swisstopo_municipality_at` instead of reading as "no restrictions exist" — a
+materially wrong statement about a legally binding cadastre.
+
+**Criterion 1 — a fuzzy/suggestion mechanism.** `match_type: "fuzzy"` was a
+member of the `Literal` no code produced. `swisstopo_geocode` now relaxes a
+failed query by dropping the trailing token and retries once, reporting hits as
+`fuzzy` with a note naming the original query and the relaxed one. Two failure
+modes this actually recovers: a house number absent from the register, and a
+street spelled differently from the official entry where the municipality alone
+resolves. A single-token query is not retried — that would repeat the same
+search and the note would be a lie.
+
+**The consistency gap.** The OpenPLZ hints the previous run credited lived in
+the summary markdown, not the structured field. They now populate both, so one
+contract holds across modules.
+
+**The missing test.** Item 4 of the previous remediation plan asked for the
+invariant test and it was never added — which is why the coverage could not
+grow. `tests/test_empty_results.py` has 18: the envelope invariant, the call-site
+sweep, the fuzzy behaviour (including that an exact hit costs no second upstream
+call), and the tools most likely to legitimately return nothing. Two verified to
+fail against the previous implementation.
+
+`docs/roadmap.md`'s unticked entry — which the finding cited as the maintainer's
+own admission — is now ticked, accurately.

@@ -11,6 +11,7 @@ from urllib.parse import urlparse
 
 import httpx
 
+from swisstopo_mcp import __version__
 from swisstopo_mcp.logging_config import get_logger
 
 _log = get_logger("swisstopo_mcp.api_client")
@@ -26,7 +27,11 @@ OVERPASS_BASE = "https://overpass.osm.ch"
 OPENPLZ_BASE = "https://openplzapi.org/ch"
 
 REQUEST_TIMEOUT = 30.0
-USER_AGENT = "SwisstopoMCP/0.1 (MCP Server; +https://github.com/malkreide/swisstopo-mcp)"
+# Derived from the package version, not hand-maintained: this literal used to
+# read "SwisstopoMCP/0.1" while the package was at 0.3.0, so every request to
+# geo.admin.ch, REFRAME, STAC, Overpass and OpenPLZ identified itself as a
+# version that had not been current since the first release.
+USER_AGENT = f"SwisstopoMCP/{__version__} (MCP Server; +https://github.com/malkreide/swisstopo-mcp)"
 
 # Swiss bounding box (WGS84)
 CH_LAT_MIN, CH_LAT_MAX = 45.8, 47.9

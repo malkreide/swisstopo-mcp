@@ -49,6 +49,11 @@ dev = [
     "respx>=0.21.0",
     "ruff>=0.4.0",
     "mypy>=1.10.0",
+    # Test-only: the egress-ACL test parses deploy/smokescreen-acl.yaml the way
+    # the proxy would (SEC-021). Not a runtime dependency — the server itself
+    # reads no YAML. It was available transitively in the dev sandbox, which is
+    # why the gap only surfaced in CI.
+    "PyYAML>=6.0",
 ]
 
 [project.scripts]

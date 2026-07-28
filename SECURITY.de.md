@@ -79,9 +79,31 @@ erreicht.
   Solange kein zentrales Gateway existiert, ist das Risiko durch die
   Egress-Allow-List und die read-only Tool-Oberfläche begrenzt.
 - **Server-übergreifende Tool-Poisoning-Erkennung** ist eine Host-/Gateway-
-  Verantwortung. Die Tool-Definitionen dieses Servers sind versionskontrolliert
-  und werden aus diesem Repository ausgeliefert; es gibt keine dynamische oder
-  entfernte Tool-Registrierung.
+  Verantwortung — kein einzelner Server sieht über die Menge hinweg. Die
+  Tool-Definitionen dieses Servers sind versionskontrolliert und werden aus
+  diesem Repository ausgeliefert; es gibt keine dynamische oder entfernte
+  Tool-Registrierung.
+
+  Zusätzlich prüft `tests/test_tool_hygiene.py` **jede Zeichenkette, die dieser
+  Server ins Kontextfenster eines Modells liefert** — Tool-Namen und
+  -Beschreibungen, jede `description` in einem Input- oder Output-Schema sowie
+  den serverweiten `instructions`-Block. Geprüft wird auf unsichtbare Zeichen,
+  Override-Formulierungen (deutsch, französisch, englisch), eingebettete
+  Rollen-/System-Marker (`<SYSTEM>`, `[INST]`, `### Instructions:`,
+  `<|im_start|>`), verwechselbare kyrillische/griechische Substitutionen, nicht
+  kanonische Tool-Namen und eine Längenobergrenze. `tool-hashes.json` fixiert
+  zusätzlich Name, Beschreibung und Input-Schema pro Tool.
+
+  Zuvor las der Scan nur Namen und Beschreibungen, während dieser Abschnitt
+  behauptete, er decke „die eigenen Beschreibungen" ab. Schema-Feldbeschreibungen
+  und der Instructions-Block erreichen das Modell identisch — eine dort platzierte
+  Injektion kam durch jede Prüfung (Audit `2026-07-27T162602-Z`, SEC-015). Beides
+  wird jetzt durchlaufen, und ein Test stellt sicher, dass der Sweep sie erreicht.
+
+  Jede Musterklasse hat einen eigenen Test mit Beispiel-Payload, damit ein
+  stillschweigend kaputtes Muster den Build bricht statt leise zu bestehen.
+
+  Das bleibt ein Selbst-Scan, keine serverübergreifende Erkennung.
 
 ## Anlässe zur Neubewertung
 

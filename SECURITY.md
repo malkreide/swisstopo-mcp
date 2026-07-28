@@ -87,10 +87,27 @@ fixed set of trusted public-data providers.
   responsibility — no single server can see across the set. What *is* covered
   here today: tool definitions are version-controlled and shipped from this
   repository, there is no dynamic or remote registration, and
-  `tests/test_tool_hygiene.py` scans this server's own descriptions for
-  invisible characters and override phrasing (German, French and English), while
-  `tool-hashes.json` pins name, description and input schema per tool so a
-  change cannot ship unreviewed.
+  `tests/test_tool_hygiene.py` scans **every string this server ships into a
+  model's context window** — tool names and descriptions, every `description`
+  inside an input or output schema, and the server-level `instructions` block.
+  It checks for invisible characters, override phrasing (German, French and
+  English), embedded role/system markers (`<SYSTEM>`, `[INST]`, `### Instructions:`,
+  `<|im_start|>`), confusable Cyrillic/Greek substitutions, non-canonical tool
+  names, and a length ceiling. `tool-hashes.json` additionally pins name,
+  description and input schema per tool, so a change cannot ship unreviewed.
+
+  The scan previously read tool names and descriptions only, while this section
+  claimed it covered "this server's own descriptions". Schema field descriptions
+  and the instructions block reach the model identically, so an injection placed
+  there passed every check — the surface was narrower than the claim (audit
+  `2026-07-27T162602-Z`, SEC-015). Both are now walked, and a test asserts the
+  sweep still reaches them.
+
+  Each pattern class has a test that feeds it a payload, so a matcher that
+  silently stops working fails the build rather than passing quietly. The
+  scanner is written with `\uXXXX` escapes: a pattern file containing the
+  characters it detects is invisible to review, a defect this repository has
+  shipped once.
 
   This is a self-scan, not cross-server detection. It cannot see what another
   server declares.

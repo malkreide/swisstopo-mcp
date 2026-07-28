@@ -7,6 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added (ARCH-006)
+- **The tool budget is now a gate, not an assertion.** The README declared a
+  ceiling of 25 and nothing enforced it — "nothing fails if tool 26 is
+  registered", as the audit put it. A test now fails above the ceiling, and two
+  more fail if either README stops stating the budget or the actual count. The
+  count had already drifted twice in prose (13 → 23 → 24), so the second pair
+  earns its place. Raising the ceiling stays allowed, as a deliberate edit in
+  both the test and the READMEs.
+
+### Changed (ARCH-006)
+- **The tool-budget section states a position instead of deferring one.** It
+  ended with "remains a merge candidate for a future major release", which the
+  audit read — correctly — as documenting the debt rather than discharging it.
+  Both READMEs now say the five api3 tools stay separate, and that the trigger
+  for revisiting is a *measurement* (evidence that models pick the wrong one),
+  not a tool count.
+
+  The two pairs the section previously swept in under the api3 argument are now
+  argued on their own terms: `search_layers` + `layer_info` differ in kind
+  rather than depth, and `geocode` + `reverse_geocode` — which genuinely are one
+  endpoint twice — stay separate because "address → coordinates" and
+  "coordinates → address" are different questions with different input types.
+
+  **Not done:** the api3 five are not merged, so the check's "no obvious 1:1 API
+  mappings" criterion remains unmet. That is a judgement, recorded with its
+  reasoning in the finding: merging behind a discriminated union moves the
+  decision from tool selection into schema navigation, where the caller has less
+  help. Whether to spend a major release on it is a maintainer's call.
+
+- Noted in both READMEs, which the audit did not raise:
+  `swisstopo_search_layers` and `swisstopo_list_available_layers` both say
+  "layers" and front different catalogues. Not merge candidates, but the names
+  are closer than the concepts — a rename belongs with the next breaking release.
+
 ### Changed (ARCH-007)
 - **`swisstopo_query_geodata` fans out over collections concurrently.** The loop
   was strictly sequential — the check's named anti-pattern for an aggregation

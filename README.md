@@ -346,8 +346,33 @@ tool choice into a variant choice — the same decision, relocated, plus a schem
 the caller must navigate. The audit notes the real risk here: a wrong pick
 returns empty rather than erroring. That is mitigated instead by the `note`
 hints added for ARCH-003, which name the likely mistake and the tool to use.
-This remains a merge candidate for a future major release, not a settled
-question.
+
+**This is a decision, not a deferral.** An earlier version of this section ended
+with "remains a merge candidate for a future major release", which the audit
+correctly read as documenting the debt rather than discharging it (ARCH-006).
+The position now: these five stay separate, and the trigger for revisiting is a
+*measurement* — evidence that models pick the wrong one — not a tool count.
+
+**The two pairs this section used to sweep in without arguing**, both named by
+the audit:
+
+- `search_layers` + `layer_info` are a discovery pair over the same catalogue,
+  which is the classic merge candidate. They stay separate because the
+  operations differ in kind, not just in depth: one searches 500+ layers by
+  keyword, the other returns one layer's queryable fields and legend. A caller
+  that has a layer ID and wants its fields is not doing a narrowed search.
+- `geocode` + `reverse_geocode` do hit the same SearchServer endpoint, so on the
+  API axis this is a 1:1 mapping twice over. They stay separate on the axis that
+  matters for tool selection: "address → coordinates" and "coordinates →
+  address" are different questions with different input types, and collapsing
+  them into one tool with a mode would make the model choose a variant instead
+  of a tool. Sharing an endpoint is an implementation detail of the upstream.
+
+**A naming ambiguity worth stating**, which the audit did not raise:
+`swisstopo_search_layers` and `swisstopo_list_available_layers` both say
+"layers" and front *different* catalogues — the api3 layer catalogue and the
+consolidated façade. They are not merge candidates, but the names are closer
+than the concepts. A rename belongs with the next breaking release.
 
 **Search → detail pairs.** `search_geodata` → `get_collection` is a genuine
 pair: STAC collection metadata is large and callers usually want one of many

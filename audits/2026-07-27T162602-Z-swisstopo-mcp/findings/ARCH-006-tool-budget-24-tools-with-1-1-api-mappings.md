@@ -74,3 +74,64 @@ candidate» documents the debt; it does not discharge it. One of the two
 named search→detail pairs was genuinely collapsed, and the argument quality
 is high, so partial rather than fail — but not the «Closed» the previous
 batch recorded.
+
+---
+
+### Remediation Status (2026-07-28, follow-up PR)
+
+**Partially closed. The gate is in; the tools are not merged, and that is a
+decision I am stating rather than a task I am deferring.**
+
+**Closed — the budget is now enforced.** The finding's last gap was concrete:
+*"The self-imposed budget of 25 is a README assertion with no CI gate — nothing
+fails if tool 26 is registered."* `tests/test_tool_namespace.py::TestToolBudget`
+now fails above 25, and two further tests fail if either README stops stating
+the budget or the actual count. The count had already drifted twice in prose
+(13 → 23 → 24), so the second pair is not redundant.
+
+Raising the ceiling stays allowed — as a deliberate edit in the test *and* both
+READMEs, which is exactly the conversation the check wants to force.
+
+**Closed — the deferral dressed as a justification.** The section ended with
+"remains a merge candidate for a future major release", which the finding read,
+correctly, as documenting the debt rather than discharging it. Both READMEs now
+state a position: the five stay separate, and the trigger for revisiting is a
+*measurement* — evidence that models pick the wrong one — not a tool count.
+
+**Closed — the two pairs the section swept in without arguing.** The finding was
+right that the api3-five argument was strong and silently extended to cases it
+did not cover. Both are now argued on their own terms:
+
+- `search_layers` + `layer_info` differ in kind, not depth: keyword search over
+  500+ layers versus one layer's queryable fields and legend. A caller holding a
+  layer ID is not performing a narrower search.
+- `geocode` + `reverse_geocode` genuinely are a 1:1 endpoint mapping twice over.
+  They stay separate on the axis that governs tool selection: "address →
+  coordinates" and "coordinates → address" are different questions with
+  different input types. A shared endpoint is an upstream implementation detail,
+  and collapsing them would replace a tool choice with a mode choice.
+
+**Not closed — criterion 2 ("keine offensichtlichen 1:1-API-Mappings").** The
+api3 five are still one tool per REST endpoint and I have not merged them.
+
+This is a judgement, so the reasoning should be visible rather than asserted.
+Merging them behind a discriminated union does not remove the decision; it moves
+it from tool selection into schema navigation, where the caller has less help —
+tool descriptions are what a model actually reads. The failure mode the check
+worries about (a wrong pick returning empty rather than erroring) is real, and
+it is addressed directly by the ARCH-003 `note` hints, which name the likely
+mistake and the tool to use. Merging would satisfy the checklist and, in my
+assessment, make the surface worse.
+
+The check has an escape clause for a documented justification. What it does not
+have — and what I cannot supply — is evidence either way about how models
+actually behave on this surface. So the position is documented, the trigger for
+revisiting is named, and the decision on whether to spend a major release on the
+merge belongs to the maintainer, not to me.
+
+**One thing the finding did not raise, added here.**
+`swisstopo_search_layers` and `swisstopo_list_available_layers` both say
+"layers" and front *different* catalogues — api3's, and the consolidated façade.
+They are not merge candidates, but the names are closer than the concepts, and
+that is a tool-selection risk of the same family as the one this check is about.
+Recorded in both READMEs as belonging to the next breaking release.

@@ -324,6 +324,8 @@ This server is in **Phase 2.5 — Consolidation of `swiss-geodata-mcp`**
 | Read tools | 24, all `readOnlyHint: true` / `destructiveHint: false` |
 | Write tools | none — Phase 3, not planned |
 | Transport | stdio (default) and Streamable-HTTP |
+| ISDS classification | [`docs/isds-dsg.md`](docs/isds-dsg.md) — low protection requirement |
+| DSG processing record | not maintained, with reasons — [`docs/isds-dsg.md` §5](docs/isds-dsg.md) |
 | Last audit | `audits/2026-07-27T162602-Z-swisstopo-mcp/` |
 
 A phase advance requires: the phase's roadmap items checked off, a re-run audit
@@ -455,9 +457,10 @@ validated user identity (audit finding SEC-009).
   JSON-RPC error objects. Verified against mcp 1.28.1 by runtime probe; an
   earlier version of this section claimed `-32602` and was wrong. Input
   validation happens at the Pydantic boundary (SEC-018).
-- **Caveat:** for *handled* execution errors the server sets only the payload
-  field `is_error`, never the protocol `isError` flag. A client that branches on
-  the protocol flag sees success. Tracked as OBS-001.
+- **Both flags agree.** A handled execution error sets the protocol
+  `isError` flag *and* the payload field `is_error`, so a client can branch on
+  either. The envelope — including `source` and `license` — survives on the
+  error path (OBS-001).
 
 ## MCP Primitives
 

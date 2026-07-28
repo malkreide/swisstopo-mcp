@@ -136,7 +136,7 @@ class TestQueryHandler:
         assert "erneut versuchen" in r.summary
 
     async def test_geocodes_place_name(self, monkeypatch):
-        async def fake_geo(path, params=None):
+        async def fake_geo(path, params=None, **_):
             return {"results": [{"attrs": {"lat": 47.36, "lon": 8.52}}]}
 
         async def fake_request(method, url, **kwargs):

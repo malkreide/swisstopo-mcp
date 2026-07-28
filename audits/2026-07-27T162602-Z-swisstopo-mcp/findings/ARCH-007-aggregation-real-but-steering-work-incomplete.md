@@ -84,3 +84,48 @@ layer is where the rule has to live, and there it is missing. Add the stale
 README workflow sections and the absent parallelisation, and this is
 partial: genuine, well-built progress on the aggregate itself, with the
 surrounding steering work claimed but not done.
+
+---
+
+### Remediation Status (2026-07-28, follow-up PR)
+
+**Closed.** The description and README gaps were fixed earlier in this batch;
+the parallelisation criterion is closed here.
+
+**Already fixed earlier:**
+
+- `swisstopo_get_egrid` no longer describes itself as a "Vorstufe", and both it
+  and `swisstopo_get_oereb_extract` now point at `swisstopo_oereb_at`. This was
+  the claim the re-audit falsified — I had asserted it, a targeted replacement
+  had silently failed, and the agent was right. Verified at runtime after
+  fixing, and the `2026-07-28` `tool-hashes.json` pins the descriptions.
+- Both READMEs' "Tool workflows" sections name `swisstopo_oereb_at` as the
+  cadastre path instead of documenting the superseded chain.
+
+**Closed here — criterion 2, parallelisation.** `geodata.py` looped over
+discovered geodienste collections one request at a time; `asyncio.gather`
+appeared nowhere in `src/`.
+
+The naive fix would have been a regression. The sequential loop had a real
+virtue the finding does not mention: it stopped as soon as it had `limit`
+records, often after a single request. A `gather` over every collection throws
+that away — and a single geodienste dataset can hold **24** collections
+(measured against `av_0`), so all-at-once means 24 requests against a cantonal
+service on every call, to save latency only when the early ones come back empty.
+
+So the fan-out runs in **waves** of 4, which keeps the early exit and still cuts
+the worst case by the wave size, with a cap of 12 collections per call. When the
+cap bites, the response says so — a cap nobody is told about reads as "this is
+everything", which is the same class of quiet-untruth this audit has been about.
+
+Six tests hold all three properties, because a fix satisfying only the first
+would be worse than the defect: requests actually overlap (peak concurrency > 1,
+verified to fail at concurrency 1), concurrency stays bounded, the early exit
+survives (filling `limit` in the first wave must not query the rest), results
+stay deterministic despite concurrency, the truncation note appears when the cap
+bites, and does not appear when it did not.
+
+**Deliberately unchanged:** `swisstopo_get_egrid` and `swisstopo_search_layers`
+still return pointers rather than self-contained results. Both are now shadowed
+by an aggregate and both describe themselves that way, which is the shape the
+check wants; removing them would be a breaking change belonging with ARCH-006.

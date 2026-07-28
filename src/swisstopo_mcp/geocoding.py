@@ -15,6 +15,12 @@ from swisstopo_mcp.api_client import (
 from swisstopo_mcp.logging_config import log_tool_call
 from swisstopo_mcp.models import ToolResponse
 
+# The `origins` values SearchServer accepts. Kept as a frozenset rather than a
+# Literal because the parameter is a comma-separated list (SEC-018).
+ORIGINS = frozenset(
+    {"address", "zipcode", "gg25", "district", "kantone", "gazetteer", "parcel"}
+)
+
 # ---------------------------------------------------------------------------
 # Input Models
 # ---------------------------------------------------------------------------
@@ -32,9 +38,10 @@ class GeocodeInput(BaseModel):
     )
     origins: str | None = Field(
         default=None,
+        max_length=128,
         pattern=r"^[a-z0-9,]+$",
         description=(
-            "Filter: 'address', 'zipcode', 'gg25', 'district', "
+            "Filter, kommagetrennt: 'address', 'zipcode', 'gg25', 'district', "
             "'kantone', 'gazetteer', 'parcel'"
         ),
     )
@@ -46,6 +53,27 @@ class GeocodeInput(BaseModel):
         # Wires up validate_sr(), which existed but was never called — an
         # arbitrary int used to be forwarded straight upstream (SEC-018).
         return validate_sr(v)
+
+    @field_validator("origins")
+    @classmethod
+    def _validate_origins(cls, v: str | None) -> str | None:
+        """Check each member against the documented set.
+
+        The field is a comma-separated list, so a `Literal` cannot express it.
+        The pattern only said "lowercase letters, digits and commas", which
+        accepted anything of that shape — the description promised an enum the
+        validation did not enforce (SEC-018).
+        """
+        if v is None:
+            return v
+        members = [m for m in v.split(",") if m]
+        unknown = sorted({m for m in members if m not in ORIGINS})
+        if unknown:
+            raise ValueError(
+                f"Unbekannte origins: {', '.join(unknown)}. "
+                f"Erlaubt: {', '.join(sorted(ORIGINS))}."
+            )
+        return v
 
     limit: int = Field(default=10, ge=1, le=50, description="Maximale Trefferanzahl")
 
@@ -101,6 +129,24 @@ def format_geocode_results(results: list[dict[str, Any]]) -> str:
     return "\n".join(lines)
 
 
+def _relax_query(search_text: str) -> str | None:
+    """A broader form of a failed query, or None if there is nothing to relax.
+
+    Two failures dominate in practice, and both are recoverable by dropping
+    tokens from the right: a house number that does not exist in the register
+    ("Musterstrasse 999"), and a street spelled differently from the official
+    entry, where the municipality alone still resolves.
+
+    Returns None when the query is a single token — re-running the same search
+    would waste an upstream call and the retry note would be a lie.
+    """
+    tokens = [t for t in search_text.replace(",", " ").split() if t]
+    if len(tokens) < 2:
+        return None
+    candidate = " ".join(tokens[:-1]).strip()
+    return candidate or None
+
+
 # ---------------------------------------------------------------------------
 # Async Handler Functions
 # ---------------------------------------------------------------------------
@@ -125,10 +171,44 @@ async def geocode(params: GeocodeInput) -> ToolResponse:
             query_params,
         )
         results = data.get("results", [])
+        if results:
+            return ToolResponse.ok(
+                format_geocode_results(results), results, match_type="exact"
+            )
+
+        # Nothing matched: relax the query and try again before reporting a
+        # bare negative (ARCH-003). This is what makes `match_type: "fuzzy"` a
+        # real value rather than a member of the Literal no code produces.
+        relaxed = _relax_query(params.search_text)
+        if relaxed is not None:
+            data = await geo_admin_request(
+                "/rest/services/ech/SearchServer",
+                {**query_params, "searchText": relaxed},
+            )
+            results = data.get("results", [])
+            if results:
+                return ToolResponse.ok(
+                    format_geocode_results(results),
+                    results,
+                    match_type="fuzzy",
+                    note=(
+                        f"Keine exakten Treffer für '{params.search_text}'. "
+                        f"Gezeigt werden Treffer für die gelockerte Suche "
+                        f"'{relaxed}' — bitte vor der Weiterverwendung prüfen."
+                    ),
+                )
+
         return ToolResponse.ok(
             format_geocode_results(results),
             results,
-            match_type="exact" if results else "none",
+            match_type="none",
+            note=(
+                f"Keine Treffer für '{params.search_text}', auch nicht gelockert. "
+                "Ort ohne Strasse suchen, Schreibweise prüfen (Umlaute, "
+                "Abkürzungen wie 'str.' ausschreiben), oder mit "
+                "swisstopo_search_address bzw. swisstopo_lookup_postal_code die "
+                "amtliche Schreibweise ermitteln."
+            ),
         )
     except Exception as e:
         return ToolResponse.error(handle_api_error(e, "Geocoding"))
@@ -159,6 +239,13 @@ async def reverse_geocode(params: ReverseGeocodeInput) -> ToolResponse:
             format_geocode_results(results),
             results,
             match_type="exact" if results else "none",
+            note=(
+                None
+                if results
+                else "Keine Adresse im 500-m-Umkreis — der Punkt liegt womöglich "
+                "ausserhalb besiedelten Gebiets. swisstopo_municipality_at nennt "
+                "die zuständige Gemeinde auch dort, wo es keine Adresse gibt."
+            ),
         )
     except Exception as e:
         return ToolResponse.error(handle_api_error(e, "Reverse Geocoding"))

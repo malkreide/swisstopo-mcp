@@ -19,6 +19,7 @@ import json
 import re
 from typing import Literal
 
+from mcp.server.fastmcp import Context
 from pydantic import BaseModel, ConfigDict, Field
 
 from swisstopo_mcp.api_client import (
@@ -107,16 +108,28 @@ def _looks_like_point(area: str) -> bool:
         return False
 
 
-async def _resolve_area(area: str) -> tuple[float, float]:
+async def _say(ctx: Context | None, message: str) -> None:
+    """Best-effort status line — reporting must never fail a request."""
+    if ctx is None:
+        return
+    try:
+        await ctx.info(message)
+    except Exception:  # noqa: BLE001 - progress reporting is best-effort
+        pass
+
+
+async def _resolve_area(area: str, ctx: Context | None = None) -> tuple[float, float]:
     """Return (lat, lon) for a 'lat,lon' string or a geocoded place name."""
     if _looks_like_point(area):
         lat, lon = (float(p) for p in area.split(","))
         if not (45.8 <= lat <= 47.9 and 5.9 <= lon <= 10.5):
             raise ValueError(f"Punkt ausserhalb der Schweiz: {lat},{lon}.")
         return lat, lon
+    await _say(ctx, f"Geocodiere «{area}» …")
     data = await geo_admin_request(
         "/rest/services/api/SearchServer",
         {"type": "locations", "searchText": area, "limit": 1, "sr": 4326},
+        ctx=ctx,
     )
     results = data.get("results", [])
     if not results:
@@ -201,13 +214,20 @@ def _classify_remark(remark: str) -> str:
 
 
 @log_tool_call("swisstopo_query_osm_features")
-async def query_osm_features(params: QueryOsmFeaturesInput) -> ToolResponse:
+async def query_osm_features(
+    params: QueryOsmFeaturesInput, ctx: Context | None = None
+) -> ToolResponse:
     """Query OpenStreetMap POIs around a point via Overpass (ODbL)."""
     try:
         tag = FEATURE_TAGS[params.feature_type]
-        lat, lon = await _resolve_area(params.area)
+        lat, lon = await _resolve_area(params.area, ctx)
         query = _build_query(tag, lat, lon, params.radius_m, params.limit)
 
+        # The slowest tool in the surface: a 25 s server timeout behind a 30 s
+        # client timeout, plus up to 14 s of retry backoff. Announcing the wait
+        # before it starts is the difference between "slow" and "hung" from the
+        # client's side (audit SDK-003).
+        await _say(ctx, f"Overpass-Abfrage läuft (bis zu {OVERPASS_SERVER_TIMEOUT} s) …")
         try:
             response = await request_with_retry(
                 "POST",
@@ -215,6 +235,7 @@ async def query_osm_features(params: QueryOsmFeaturesInput) -> ToolResponse:
                 content=f"data={query}",
                 headers={"Content-Type": "application/x-www-form-urlencoded"},
                 timeout=OVERPASS_CLIENT_TIMEOUT,
+                ctx=ctx,
             )
         except Exception as exc:  # noqa: BLE001 — degrade gracefully
             return ToolResponse.error(
@@ -265,6 +286,13 @@ async def query_osm_features(params: QueryOsmFeaturesInput) -> ToolResponse:
         summary = _format(params, lat, lon, records, remark)
         return ToolResponse.ok(
             summary, records, match_type="exact" if records else "none",
+            note=(
+                None if records else
+                f"Keine '{params.feature_type}' im Umkreis von "
+                f"{params.radius_m} m. radius_m erhöhen (max. 5000), oder eine "
+                "andere feature_type-Kategorie wählen. OSM-Daten sind "
+                "community-gepflegt und je nach Region unvollständig."
+            ),
             source=OSM_SOURCE, license=OSM_LICENSE,
         )
     except Exception as e:  # noqa: BLE001

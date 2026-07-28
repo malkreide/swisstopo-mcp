@@ -42,17 +42,31 @@ Dieser Server befindet sich in **Phase 2.5** (siehe
 [docs/roadmap.md](docs/roadmap.md) — die alleinige Autorität für den
 Phasenstand). Er bleibt ein Read-only-Wrapper: alle 24 Tools sind
 `readOnlyHint: true` / `destructiveHint: false`; es gibt keine schreibenden oder
-versendenden Funktionen. Zu beachten: die CI erzwingt die *Annotation*, nicht die
-Eigenschaft — siehe SEC-014 im aktuellen Audit-Lauf.
+versendenden Funktionen. Die CI erzwingt beide Hälften: `tests/test_tool_hygiene.py`
+schlägt fehl, wenn ein Tool `readOnlyHint` verliert, **und** findet statisch jeden
+ausgehenden HTTP-Aufruf in `src/` und schlägt bei jeder mutierenden Methode fehl.
+Die Annotation ist, was ein Tool behauptet; die Methodenprüfung ist, was es tut.
 
 ## Sessions & Authentifizierung
 
 Der Server ist bewusst nicht authentifiziert — er liefert ausschliesslich
-öffentliche Open Data. Über HTTP werden Session-IDs vollständig vom FastMCP-
-Framework verwaltet; es gibt keinen benutzerspezifischen Zustand, also nichts,
-woran eine Session gebunden werden müsste. Würde später eine authentifizierte
-Variante eingeführt, müssen Session-IDs an die validierte Benutzeridentität
-gebunden werden (Audit-Finding SEC-009).
+öffentliche Open Data. Über HTTP erzeugt das SDK die Session-IDs (`uuid4().hex`,
+128 Bit aus `os.urandom`); es gibt keinen benutzerspezifischen Zustand, also
+nichts, woran eine Session gebunden werden müsste. Würde später eine
+authentifizierte Variante eingeführt, müssen Session-IDs an die validierte
+Benutzeridentität gebunden werden (Audit-Finding SEC-009).
+
+Zwei Kontrollen, die kein Auth-Modell voraussetzen, sind aktiv:
+
+- **Idle-Timeout.** `SWISSTOPO_SESSION_IDLE_TIMEOUT` (Standard 1800 s) beendet
+  Sessions ohne Anfragen. Der SDK-Standard ist *kein* Timeout — ein Client, der
+  sich ohne Session-Abbau trennt, hinterlässt eine Session für die gesamte
+  Prozesslaufzeit. Aktivität verschiebt die Frist; `0` stellt das unbegrenzte
+  Verhalten wieder her.
+- **Serverseitige Invalidierung.** `DELETE /mcp` mit der Session-ID beendet sie
+  sofort — verifiziert: die nächste Anfrage erhält `404`. Das ist der Mechanismus
+  des Protokolls selbst, eine eigene Logout-Route existiert daher nicht und
+  wird nicht gebraucht.
 
 ## Kontrollen auf Portfolio-Ebene
 
@@ -65,11 +79,42 @@ erreicht.
 - **Tool-Allow-Listing** gehört zum MCP-Host/-Gateway, das mehrere Server
   aggregiert, nicht zu einem einzelnen Server mit fixem, read-only Tool-Set.
   Solange kein zentrales Gateway existiert, ist das Risiko durch die
-  Egress-Allow-List und die read-only Tool-Oberfläche begrenzt.
+  Egress-Allow-List und die read-only Tool-Oberfläche begrenzt — beides in der
+  CI erzwungen, nicht bloss behauptet. Read-only wird auf zwei Ebenen geprüft,
+  weil die Annotation selbstbehauptet ist und ein schreibendes Tool darin
+  schlicht lügen könnte: ein Test schlägt fehl, wenn ein Tool `readOnlyHint`
+  verliert, ein zweiter parst `src/` und schlägt bei `PUT`, `PATCH` oder
+  `DELETE` fehl. Der einzige Nicht-GET-Aufruf ist Overpass, das seine *Abfrage*
+  im Request-Body überträgt; er ist im Test mit dieser Begründung benannt, und
+  der Test schlägt auch fehl, wenn diese Ausnahme wegfällt — eine veraltete
+  Ausnahme ist eine Erlaubnis, die niemand erteilt hat (Audit
+  `2026-07-27T162602-Z`, SEC-014).
 - **Server-übergreifende Tool-Poisoning-Erkennung** ist eine Host-/Gateway-
-  Verantwortung. Die Tool-Definitionen dieses Servers sind versionskontrolliert
-  und werden aus diesem Repository ausgeliefert; es gibt keine dynamische oder
-  entfernte Tool-Registrierung.
+  Verantwortung — kein einzelner Server sieht über die Menge hinweg. Die
+  Tool-Definitionen dieses Servers sind versionskontrolliert und werden aus
+  diesem Repository ausgeliefert; es gibt keine dynamische oder entfernte
+  Tool-Registrierung.
+
+  Zusätzlich prüft `tests/test_tool_hygiene.py` **jede Zeichenkette, die dieser
+  Server ins Kontextfenster eines Modells liefert** — Tool-Namen und
+  -Beschreibungen, jede `description` in einem Input- oder Output-Schema sowie
+  den serverweiten `instructions`-Block. Geprüft wird auf unsichtbare Zeichen,
+  Override-Formulierungen (deutsch, französisch, englisch), eingebettete
+  Rollen-/System-Marker (`<SYSTEM>`, `[INST]`, `### Instructions:`,
+  `<|im_start|>`), verwechselbare kyrillische/griechische Substitutionen, nicht
+  kanonische Tool-Namen und eine Längenobergrenze. `tool-hashes.json` fixiert
+  zusätzlich Name, Beschreibung und Input-Schema pro Tool.
+
+  Zuvor las der Scan nur Namen und Beschreibungen, während dieser Abschnitt
+  behauptete, er decke „die eigenen Beschreibungen" ab. Schema-Feldbeschreibungen
+  und der Instructions-Block erreichen das Modell identisch — eine dort platzierte
+  Injektion kam durch jede Prüfung (Audit `2026-07-27T162602-Z`, SEC-015). Beides
+  wird jetzt durchlaufen, und ein Test stellt sicher, dass der Sweep sie erreicht.
+
+  Jede Musterklasse hat einen eigenen Test mit Beispiel-Payload, damit ein
+  stillschweigend kaputtes Muster den Build bricht statt leise zu bestehen.
+
+  Das bleibt ein Selbst-Scan, keine serverübergreifende Erkennung.
 
 ## Anlässe zur Neubewertung
 

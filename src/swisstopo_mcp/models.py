@@ -10,7 +10,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 Provenance = Literal["live_api", "cached"]
 MatchType = Literal["exact", "fuzzy", "none"]
@@ -90,6 +90,23 @@ def license_for(source: str) -> str:
     return LICENSE_BY_SOURCE.get(source, SWISSTOPO_LICENSE)
 
 
+# --- Empty results always carry a next step (audit ARCH-003) ---
+#
+# A bare negative is where an LLM either gives up or invents. The `note` field
+# existed but was populated at 5 of ~25 sites that can report `match_type:
+# "none"`, and nothing enforced it — so the coverage that existed could regress
+# silently, and did not grow.
+#
+# This is the floor, not the goal: the validator guarantees *a* next step, and
+# `tests/test_empty_results.py` asserts the tools that legitimately return
+# nothing often carry a *specific* one instead. A handler that falls back to
+# this text is logged, so the gap is visible rather than merely covered.
+FALLBACK_NOTE = (
+    "Keine Treffer. Suchbegriff weiter fassen oder Schreibweise prüfen; "
+    "swisstopo_list_available_layers zeigt die verfügbaren Datensätze."
+)
+
+
 def _now_iso() -> str:
     return datetime.now(UTC).isoformat()
 
@@ -119,6 +136,19 @@ class ToolResponse(BaseModel):
         ),
     )
     is_error: bool = Field(default=False, description="True if this represents a handled error.")
+
+    @model_validator(mode="after")
+    def _empty_results_carry_a_next_step(self) -> ToolResponse:
+        """`match_type == "none"` implies a non-empty `note` (ARCH-003).
+
+        Filling a fallback rather than raising is deliberate: an unhandled
+        empty path is a missing hint, and turning that into an exception would
+        replace a mildly unhelpful answer with a masked internal error — a
+        worse outcome for the caller than the defect being fixed.
+        """
+        if self.match_type == "none" and not self.note:
+            self.note = FALLBACK_NOTE
+        return self
 
     @classmethod
     def ok(

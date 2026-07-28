@@ -74,3 +74,53 @@ Partial: the check's actual criteria (default-deny allow-list, role scoping,
 denied-call auditing) are entirely absent. Not fail, because the deferral is
 architecturally correct for a single unauthenticated read-only server and
 the risk-bounding argument is backed by real gates.
+
+---
+
+### Remediation Status (2026-07-28, follow-up PR)
+
+**The deferral stands; the gap under it is closed.**
+
+The check's own criteria — a default-deny allow-list per team/role, server-side
+group scoping, audit events for denied calls — remain absent and remain
+impossible: this server has no auth model, so there is no principal to scope
+against. That part of the finding is not something a single unauthenticated
+server can satisfy, and `SECURITY.md` continues to say so.
+
+What *was* actionable is the sentence the finding closes on: *"the read-only
+gate checks what a tool **declares**, not what it **does**, so it is one
+indirection away from the premise it is standing in for … verified by me, not by
+the test."* That is now verified by the test.
+
+`TestReadOnlyIsAPropertyNotOnlyAnAnnotation` parses every module in `src/`,
+finds each outbound HTTP call — `request_with_retry("METHOD", …)`,
+`client.get/post/...`, `client.request("METHOD", …)` — and asserts:
+
+- no `PUT`, `PATCH` or `DELETE` anywhere;
+- every non-GET is a **named** exception carrying its reason. The only entry is
+  Overpass, which expresses a read as `POST` because the query travels in the
+  request body;
+- no method is assembled at runtime, since a computed verb would slip past a
+  static check;
+- **listed exceptions still occur** — an allow-list that outlives its entries
+  drifts into permission;
+- the sweep found at least 10 call sites, so it cannot pass vacuously.
+
+Verified in both directions against deliberate defects: a
+`request_with_retry("DELETE", …)` added to `stac.py` failed two assertions by
+file and line, and flipping the Overpass `POST` to `GET` failed the
+stale-exception test.
+
+The annotation test is retained. The two together are the point: the annotation
+is what a tool *says*, the method sweep is what it *does*, and SEC-014's
+risk-bounding argument needs the second one to be true.
+
+**On audit logging for denied calls**, which the finding lists as absent because
+"nothing is ever denied": egress refusals *are* denials, and since the OBS-002
+work they are logged under `egress_blocked` with the host and reason while the
+caller gets a fixed message. That is not the role-scoped denial logging the
+check envisages, but it is no longer true that nothing is recorded.
+
+Both security policies were rewritten — they previously stated the gap
+explicitly ("CI enforces the *annotation*, not the property"), which was honest
+and is now simply out of date.

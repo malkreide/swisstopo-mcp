@@ -19,6 +19,10 @@ authoritative, which meant neither was (audit `2026-07-27T162602-Z`, OPS-003).
 - [x] Error masking for unexpected exceptions (OBS-002)
 - [x] CORS with `expose_headers: Mcp-Session-Id` for HTTP transport (SDK-004)
 - [x] Audit run against mcp-audit-skill (`audits/`)
+- [x] ISDS classification and DSG assessment — [`isds-dsg.md`](isds-dsg.md).
+      The check lists both as Phase-1 exit criteria (OPS-003). No processing
+      record is maintained; §5 gives the reasons and §6 the triggers that would
+      overturn them.
 
 ## Phase 2 — Semantic / richer responses (✅ largely done)
 
@@ -27,7 +31,10 @@ authoritative, which meant neither was (audit `2026-07-27T162602-Z`, OPS-003).
 - [x] Structured logging via structlog on stderr (OBS-003)
 - [x] `match_type` on search-style tools; empty results are reported as
       `match_type: "none"` rather than as errors (ARCH-003)
-- [ ] Suggestion mechanism for empty results — still open (ARCH-003)
+- [x] Suggestion mechanism for empty results (ARCH-003): every
+      `match_type: "none"` path names a concrete next step, enforced by the
+      envelope and by an AST sweep over the call sites; `swisstopo_geocode`
+      relaxes a failed query and reports the retry as `match_type: "fuzzy"`
 - [ ] Resources for static catalogs (e.g. notable map layers) (ARCH-008)
 - [x] OpenTelemetry tracing, opt-in via `OTEL_EXPORTER_OTLP_ENDPOINT`, with
       httpx auto-instrumentation so upstream calls nest under the tool span

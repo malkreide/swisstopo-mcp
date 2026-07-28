@@ -66,3 +66,61 @@ the moment someone scales out do not hold up under scrutiny: the HAProxy config
 never learns the session-to-backend mapping (it only reads the header, never
 stores it from the response), and cookie affinity does not apply to non-browser
 MCP clients. TTLs are set on both, which satisfies one criterion. Partial.
+
+---
+
+### Remediation Status (2026-07-28, follow-up PR)
+
+**Closed.** All three gaps, plus a defect I introduced fixing SCALE-003 and
+caught before it shipped.
+
+**1. Both offered patterns were defective.** The HAProxy config is fixed under
+SCALE-003 — it now learns the session id from the `initialize` response instead
+of trying to store it from a request that does not carry one, and it addresses a
+headless Service this repository actually creates. The NGINX cookie manifest is
+no longer presented as an equal option: it is scoped explicitly to browser
+clients, with the reason stated (MCP hosts do not persist cookies), and the
+"Option A (preferred)" snippet that duplicated the broken HAProxy config was
+removed rather than corrected.
+
+**2. The `sessionAffinity: ClientIP` fallback** is now on the base Service, with
+a 1h timeout — and with its failure mode named where someone would read it. It
+is inert at one replica; if replicas are raised anyway it keeps sessions working
+for clients reaching the Service directly from inside the cluster, and does
+nothing useful behind an ingress, where kube-proxy sees the ingress pod as the
+source and every client collapses to one backend. A fallback presented without
+that caveat gets mistaken for the solution.
+
+**3. A test covering session affinity, which is Modus 3 of the check.** No unit
+test can exercise HAProxy, but it can pin the property that *creates* the
+requirement. Two independent `StreamableHTTPSessionManager` instances over the
+same server — which is what two replicas are — driven through in-process ASGI
+transports:
+
+| | result |
+|---|---|
+| session id used on the replica that minted it | `200` |
+| same id used on the other replica | `404` |
+| sessions tracked by the non-minting replica | `0` |
+
+If that ever changes — a shared session store, an SDK change — the
+single-replica default and the whole HAProxy arrangement become obsolete, and
+this test failing is how anyone finds out. A second test fails if
+`deploy/kubernetes.yaml` ever raises `replicas` above 1, since that is the path
+the finding says a reader would take and get intermittently broken sessions.
+
+**4. A defect in my own SCALE-003 fix.** The HAProxy Deployment I shipped there
+had `replicas: 2` — and each HAProxy process holds its own stick-table, so two
+instances behind a round-robin Service learn different halves of the session
+map. A client whose `initialize` lands on one and whose next request lands on
+the other misses the table entirely: the exact defect this finding is about, one
+layer up. It is now `replicas: 1`, with the `peers` requirement for scaling
+named in the manifest and in the docs, and two tests hold both facts. I did not
+ship a `peers` config: it would be a second untested config, which is what the
+audit found wrong the first time.
+
+**Not implemented, unchanged:** the shared session store (option C). It is the
+only thing that would make sessions survive pod loss — affinity routes sessions,
+it does not replicate them — and `docs/deployment.md` now says so under
+"Failover is a deliberate non-goal" rather than leaving a reader to assume
+sticky sessions buy availability.

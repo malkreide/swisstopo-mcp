@@ -40,6 +40,18 @@ SUPPORTED_SRS = {4326, 2056, 21781, 3857}
 # query params, so the goal is to reject control characters and obviously
 # malicious payloads while still accepting real Swiss addresses, layer IDs and
 # search terms (incl. umlauts/accents).
+#
+# TEXT_PATTERN deliberately admits `;` `&` `/` `%` — they occur in real Swiss
+# addresses and place names ("Rue de l'Hôpital 3/5", "Bäckerei & Co."). That is
+# a broader charset than a whitelist ideal implies, and it is safe *here* for
+# reasons that must stay true: no value reaches a shell or a SQL statement, and
+# everything goes through httpx's own parameter encoding rather than string
+# concatenation. If a tool ever builds a command or a query by interpolation,
+# this pattern stops being sufficient (SEC-018).
+#
+# Length is bounded separately, per field, via `max_length` — a pattern
+# constrains the charset, not the size. `tests/test_input_validation.py` fails
+# if a string field ships without a bound.
 TEXT_PATTERN = r"^[\w\sÀ-ÿ.,;:'’\-/()&+%°]+$"  # addresses, place names, search terms
 ID_PATTERN = r"^[\w.,\s\-]+$"  # layer / feature / collection identifiers
 COORDS_PATTERN = r"^[\d.,;\s\-]+$"  # 'lat1,lon1;lat2,lon2;...'
@@ -282,6 +294,21 @@ async def _sleep(seconds: float) -> None:
     await asyncio.sleep(seconds)
 
 
+async def _notify_retry(ctx: Any, host: str, attempt: int, delay: float) -> None:
+    """Tell the client a retry is coming. Never let reporting break the request.
+
+    A context whose session has already gone away raises on `warning()`; that
+    must not turn a recoverable upstream blip into a failed tool call.
+    """
+    try:
+        await ctx.warning(
+            f"{host} antwortet nicht — Versuch {attempt} von "
+            f"{len(RETRY_BACKOFFS)} in {delay:.0f} s."
+        )
+    except Exception:  # noqa: BLE001 - progress reporting is best-effort
+        _log.debug("retry_notify_failed", host=host, attempt=attempt)
+
+
 async def request_with_retry(
     method: str,
     url: str,
@@ -291,12 +318,21 @@ async def request_with_retry(
     headers: dict[str, str] | None = None,
     timeout: float | None = None,
     check_host: bool = True,
+    ctx: Any | None = None,
 ) -> httpx.Response:
     """Perform an HTTP request with exponential-backoff retry.
 
     Retries on 429/5xx and network/timeout errors (2s, 4s, 8s). 4xx other than
     429 raise immediately. The host is checked against the egress allow-list
     before the first attempt.
+
+    `ctx` is an optional MCP `Context`. A full retry chain adds 2+4+8 seconds of
+    otherwise *silent* waiting, which from the client's side is indistinguishable
+    from a hang — and the usual response to a hang is to cancel and retry,
+    multiplying load on an upstream that is already struggling. When a context is
+    supplied, each retry emits a warning naming the host and the wait, so the
+    single longest source of unexplained latency in this server is visible
+    (audit SDK-003).
     """
     if check_host:
         assert_host_allowed(url)
@@ -304,7 +340,10 @@ async def request_with_retry(
     last_exc: Exception | None = None
     for attempt in range(len(RETRY_BACKOFFS) + 1):
         if attempt:
-            await _sleep(RETRY_BACKOFFS[attempt - 1])
+            delay = RETRY_BACKOFFS[attempt - 1]
+            if ctx is not None:
+                await _notify_retry(ctx, host, attempt, delay)
+            await _sleep(delay)
             _log.debug("upstream_retry", host=host, attempt=attempt)
         try:
             async with await _get_client() as client:
@@ -326,16 +365,20 @@ async def request_with_retry(
     raise last_exc
 
 
-async def geo_admin_request(path: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
+async def geo_admin_request(
+    path: str, params: dict[str, Any] | None = None, ctx: Any | None = None
+) -> dict[str, Any]:
     """GET request on api3.geo.admin.ch, returns parsed JSON."""
     url = f"{GEO_ADMIN_BASE}{path}"
     _log.debug("upstream_request", host="api3.geo.admin.ch", path=path)
-    response = await request_with_retry("GET", url, params=params or {})
+    response = await request_with_retry("GET", url, params=params or {}, ctx=ctx)
     payload: dict[str, Any] = response.json()
     return payload
 
 
-async def geo_admin_request_text(path: str, params: dict[str, Any] | None = None) -> str:
+async def geo_admin_request_text(
+    path: str, params: dict[str, Any] | None = None, ctx: Any | None = None
+) -> str:
     """GET request on api3.geo.admin.ch returning the raw body as text.
 
     The legend endpoints serve HTML rather than JSON, so they cannot go through
@@ -343,7 +386,7 @@ async def geo_admin_request_text(path: str, params: dict[str, Any] | None = None
     """
     url = f"{GEO_ADMIN_BASE}{path}"
     _log.debug("upstream_request", host="api3.geo.admin.ch", path=path)
-    response = await request_with_retry("GET", url, params=params or {})
+    response = await request_with_retry("GET", url, params=params or {}, ctx=ctx)
     return response.text
 
 
@@ -363,17 +406,19 @@ async def reframe_request(path: str, params: dict[str, Any] | None = None) -> di
     return payload
 
 
-async def stac_request(path: str, params: dict[str, Any] | None = None) -> Any:
+async def stac_request(
+    path: str, params: dict[str, Any] | None = None, ctx: Any | None = None
+) -> Any:
     """GET request on data.geo.admin.ch STAC API, returns parsed JSON."""
     url = f"{STAC_BASE}{path}"
     _log.debug("upstream_request", host="data.geo.admin.ch", path=path)
-    response = await request_with_retry("GET", url, params=params or {})
+    response = await request_with_retry("GET", url, params=params or {}, ctx=ctx)
     payload: dict[str, Any] = response.json()
     return payload
 
 
 async def openplz_request(
-    path: str, params: dict[str, Any] | None = None
+    path: str, params: dict[str, Any] | None = None, ctx: Any | None = None
 ) -> httpx.Response:
     """GET request on the OpenPLZ API (openplzapi.org/ch).
 
@@ -384,7 +429,7 @@ async def openplz_request(
     """
     url = f"{OPENPLZ_BASE}{path}"
     _log.debug("upstream_request", host="openplzapi.org", path=path)
-    return await request_with_retry("GET", url, params=params or {})
+    return await request_with_retry("GET", url, params=params or {}, ctx=ctx)
 
 
 # --- Error Handling ---

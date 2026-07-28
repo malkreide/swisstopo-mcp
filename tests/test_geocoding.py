@@ -202,7 +202,7 @@ class TestFormatGeocodeResults:
 
 class TestGeocodeHandler:
     async def test_geocode_mocked(self, monkeypatch):
-        async def mock_request(path, params=None):
+        async def mock_request(path, params=None, **_):
             return {
                 "results": [
                     {
@@ -225,7 +225,7 @@ class TestGeocodeHandler:
     async def test_geocode_with_origins(self, monkeypatch):
         captured = {}
 
-        async def mock_request(path, params=None):
+        async def mock_request(path, params=None, **_):
             captured["params"] = params
             return {"results": []}
 
@@ -236,7 +236,7 @@ class TestGeocodeHandler:
     async def test_geocode_no_origins_when_none(self, monkeypatch):
         captured = {}
 
-        async def mock_request(path, params=None):
+        async def mock_request(path, params=None, **_):
             captured["params"] = params
             return {"results": []}
 
@@ -246,7 +246,7 @@ class TestGeocodeHandler:
         assert "origins" not in captured["params"]
 
     async def test_geocode_empty_results(self, monkeypatch):
-        async def mock_request(path, params=None):
+        async def mock_request(path, params=None, **_):
             return {"results": []}
 
         monkeypatch.setattr("swisstopo_mcp.geocoding.geo_admin_request", mock_request)
@@ -256,7 +256,7 @@ class TestGeocodeHandler:
     async def test_geocode_api_error(self, monkeypatch):
         import httpx
 
-        async def mock_request(path, params=None):
+        async def mock_request(path, params=None, **_):
             resp = httpx.Response(500, request=httpx.Request("GET", "http://test"))
             raise httpx.HTTPStatusError("Server error", request=resp.request, response=resp)
 
@@ -267,7 +267,7 @@ class TestGeocodeHandler:
     async def test_geocode_passes_correct_params(self, monkeypatch):
         captured = {}
 
-        async def mock_request(path, params=None):
+        async def mock_request(path, params=None, **_):
             captured["path"] = path
             captured["params"] = params
             return {"results": []}
@@ -283,7 +283,7 @@ class TestGeocodeHandler:
 
 class TestReverseGeocodeHandler:
     async def test_reverse_geocode_mocked(self, monkeypatch):
-        async def mock_request(path, params=None):
+        async def mock_request(path, params=None, **_):
             return {
                 "results": [
                     {
@@ -303,7 +303,7 @@ class TestReverseGeocodeHandler:
         assert "Zürich" in result.summary or "Zurich" in result.summary or "8001" in result.summary
 
     async def test_reverse_geocode_empty_results(self, monkeypatch):
-        async def mock_request(path, params=None):
+        async def mock_request(path, params=None, **_):
             return {"results": []}
 
         monkeypatch.setattr("swisstopo_mcp.geocoding.geo_admin_request", mock_request)
@@ -313,7 +313,7 @@ class TestReverseGeocodeHandler:
     async def test_reverse_geocode_bbox_params(self, monkeypatch):
         captured = {}
 
-        async def mock_request(path, params=None):
+        async def mock_request(path, params=None, **_):
             captured["params"] = params
             return {"results": []}
 
@@ -332,7 +332,7 @@ class TestReverseGeocodeHandler:
     async def test_reverse_geocode_api_error(self, monkeypatch):
         import httpx
 
-        async def mock_request(path, params=None):
+        async def mock_request(path, params=None, **_):
             resp = httpx.Response(404, request=httpx.Request("GET", "http://test"))
             raise httpx.HTTPStatusError("Not found", request=resp.request, response=resp)
 

@@ -17,6 +17,7 @@ probe that motivated this design.
 """
 from __future__ import annotations
 
+import asyncio
 import math
 import re
 import time
@@ -56,6 +57,13 @@ GEODIENSTE_PREFIX = "geodienste:"
 # Catalogue is a 3.4 MB JSON dump; cache it in-memory (Architecture B).
 CATALOG_TTL_SECONDS = 6 * 3600
 _MAX_LIMIT = 50
+
+# Collection fan-out (ARCH-007). Waves rather than one-at-a-time or all-at-once:
+# see the comment at the loop. The cap bounds a single tool call against a
+# cantonal service; when it bites, the response says so rather than presenting a
+# partial scan as complete.
+_COLLECTION_CONCURRENCY = 4
+_MAX_COLLECTIONS_SCANNED = 12
 
 # Static (non-geodienste) façade layers.
 # Per-record licences for the layer catalogue. The records use a short source
@@ -287,6 +295,12 @@ async def _query_streets(params: QueryGeodataInput) -> ToolResponse:
         )
         return ToolResponse.ok(
             summary, name_hits, match_type="exact" if name_hits else "none",
+            note=(
+                None if name_hits else
+                f"Keine Strasse in '{params.commune}' gefunden. Gemeindename mit "
+                "swisstopo_find_commune in amtlicher Schreibweise ermitteln, oder "
+                "den Strassennamen weglassen, um alle Strassen der Gemeinde zu sehen."
+            ),
             source=SWISSTOPO_SOURCE, license=SWISSTOPO_LICENSE,
         )
 
@@ -340,6 +354,11 @@ async def _query_streets(params: QueryGeodataInput) -> ToolResponse:
     )
     return ToolResponse.ok(
         summary, records, match_type="exact" if records else "none",
+        note=(
+            None if records else
+            "Keine Strasse im Umkreis. radius_m erhöhen, oder mit "
+            "swisstopo_municipality_at prüfen, ob der Punkt in der Schweiz liegt."
+        ),
         source=SWISSTOPO_SOURCE, license=SWISSTOPO_LICENSE,
     )
 
@@ -389,7 +408,14 @@ async def _query_oereb_availability(params: QueryGeodataInput) -> ToolResponse:
     if not records:
         return ToolResponse.ok(
             f"Keine ÖREB-Verfügbarkeitsinformation für {lat:.5f},{lon:.5f}.",
-            [], match_type="none", source=OEREB_SOURCE, license=OEREB_LICENSE,
+            [], match_type="none",
+            note=(
+                "Der Bundesdienst kennt für diesen Punkt keinen Eintrag — er liegt "
+                "womöglich ausserhalb der Schweiz. swisstopo_municipality_at nennt "
+                "die Gemeinde, swisstopo_oereb_at liefert den Auszug direkt, wo "
+                "der Kanton unterstützt wird."
+            ),
+            source=OEREB_SOURCE, license=OEREB_LICENSE,
         )
     lines = [f"**ÖREB-Kataster-Verfügbarkeit** ({lat:.5f},{lon:.5f})", ""]
     for rec in records:
@@ -460,31 +486,66 @@ async def _query_geodienste(params: QueryGeodataInput) -> ToolResponse:
     if not collections:
         return ToolResponse.ok(
             f"Datensatz '{topic}' ({canton.upper()}) enthält keine Collections.",
-            [], match_type="none", source=GEODIENSTE_SOURCE, license=GEODIENSTE_LICENSE,
+            [], match_type="none",
+            note=(
+                f"Der Kanton {canton.upper()} publiziert für '{topic}' keine "
+                "abfragbaren Collections. swisstopo_list_available_layers zeigt, "
+                "welche Kantone das Thema mit OGC-API frei anbieten."
+            ),
+            source=GEODIENSTE_SOURCE, license=GEODIENSTE_LICENSE,
         )
     all_records: list[dict[str, Any]] = []
     features_out: list[dict[str, Any]] = []
     total_matched = 0
-    for coll in collections:
-        cid = coll.get("id")
-        if not cid:
-            continue
+
+    # Fan out in waves rather than one collection at a time (ARCH-007). The old
+    # loop was strictly sequential, which is the check's named anti-pattern for
+    # an aggregation tool — but it had a real virtue: it stopped as soon as it
+    # had `limit` records, often after one request.
+    #
+    # Querying all collections at once would throw that away. A single
+    # geodienste dataset can hold 24 collections (measured: av_0), so a naive
+    # gather would mean 24 requests against a cantonal service every time, to
+    # save latency only when the early ones come back empty. Waves keep the
+    # early exit and still cut the worst case by the wave size.
+    ids = [c.get("id") for c in collections if c.get("id")]
+    scanned = ids[:_MAX_COLLECTIONS_SCANNED]
+
+    async def _fetch(cid: str) -> tuple[str, dict[str, Any]]:
         items_url = f"{ogc_base.rstrip('/')}/collections/{cid}/items"
-        items_resp = await request_with_retry(
+        response = await request_with_retry(
             "GET", items_url, params={"f": "json", "bbox": bbox, "limit": params.limit}
         )
-        payload = items_resp.json()
-        feats = payload.get("features", [])
-        total_matched += payload.get("numberMatched", len(feats)) or 0
-        for f in feats:
-            props = f.get("properties", {})
-            rec = {"collection": cid, **props}
-            all_records.append(rec)
-            if params.format == "geojson":
-                features_out.append(f)
+        return cid, response.json()
+
+    stopped_early = False
+    for start in range(0, len(scanned), _COLLECTION_CONCURRENCY):
+        wave = scanned[start : start + _COLLECTION_CONCURRENCY]
+        # gather preserves order, so results stay deterministic regardless of
+        # which upstream answers first.
+        for cid, payload in await asyncio.gather(*(_fetch(c) for c in wave)):
+            feats = payload.get("features", [])
+            total_matched += payload.get("numberMatched", len(feats)) or 0
+            for f in feats:
+                props = f.get("properties", {})
+                all_records.append({"collection": cid, **props})
+                if params.format == "geojson":
+                    features_out.append(f)
         if len(all_records) >= params.limit:
+            stopped_early = True
             break
+
     all_records = all_records[: params.limit]
+    # Only a cap that actually bit is worth reporting: if we stopped early we
+    # had enough data, and if we scanned every collection nothing was left out.
+    truncated_note = None
+    if not stopped_early and len(ids) > len(scanned):
+        # Never silently: a cap that is invisible reads as "this is everything".
+        truncated_note = (
+            f"Nur die ersten {len(scanned)} von {len(ids)} Collections dieses "
+            "Datensatzes wurden abgefragt. Mit einer engeren bbox erneut suchen, "
+            "wenn ein bestimmtes Objekt fehlt."
+        )
     title = f"{entry.get('topic_title', topic)} ({canton.upper()})"
     if params.format == "geojson":
         summary = f"**{title}** — {len(features_out)} Feature(s), numberMatched≈{total_matched}."
@@ -494,8 +555,19 @@ async def _query_geodienste(params: QueryGeodataInput) -> ToolResponse:
             f"{title} — numberMatched≈{total_matched}", all_records, params.format
         )
         payload_records = all_records
+    if all_records:
+        note = truncated_note
+    else:
+        note = (
+            "Keine Features im abgefragten Bereich. bbox vergrössern oder einen "
+            "anderen Punkt wählen; swisstopo_list_available_layers zeigt, ob der "
+            "Datensatz für diesen Kanton überhaupt Daten führt."
+        )
+        if truncated_note:
+            note = f"{note} {truncated_note}"
     return ToolResponse.ok(
         summary, payload_records, match_type="exact" if all_records else "none",
+        note=note,
         source=f"{GEODIENSTE_SOURCE} / {entry.get('canton', canton.upper())}",
         license=GEODIENSTE_LICENSE,
     )
@@ -544,6 +616,11 @@ async def list_available_layers(params: ListLayersInput) -> ToolResponse:
 
         return ToolResponse.ok(
             summary, records, match_type="exact" if records else "none",
+            note=(
+                None if records else
+                "Keine Layer für diesen Filter. source/topic/canton weglassen, um "
+                "den vollständigen Katalog zu sehen, oder free_only abschalten."
+            ),
             source=f"{SWISSTOPO_SOURCE} + {GEODIENSTE_SOURCE}",
             license="gemischt — siehe je Layer (Feld `license` pro Record)",
             provenance="cached",

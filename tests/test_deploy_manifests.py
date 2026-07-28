@@ -194,6 +194,72 @@ class TestTheHaproxyDeploymentIsCoherent:
         assert service["spec"]["ports"][0]["targetPort"] == bind
 
 
+class TestTheEgressProxySidecarMountsWhatItReads:
+    """The defect SEC-021 found second, and the one nothing guarded against.
+
+    The sidecar passed `--config-file=/etc/smokescreen/config.yaml`, but the
+    documented ConfigMap is built `--from-file=deploy/smokescreen-acl.yaml`
+    alone, so that path would not exist at the mount and Smokescreen would exit
+    before serving anything. The flag was dropped; these tests are what stops an
+    equivalent one from being added back.
+
+    Deliberately generic: it asserts that *every* file the args name under the
+    mount path is one the documented create command actually supplies, rather
+    than blacklisting the single string that was wrong.
+    """
+
+    @staticmethod
+    def _manifest() -> str:
+        return (DEPLOY / "egress-proxy.yaml").read_text(encoding="utf-8")
+
+    @staticmethod
+    def _sidecar() -> dict:
+        deployment = _by_kind(_load("egress-proxy.yaml"), "Deployment")
+        containers = deployment["spec"]["template"]["spec"]["containers"]
+        matches = [c for c in containers if c["name"] == "smokescreen"]
+        assert matches, "no smokescreen sidecar in egress-proxy.yaml"
+        return matches[0]
+
+    def test_configmap_name_matches_the_documented_command(self):
+        deployment = _by_kind(_load("egress-proxy.yaml"), "Deployment")
+        volume = deployment["spec"]["template"]["spec"]["volumes"][0]
+        assert volume["configMap"]["name"] in self._manifest(), (
+            "the Deployment mounts a ConfigMap the documented create command "
+            "does not build"
+        )
+
+    def test_every_file_the_args_name_is_supplied_by_the_configmap(self):
+        sidecar = self._sidecar()
+        mount = sidecar["volumeMounts"][0]["mountPath"].rstrip("/")
+        supplied = {
+            pathlib.PurePosixPath(p).name
+            for p in re.findall(r"--from-file=(\S+)", self._manifest())
+        }
+        assert supplied, "the manifest header documents no --from-file source"
+
+        for arg in sidecar["args"]:
+            _, _, value = arg.partition("=")
+            if not value.startswith(f"{mount}/"):
+                continue
+            requested = pathlib.PurePosixPath(value).name
+            assert requested in supplied, (
+                f"the sidecar reads {value!r}, but the documented ConfigMap is "
+                f"built from {sorted(supplied)} only — that file would be absent "
+                "from the mount and the container would fail to start. Either "
+                "add it to the create command in the manifest header, or drop "
+                "the flag (audit SEC-021)."
+            )
+
+    def test_the_acl_the_sidecar_reads_is_the_generated_one(self):
+        """A sidecar pointed at a hand-written ACL would silently escape the
+        `render_egress_acl.py --check` gate."""
+        sidecar = self._sidecar()
+        assert any("smokescreen-acl.yaml" in arg for arg in sidecar["args"]), (
+            "the sidecar does not read smokescreen-acl.yaml, which is the file "
+            "generated from ALLOWED_HOSTS and gated in CI"
+        )
+
+
 class TestTheDocumentationPointsAtTheRealFiles:
     """`docs/deployment.md` linked only to ingress-sticky-sessions.yaml, so the
     config that was supposed to be the deployable one went unreferenced."""

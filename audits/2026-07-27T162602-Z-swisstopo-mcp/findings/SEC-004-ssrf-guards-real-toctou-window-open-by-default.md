@@ -77,3 +77,63 @@ and the default configuration still does two independent lookups. The
 mitigations are genuine (fixed frozenset of ten federal/cantonal hosts, no
 auth, no secrets, public data only), which is why this is partial rather
 than fail.
+
+---
+
+### Remediation Status (2026-07-28, follow-up PR)
+
+**Closed.** All three remediation items are addressed; the first two here, the
+third under SEC-021.
+
+**1. `SWISSTOPO_PIN_DNS` defaults to on (item 1).** The check's pass criterion —
+"DNS-Resolution erfolgt einmal, resolved IP wird für den eigentlichen Request
+verwendet" — now holds in the shipped configuration rather than for operators who
+opted in. The finding's framing of the residual risk was accurate (a hostile or
+compromised resolver rather than a remote input, against a fixed frozenset of ten
+hosts with no credentials), and that is precisely why the previous default was
+defensible-but-wrong: the exposure was small enough that leaving the window open
+felt affordable, which is how a criterion stays unmet indefinitely.
+
+The finding recommended defaulting it on "for the stdio path", noting it is inert
+behind a proxy anyway. It is on for both paths, which comes to the same thing —
+the proxy case disables itself in `_pinning_enabled()`, so scoping the default to
+stdio would add a branch without changing any behaviour. Detail on what made
+default-on safe (walking every resolved address rather than betting on the first)
+is in the SEC-005 status; that fix was the precondition for this one.
+
+**2. The fail-open on `socket.gaierror` (item 2) — decided, kept, and pinned.**
+The finding asked for a deliberate decision rather than an inherited default, and
+was careful to call it "documented and low-impact" rather than a defect. The
+decision is to keep it, and the reasoning is now in the function's docstring
+instead of living in whoever wrote it:
+
+A name that does not resolve is a name nothing can connect to. This guard exists
+to reject a host that resolves *somewhere it should not*; a `gaierror` is the
+absence of an answer, not a suspicious one, and there is no address for an
+attacker to have supplied. Failing closed would convert every transient DNS
+outage into a `PermissionError` reading "blocked by the SSRF/DNS-rebinding
+guard" — a false accusation that sends whoever reads the log hunting for an
+attack instead of a resolver.
+
+What makes it affordable is that the guard is not the last line of defence, and
+that is now tested rather than asserted: the host still had to clear the scheme
+check and the `ALLOWED_HOSTS` frozenset to get here, and with pinning on
+`PinnedTransport` re-runs this check against the addresses it is about to use.
+
+**The boundary is where this could rot, so it is what the new tests hold.**
+Fail-open is defensible only for the *absence* of an answer, never for an answer
+that is partly bad. `TestTheFailOpenOnResolutionError` asserts that a mixed
+answer — one real address plus one pointing at loopback, which is the exact shape
+of a split-horizon rebinding attack — still raises. Without that test, someone
+generalising "resolution problems are not fatal" into a `try/except Exception`
+would widen this into a genuine hole and every existing test would still pass.
+
+**3. The egress proxy (item 3).** Closed under SEC-021: the generated ACL parses,
+a test asserts `allowed_domains == sorted(ALLOWED_HOSTS)` rather than diffing the
+renderer against itself, and the sidecar no longer references a `config.yaml` the
+ConfigMap does not supply. The "Egress-Proxy als Defense-in-Depth" criterion is
+now satisfied by an artefact that works when applied.
+
+**Not claimed.** The finding notes no runtime SSRF probe was executed against a
+running HTTP server; that is still true, and verification here remains code-level
+plus the unit suite.

@@ -1,7 +1,7 @@
 """
 swisstopo-mcp — MCP-Server fuer schweizerische Bundesgeodaten.
 
-24 Tools aus 10 Quellen-Familien: REST, Geocoding, Hoehe, REFRAME
+20 Tools aus 10 Quellen-Familien: REST, Geocoding, Hoehe, REFRAME
 (Koordinatenumrechnung), STAC, WMTS, OEREB, die konsolidierte Geodaten-Fassade
 (Strassenverzeichnis, geodienste.ch, OEREB-Verfuegbarkeit), OpenStreetMap-POIs
 via Overpass, plus die administrative Adressebene via OpenPLZ
@@ -143,21 +143,24 @@ mcp = _SwisstopoMCP(
         allowed_origins=settings.transport_origins_list,
     ),
     instructions=(
-        "Swiss federal geodata server with 24 tools. "
-        "Use swisstopo_search_layers to discover layer IDs, swisstopo_layer_info to see "
-        "a layer's queryable fields, then swisstopo_identify_features or "
-        "swisstopo_find_features to query them. "
+        "Swiss federal geodata server with 20 tools. "
+        "swisstopo_map_query is the national map catalogue (api3.geo.admin.ch) and "
+        "takes one `operation` per call: search_layers to discover layer IDs, "
+        "layer_info for a layer's queryable fields, then features_at_point (spatial) "
+        "or features_by_attribute (by value), and feature_by_id for one full record. "
         "PRECEDENCE for point questions — prefer the direct tool over the generic one: "
-        "Bauzone → swisstopo_zoning_at (use swisstopo_identify_features on "
-        "ch.are.bauzonen only when raw layer attributes are needed; "
-        "swisstopo_query_geodata with geodienste:nutzungsplanung:<kanton> only for "
+        "Bauzone → swisstopo_zoning_at (use swisstopo_map_query with "
+        "operation='features_at_point' on ch.are.bauzonen only when raw layer "
+        "attributes are needed; swisstopo_query_geodata with "
+        "geodienste:nutzungsplanung:<kanton> only for "
         "cantonal Nutzungsplanung beyond the harmonised ARE layer). "
         "Gemeinde/BFS-Nummer → swisstopo_municipality_at. "
         "ÖREB-Beschränkungen → swisstopo_oereb_at (swisstopo_get_egrid only when the "
         "parcel ID itself is wanted). "
         "swisstopo_geocode converts addresses to coordinates. "
         "swisstopo_get_height returns elevation. "
-        "Point-based tools (swisstopo_get_height, swisstopo_identify_features, "
+        "Point-based tools (swisstopo_get_height, swisstopo_map_query with "
+        "operation='features_at_point', "
         "swisstopo_get_egrid) take EITHER lat/lon (WGS84) OR easting/northing "
         "(LV95, EPSG:2056) — pass one pair, not both. swisstopo_elevation_profile "
         "takes coordinate_system='lv95' for LV95 support points. "
@@ -203,8 +206,8 @@ async def swisstopo_geocode(params: GeocodeInput) -> ToolResponse:
     """Wandelt eine Adresse, einen Ortsnamen oder eine PLZ in Koordinaten um (Geocoding).
 
     <use_case>Startpunkt für ortsbezogene Abfragen: Adresse → Koordinaten, die danach
-    an swisstopo_get_height, swisstopo_identify_features oder swisstopo_get_egrid
-    übergeben werden.</use_case>
+    an swisstopo_get_height, swisstopo_map_query (operation='features_at_point')
+    oder swisstopo_get_egrid übergeben werden.</use_case>
     """
     return await geocode(params)
 
@@ -229,105 +232,48 @@ async def swisstopo_reverse_geocode(params: ReverseGeocodeInput) -> ToolResponse
 
 # --- REST API Tools ---
 from swisstopo_mcp.rest_api import (  # noqa: E402
-    FindFeaturesInput,
-    GetFeatureInput,
-    IdentifyInput,
-    LayerInfoInput,
+    MapQueryInput,
     MunicipalityAtInput,
-    SearchLayersInput,
     ZoningAtInput,
-    find_features,
-    get_feature,
-    identify_features,
-    layer_info,
+    map_query,
     municipality_at,
-    search_layers,
     zoning_at,
 )
 
 
 @mcp.tool(
-    name="swisstopo_search_layers",
+    name="swisstopo_map_query",
     annotations=ToolAnnotations(
-        title="Swisstopo Layer suchen",
+        title="Nationaler Kartenkatalog: Layer und Features",
         readOnlyHint=True,
         destructiveHint=False,
         idempotentHint=True,
         openWorldHint=True,
     ),
 )
-async def swisstopo_search_layers(params: SearchLayersInput) -> ToolResponse:
-    """Durchsucht den Swisstopo-Layerkatalog (500+ Layer) nach Geodatensätzen.
+async def swisstopo_map_query(
+    params: MapQueryInput, ctx: Context | None = None
+) -> ToolResponse:
+    """Fragt den nationalen Swisstopo-Kartenkatalog ab (500+ Layer): Layer finden, Felder ansehen, Features abfragen.
 
-    <use_case>Erster Schritt der Feature-Recherche: Layer-IDs finden, die danach an
-    swisstopo_identify_features / swisstopo_find_features übergeben werden.</use_case>
-    <important_notes>Liefert Layer-IDs, keine Feature-Daten.</important_notes>
-    """
-    return await search_layers(params)
-
-
-@mcp.tool(
-    name="swisstopo_identify_features",
-    annotations=ToolAnnotations(
-        title="Features an Koordinate identifizieren",
-        readOnlyHint=True,
-        destructiveHint=False,
-        idempotentHint=True,
-        openWorldHint=True,
-    ),
-)
-async def swisstopo_identify_features(params: IdentifyInput) -> ToolResponse:
-    """Findet Features an einer bestimmten Koordinate (räumliche Punktabfrage über Layer).
-
-    <use_case>«Was liegt an diesem Punkt?» — generische Punktabfrage über beliebige
-    Layer. Layer-IDs vorher via swisstopo_search_layers ermitteln.</use_case>
+    <use_case>Der übliche Ablauf ist eine Kette: operation='search_layers' liefert
+    Layer-IDs, operation='layer_info' zeigt deren abfragbare Felder, danach
+    operation='features_at_point' (räumlich) oder 'features_by_attribute'
+    (nach Attributwert), und operation='feature_by_id' holt ein einzelnes
+    Feature vollständig.</use_case>
+    <important_notes>Genau eine operation pro Aufruf. Felder, die zu einer anderen
+    operation gehören, werden abgelehnt statt ignoriert — die Fehlermeldung nennt
+    die zulässigen.</important_notes>
     <important_notes>Für Bauzone bzw. Gemeinde gibt es direkte Tools
-    (swisstopo_zoning_at, swisstopo_municipality_at) — dieses Tool nur nutzen, wenn
-    zusätzliche Rohattribute gebraucht werden oder ein anderer Layer gefragt ist.</important_notes>
-    <important_notes>Im Gegensatz zu swisstopo_find_features (Attributsuche) erfolgt
-    die Abfrage rein geografisch.</important_notes>
+    (swisstopo_zoning_at, swisstopo_municipality_at). 'features_at_point' nur nutzen,
+    wenn zusätzliche Rohattribute gebraucht werden oder ein anderer Layer gefragt
+    ist.</important_notes>
+    <important_notes>Das ist der nationale Katalog von api3.geo.admin.ch. Für
+    interkantonale und kantonale Quellen ist swisstopo_list_available_layers →
+    swisstopo_query_geodata zuständig, für herunterladbare Datensätze
+    swisstopo_search_geodata.</important_notes>
     """
-    return await identify_features(params)
-
-
-@mcp.tool(
-    name="swisstopo_find_features",
-    annotations=ToolAnnotations(
-        title="Features nach Attribut suchen",
-        readOnlyHint=True,
-        destructiveHint=False,
-        idempotentHint=True,
-        openWorldHint=True,
-    ),
-)
-async def swisstopo_find_features(params: FindFeaturesInput) -> ToolResponse:
-    """Sucht Features anhand eines Attributwerts in einem Layer (Attributsuche, z.B. Gebäude nach EGID).
-
-    <use_case>«Finde den Datensatz mit Attribut X» — nicht-geografische Suche nach
-    einem bekannten Wert.</use_case>
-    <important_notes>Im Gegensatz zu swisstopo_identify_features (Punktabfrage) wird
-    hier nach einem Attribut gesucht.</important_notes>
-    """
-    return await find_features(params)
-
-
-@mcp.tool(
-    name="swisstopo_get_feature",
-    annotations=ToolAnnotations(
-        title="Feature-Details abrufen",
-        readOnlyHint=True,
-        destructiveHint=False,
-        idempotentHint=True,
-        openWorldHint=True,
-    ),
-)
-async def swisstopo_get_feature(params: GetFeatureInput) -> ToolResponse:
-    """Ruft die vollständigen Attribute und die Geometrie eines Features per Layer- und Feature-ID ab.
-
-    <use_case>Detailabruf, nachdem swisstopo_identify_features / swisstopo_find_features
-    eine Feature-ID geliefert haben.</use_case>
-    """
-    return await get_feature(params)
+    return await map_query(params, ctx)
 
 
 # --- STAC Tools ---
@@ -467,7 +413,7 @@ async def swisstopo_zoning_at(params: ZoningAtInput) -> ToolResponse:
     """Gibt die harmonisierte Bauzone an einer Koordinate zurück (ch.are.bauzonen, ARE).
 
     <use_case>«Welche Bauzone gilt hier?» in einem Aufruf — ohne vorher die
-    Layer-ID via swisstopo_search_layers suchen zu müssen.</use_case>
+    Layer-ID via swisstopo_map_query erst suchen zu müssen.</use_case>
     <important_notes>Der harmonisierte ARE-Layer ist eine Synthese für die
     schweizweite Vergleichbarkeit und NICHT rechtsverbindlich — verbindlich ist
     allein die kantonale/kommunale Nutzungsplanung. Der Hinweis steht in jedem
@@ -496,32 +442,6 @@ async def swisstopo_municipality_at(params: MunicipalityAtInput) -> ToolResponse
     ausserhalb der Schweiz bleibt das Resultat leer.</important_notes>
     """
     return await municipality_at(params)
-
-
-@mcp.tool(
-    name="swisstopo_layer_info",
-    annotations=ToolAnnotations(
-        title="Layer-Felder und Legende",
-        readOnlyHint=True,
-        destructiveHint=False,
-        idempotentHint=True,
-        openWorldHint=True,
-    ),
-)
-async def swisstopo_layer_info(
-    params: LayerInfoInput, ctx: Context | None = None
-) -> ToolResponse:
-    """Listet die abfragbaren Felder und die Legende eines Layers auf.
-
-    <use_case>Bindeglied zwischen swisstopo_search_layers und
-    swisstopo_find_features: zeigt, welche Feldnamen als search_field zulässig
-    sind, statt sie raten zu müssen.</use_case>
-    <important_notes>Fehlt die Legende, werden die Felder trotzdem
-    zurückgegeben (legend = null). Das Feld legend_status unterscheidet dabei
-    "ok", "empty" (Layer hat keine Legende) und "unavailable" (Abruf
-    fehlgeschlagen).</important_notes>
-    """
-    return await layer_info(params, ctx)
 
 
 # --- Coordinate Tools ---
@@ -886,9 +806,9 @@ Vorgehen:
    - Gemeinde/BFS-Nummer → `swisstopo_municipality_at`
    - ÖREB-Beschränkungen → `swisstopo_oereb_at` (ein Aufruf; `swisstopo_get_egrid`
      nur, wenn die Parzellen-ID selbst gebraucht wird)
-3. Sonst: `swisstopo_search_layers` für die Layer-ID, `swisstopo_layer_info` für
-   die abfragbaren Felder, dann `swisstopo_identify_features` (Punkt) oder
-   `swisstopo_find_features` (Attribut).
+3. Sonst `swisstopo_map_query`, eine `operation` pro Aufruf:
+   `search_layers` für die Layer-ID, `layer_info` für die abfragbaren Felder,
+   dann `features_at_point` (Punkt) oder `features_by_attribute` (Attribut).
 
 Nenne bei jedem Resultat Quelle und Lizenz aus dem Envelope. Liefert ein Aufruf
 `match_type: "none"`, folge dem `note`-Hinweis, statt die Frage als
@@ -924,7 +844,7 @@ def _install_session_manager() -> None:
     process restarts. Every client that disconnects without sending
     `DELETE /mcp` — a crash, a closed laptop, a killed container — therefore
     leaks one for the lifetime of the pod. Nothing about that is a
-    confidentiality problem here (all 24 tools are stateless reads over public
+    confidentiality problem here (all 20 tools are stateless reads over public
     data), but unbounded growth is still unbounded (audit SEC-009).
 
     FastMCP exposes no setting for it and builds the manager lazily —

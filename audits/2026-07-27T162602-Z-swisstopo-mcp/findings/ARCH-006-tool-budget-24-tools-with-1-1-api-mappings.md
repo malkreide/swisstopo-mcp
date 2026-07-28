@@ -135,3 +135,95 @@ merge belongs to the maintainer, not to me.
 They are not merge candidates, but the names are closer than the concepts, and
 that is a tool-selection risk of the same family as the one this check is about.
 Recorded in both READMEs as belonging to the next breaking release.
+
+---
+
+### Remediation Status (2026-07-28, second follow-up PR) — decision reversed
+
+**Closed. The five api3 tools are merged. 24 → 20 tools.**
+
+The section above this one argued at length that they should not be, and closed
+with the position that the decision "belongs to the maintainer, not to me". The
+maintainer decided to merge. This section records what changed and, more
+usefully, which parts of the earlier argument survived contact with the
+implementation — because two of them were right, and the merge is better for
+having taken them seriously rather than treating the reversal as a refutation.
+
+**What shipped.** `swisstopo_search_layers`, `swisstopo_identify_features`,
+`swisstopo_find_features`, `swisstopo_get_feature` and `swisstopo_layer_info`
+are now `operation` values on `swisstopo_map_query`. Criterion 2 — "keine
+offensichtlichen 1:1-API-Mappings" — is met: there is no longer a tool per REST
+endpoint. Breaking, no alias shim, 0.4.0, migration table in the CHANGELOG.
+
+**The earlier objection, and what was done about it.** The argument was that
+merging "does not remove the decision; it moves it from tool selection into
+schema navigation, where the caller has less help — tool descriptions are what a
+model actually reads." That is a real cost and it is not answered by merging
+anyway and hoping. Three things pay it down:
+
+1. **The operations are named for questions, not endpoints.** This is the part
+   the earlier analysis missed while defending the five. `identify` and `find`
+   are ESRI vocabulary; they name the MapServer route, not what is being asked,
+   and they were *already* a navigation problem when they were tool names. The
+   merge was the occasion to fix that: `features_at_point` and
+   `features_by_attribute` can be chosen correctly by someone reading nothing
+   but the enum. The old names had the disjoint argument shapes the earlier
+   section praised — and unusable labels on top of them.
+
+2. **A field from another operation is refused, not ignored.** With five tools
+   the schema made a wrong pairing impossible: `search_field` did not exist on
+   the point query. With one tool every field is visible on every call, so that
+   protection had to be rebuilt rather than assumed. `_OPERATION_FIELDS`
+   declares what each operation accepts and everything else raises, naming the
+   alternatives. Silently dropping the stray argument would have produced a
+   plausible answer to a question nobody asked — the ARCH-003 defect class,
+   reintroduced by the fix for ARCH-006. `test_map_query.py` sweeps the whole
+   operation × foreign-field matrix rather than spot-checking, because the cost
+   of getting this wrong is an invisible one.
+
+3. **The `note` hints still work.** The earlier section's strongest point was
+   that the failure mode the check worries about — a wrong pick returning empty
+   rather than erroring — is addressed by the ARCH-003 hints. They are intact,
+   rewritten to name operations: an empty attribute search still points at
+   `operation='layer_info'` for the valid field names.
+
+**One cost the earlier analysis did not anticipate, and did not have to pay.**
+Merging five tools normally collapses five log/trace labels into one, so
+per-operation latency and error rates disappear from observability at exactly
+the moment the surface changes. Each handler keeps its own `log_tool_call`,
+relabelled `swisstopo_map_query:<operation>`, and the dispatcher is deliberately
+*not* decorated — so the granularity survives and there is still one span per
+call rather than two nested ones.
+
+**What the earlier section got right, and what it got wrong.** Right: that the
+merge relocates rather than removes the decision, and that this needed
+addressing rather than asserting. Wrong: treating "the checklist would be
+satisfied and the surface would be worse" as a dichotomy. The surface is better
+than either the five tools or a naive union, and it is better for reasons —
+question-shaped operation names, refused strays, preserved hints — that were
+available before and were not taken because the conclusion had already been
+reached. That is the transferable lesson here, more than anything about tool
+counts: *the argument for keeping a design was doing double duty as the reason
+not to look for a better version of the alternative.*
+
+**Still true, and worth not overclaiming.** The earlier section said the honest
+gap was evidence: "what it does not have — and what I cannot supply — is
+evidence either way about how models actually behave on this surface." That has
+not changed. Nothing here measures selection accuracy before versus after. The
+merge satisfies the check's criterion and the reasoning above is the best
+available argument, but it remains an argument. If selection accuracy is ever
+measured, this is the change to measure it against.
+
+**The rest of the finding, unchanged from the first follow-up:** the CI budget
+gate (`TestToolBudget`) still enforces ≤25; the two READMEs still state both the
+budget and the actual count, now 20, and the tests still fail if either drifts.
+The `geocode` / `reverse_geocode` pair stays separate on the argument recorded
+earlier, which the merge does not disturb — different questions, different input
+types, a shared endpoint being an upstream detail.
+
+**The naming ambiguity this finding's first follow-up raised on its own** —
+`swisstopo_search_layers` versus `swisstopo_list_available_layers`, two "layers"
+names over different catalogues — is resolved by the merge rather than by a
+rename. The national catalogue is now inside `swisstopo_map_query`, leaving
+`swisstopo_list_available_layers` unambiguously the consolidated façade. It was
+recorded then as belonging to "the next breaking release"; this was it.

@@ -162,7 +162,8 @@ async def search_geodata(params: SearchGeodataInput) -> ToolResponse:
                 note=(
                     f"Der STAC-Katalog kennt keine Collection zu «{params.query}». "
                     "Der Katalog führt Download-Datensätze (Orthofotos, swissALTI3D, "
-                    "3D-Modelle) — für Kartenlayer stattdessen swisstopo_search_layers."
+                    "3D-Modelle) — für Kartenlayer stattdessen swisstopo_map_query mit "
+                    "operation='search_layers'."
                 ),
             )
 

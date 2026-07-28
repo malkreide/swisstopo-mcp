@@ -9,7 +9,7 @@ allow-list (audit check **SEC-021**) and complements the SSRF hardening from
 
 | Host | Purpose | Tools |
 |---|---|---|
-| `api3.geo.admin.ch` | REST (SearchServer/MapServer), Geocoding, Height | swisstopo_search_layers, swisstopo_identify_features, swisstopo_find_features, swisstopo_get_feature, swisstopo_geocode, swisstopo_reverse_geocode, swisstopo_get_height, swisstopo_elevation_profile |
+| `api3.geo.admin.ch` | REST (SearchServer/MapServer), Geocoding, Height | swisstopo_map_query (all five operations), swisstopo_zoning_at, swisstopo_municipality_at, swisstopo_geocode, swisstopo_reverse_geocode, swisstopo_get_height, swisstopo_elevation_profile |
 | `geodesy.geo.admin.ch` | REFRAME — official LV95<->WGS84 coordinate transformation | swisstopo_convert_coordinates |
 | `data.geo.admin.ch` | STAC catalog | swisstopo_search_geodata, swisstopo_get_collection |
 | `wmts.geo.admin.ch` | WMTS tiles | (map references) |
@@ -58,16 +58,28 @@ allow-list (audit check **SEC-021**) and complements the SSRF hardening from
   Until it is applied, the code-layer list remains the only per-host control, and
   it protects the process, not a compromised image.
 
-- **DNS pinning (SEC-005):** available, off by default. `SWISSTOPO_PIN_DNS=true`
-  makes the client connect to the address the SSRF guard vetted, keeping SNI and
-  the Host header on the hostname so certificate validation is unaffected —
-  verified against `api3.geo.admin.ch` and `geodesy.geo.admin.ch`, where the same
-  connection *without* SNI fails with `IP address mismatch`.
+- **DNS pinning (SEC-005):** **on by default since 0.4.0.** The client connects
+  to the address the SSRF guard vetted, keeping SNI and the Host header on the
+  hostname so certificate validation is unaffected — verified against
+  `api3.geo.admin.ch` and `geodesy.geo.admin.ch`, where the same connection
+  *without* SNI fails with `IP address mismatch`.
 
-  It is automatically inert behind a forward proxy, since the proxy resolves the
-  name itself. Note that this makes pinning and the egress proxy above mutually
-  exclusive by design: pick the proxy for a cluster deployment, pinning for a
-  direct-egress one.
+  Set `SWISSTOPO_PIN_DNS=0` to turn it off. Two behaviours make the default
+  safe, and both are enforced in code rather than left to the operator:
+
+  - It is automatically inert behind a forward proxy, since the proxy resolves
+    the name itself. Pinning and the egress proxy above are therefore mutually
+    exclusive *by construction*, not by convention — you do not have to choose,
+    and a cluster deployment behind the proxy is unaffected by this default.
+  - When a hostname resolves to several addresses the transport tries them in
+    order, falling through on a connect-phase failure. Before 0.4.0 only the
+    first was used, so an AAAA-first answer in an IPv4-only network failed the
+    request outright — a case unpinned `httpx` handles by itself. Pinning must
+    not be the reason a working host becomes unreachable.
+
+  A name that does not resolve falls through to the unpinned path, where the
+  connection attempt fails with httpx's own message rather than a misleading
+  one from the guard.
 
 ## Update procedure
 

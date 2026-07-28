@@ -16,7 +16,7 @@ Melden Sie ausnutzbare Schwachstellen nicht über öffentliche Issues.
 ## Zusammenfassung der Sicherheitslage
 
 Dies ist ein **read-only**-, **PII-freier**, **Public-Open-Data**-MCP-Server.
-Alle 24 Tools fragen ausschliesslich eine fixe Allow-List schweizerischer
+Alle 20 Tools fragen ausschliesslich eine fixe Allow-List schweizerischer
 Bundes- und Kantonsgeodaten-Hosts ab. Bereits umgesetzte Härtung:
 
 | Bereich | Kontrolle |
@@ -24,7 +24,7 @@ Bundes- und Kantonsgeodaten-Hosts ab. Bereits umgesetzte Härtung:
 | Egress | HTTPS-Allow-List auf Code-Ebene (`ALLOWED_HOSTS`-Frozenset), beschränkt auf `*.geo.admin.ch` und die kantonalen OEREB-Endpunkte (SEC-004 / SEC-021) — siehe [docs/network-egress.md](docs/network-egress.md) |
 | Redirects | `follow_redirects=False` am gemeinsamen `httpx`-Client, sodass ein Upstream nicht auf einen Host ausserhalb der Liste umleiten kann (SEC-004) |
 | SSRF | Schema-Prüfung plus Resolved-IP-Guard, der Hosts abweist, die mit einer privaten oder Link-local-Adresse antworten (SEC-004) |
-| DNS-Pinning | **Implementiert, standardmässig aus** (SEC-005). `PinnedTransport` verbindet auf die vom SSRF-Guard geprüfte Adresse und behält Host und SNI auf dem Hostnamen, die Zertifikatsprüfung bleibt also unverändert. Einschalten mit `SWISSTOPO_PIN_DNS=true`; hinter einem Forward-Proxy wirkungslos und dort selbstdeaktivierend. **Im ausgelieferten Default bleibt das Rebinding-Fenster zwischen der Prüfung und dem Lookup von httpx offen.** |
+| DNS-Pinning | **Implementiert, seit 0.4.0 standardmässig an** (SEC-005). `PinnedTransport` verbindet auf die vom SSRF-Guard geprüfte Adresse und behält Host und SNI auf dem Hostnamen, die Zertifikatsprüfung bleibt also unverändert. Damit ist das Rebinding-Fenster zwischen der Prüfung und dem Lookup von httpx geschlossen — bis und mit 0.3.x blieb es im ausgelieferten Default offen. Abschalten mit `SWISSTOPO_PIN_DNS=0`. Hinter einem Forward-Proxy wirkungslos und dort selbstdeaktivierend, ein Cluster-Deployment mit Egress-Proxy ist also in beiden Fällen unberührt. |
 | TLS | Zertifikatsprüfung standardmässig aktiv für alle Upstream-Requests |
 | Eingabe | Strikte Pydantic-v2-Validierung an jeder Tool-Grenze (SEC-018) |
 | Secrets | Nur Umgebungsvariablen; `.gitignore` schützt `.env`; keine hartcodierten Secrets (ARCH-005) |
@@ -40,7 +40,7 @@ Härtungs-Historie in [CHANGELOG.md](CHANGELOG.md).
 
 Dieser Server befindet sich in **Phase 2.5** (siehe
 [docs/roadmap.md](docs/roadmap.md) — die alleinige Autorität für den
-Phasenstand). Er bleibt ein Read-only-Wrapper: alle 24 Tools sind
+Phasenstand). Er bleibt ein Read-only-Wrapper: alle 20 Tools sind
 `readOnlyHint: true` / `destructiveHint: false`; es gibt keine schreibenden oder
 versendenden Funktionen. Die CI erzwingt beide Hälften: `tests/test_tool_hygiene.py`
 schlägt fehl, wenn ein Tool `readOnlyHint` verliert, **und** findet statisch jeden

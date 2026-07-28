@@ -4,12 +4,16 @@ from __future__ import annotations
 
 import html
 import re
-from typing import Any
+from typing import Any, Literal
 
 from mcp.server.fastmcp import Context
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from swisstopo_mcp.api_client import (
+    CH_LAT_MAX,
+    CH_LAT_MIN,
+    CH_LON_MAX,
+    CH_LON_MIN,
     ID_PATTERN,
     LANG_PATTERN,
     TEXT_PATTERN,
@@ -126,6 +130,224 @@ class LayerInfoInput(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# The merged api3 surface (audit ARCH-006)
+#
+# These five operations shipped as five tools, one per REST endpoint, which is
+# the 1:1 API mapping the check names. They are now one tool.
+#
+# The operation names are deliberately *not* the upstream endpoint names.
+# `identify` and `find` are ESRI vocabulary: they describe which MapServer route
+# is called, not which question is being asked, and a caller who does not
+# already know ArcGIS cannot tell them apart. `features_at_point` and
+# `features_by_attribute` can be chosen correctly by someone reading nothing but
+# the operation list — which is the whole job, since collapsing five tools into
+# one moves the choice out of tool selection and into this enum.
+# ---------------------------------------------------------------------------
+
+MapQueryOperation = Literal[
+    "search_layers",
+    "layer_info",
+    "features_at_point",
+    "features_by_attribute",
+    "feature_by_id",
+]
+
+# Per operation: (required fields, additionally accepted fields).
+#
+# Anything outside the union is refused rather than ignored. Silently dropping
+# `search_field` from a `features_at_point` call would answer a question nobody
+# asked and look like a successful result — the failure mode ARCH-003 is about,
+# and the one a merged tool is most exposed to, since every operation's fields
+# are visible on every call.
+_OPERATION_FIELDS: dict[str, tuple[frozenset[str], frozenset[str]]] = {
+    "search_layers": (frozenset({"query"}), frozenset({"lang", "limit"})),
+    "layer_info": (frozenset({"layer"}), frozenset({"lang"})),
+    "features_at_point": (
+        frozenset({"layers"}),
+        frozenset({"lat", "lon", "easting", "northing", "tolerance"}),
+    ),
+    "features_by_attribute": (
+        frozenset({"layer", "search_text", "search_field"}),
+        frozenset({"contains"}),
+    ),
+    "feature_by_id": (frozenset({"layer", "feature_id"}), frozenset({"sr"})),
+}
+
+
+class MapQueryInput(BaseModel):
+    """One question against the national swisstopo map catalogue.
+
+    `operation` says what is being asked; the remaining fields are that
+    operation's arguments. Fields belonging to a different operation are
+    rejected with a message naming the ones this operation accepts.
+    """
+
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid", strict=True)
+
+    operation: MapQueryOperation = Field(
+        ...,
+        description=(
+            "search_layers: Layer-IDs zu einem Suchbegriff finden (Einstieg). "
+            "layer_info: abfragbare Felder und Legende eines Layers. "
+            "features_at_point: Features an einer Koordinate («was liegt hier?»). "
+            "features_by_attribute: Features mit einem bestimmten Attributwert. "
+            "feature_by_id: ein einzelnes Feature per Layer- und Feature-ID."
+        ),
+    )
+
+    # --- search_layers ---
+    query: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=200,
+        pattern=TEXT_PATTERN,
+        description="Suchbegriff für den Layer-Katalog (nur search_layers).",
+    )
+
+    # --- layer_info | features_by_attribute | feature_by_id ---
+    layer: str | None = Field(
+        default=None,
+        min_length=2,
+        max_length=128,
+        pattern=ID_PATTERN,
+        description=(
+            "Eine Layer-ID (layer_info, features_by_attribute, feature_by_id)."
+        ),
+    )
+
+    # --- features_at_point ---
+    layers: str | None = Field(
+        default=None,
+        min_length=2,
+        max_length=512,
+        pattern=ID_PATTERN,
+        description=(
+            "Layer-IDs, kommagetrennt, z.B. 'ch.bfs.gebaeude_wohnungs_register' "
+            "(nur features_at_point — Plural, weil hier mehrere Layer auf einmal "
+            "abgefragt werden können)."
+        ),
+    )
+    lat: float | None = Field(
+        default=None,
+        ge=CH_LAT_MIN,
+        le=CH_LAT_MAX,
+        description="Breitengrad (WGS84), zusammen mit lon. Nur features_at_point.",
+    )
+    lon: float | None = Field(
+        default=None,
+        ge=CH_LON_MIN,
+        le=CH_LON_MAX,
+        description="Längengrad (WGS84), zusammen mit lat. Nur features_at_point.",
+    )
+    easting: float | None = Field(
+        default=None,
+        description=(
+            "LV95-Ostwert in Metern (EPSG:2056, z.B. 2683531), zusammen mit "
+            "northing. Nur features_at_point."
+        ),
+    )
+    northing: float | None = Field(
+        default=None,
+        description=(
+            "LV95-Nordwert in Metern (EPSG:2056, z.B. 1247914), zusammen mit "
+            "easting. Nur features_at_point."
+        ),
+    )
+    tolerance: int = Field(
+        default=0, ge=0, le=200, description="Suchradius in Pixeln (nur features_at_point)."
+    )
+
+    # --- features_by_attribute ---
+    search_text: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=200,
+        pattern=TEXT_PATTERN,
+        description="Gesuchter Attributwert (nur features_by_attribute).",
+    )
+    search_field: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=128,
+        pattern=ID_PATTERN,
+        description=(
+            "Attributfeld, in dem gesucht wird (nur features_by_attribute). "
+            "Zulässige Feldnamen liefert operation='layer_info'."
+        ),
+    )
+    contains: bool = Field(
+        default=True,
+        description="Teilstring-Suche (True) oder exakt (False). Nur features_by_attribute.",
+    )
+
+    # --- feature_by_id ---
+    feature_id: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=128,
+        pattern=ID_PATTERN,
+        description="Feature-ID innerhalb des Layers (nur feature_by_id).",
+    )
+    sr: int = Field(
+        default=4326,
+        description="Koordinatensystem der Ausgabegeometrie (nur feature_by_id).",
+    )
+
+    # --- shared ---
+    lang: str = Field(
+        default="de",
+        pattern=LANG_PATTERN,
+        description="Sprache: de, fr, it, en (search_layers, layer_info).",
+    )
+    limit: int = Field(
+        default=10, ge=1, le=30, description="Max. Trefferzahl (nur search_layers)."
+    )
+
+    @field_validator("sr")
+    @classmethod
+    def _validate_sr(cls, v: int) -> int:
+        return validate_sr(v)
+
+    @model_validator(mode="after")
+    def _check_operation(self) -> MapQueryInput:
+        required, optional = _OPERATION_FIELDS[self.operation]
+
+        missing = sorted(name for name in required if getattr(self, name) is None)
+        if missing:
+            raise ValueError(
+                f"operation='{self.operation}' benötigt {', '.join(sorted(required))}. "
+                f"Fehlend: {', '.join(missing)}."
+            )
+
+        # `model_fields_set` rather than a None-check: `tolerance`, `contains`,
+        # `lang`, `limit` and `sr` have non-None defaults, so only the set of
+        # *explicitly supplied* fields distinguishes "sent by mistake" from
+        # "left at its default".
+        stray = sorted(self.model_fields_set - {"operation"} - required - optional)
+        if stray:
+            raise ValueError(
+                f"{', '.join(stray)} gehört nicht zu operation='{self.operation}' "
+                f"und würde ignoriert. Diese operation akzeptiert: "
+                f"{', '.join(sorted(required | optional))}."
+            )
+
+        if self.operation == "features_at_point":
+            # Delegate rather than restate. SwissPointInput owns the
+            # exactly-one-complete-pair rule *and* the messages that tell a
+            # caller which mistake they made — degrees in the LV95 fields, half
+            # a pair, a point outside Switzerland. Re-implementing that here
+            # would give this one tool worse errors than every other
+            # point-taking tool in the server.
+            SwissPointInput(
+                lat=self.lat,
+                lon=self.lon,
+                easting=self.easting,
+                northing=self.northing,
+            )
+        return self
+
+
+# ---------------------------------------------------------------------------
 # Formatting Helpers
 # ---------------------------------------------------------------------------
 
@@ -200,8 +422,8 @@ def format_layer_info(meta: dict[str, Any]) -> str:
             examples = ", ".join(str(v) for v in (f.get("example_values") or [])[:5])
             lines.append(f"| `{f.get('name')}` | {f.get('type') or '?'} | {examples} |")
         lines.append(
-            "\nDiese Feldnamen können als `search_field` an swisstopo_find_features "
-            "übergeben werden."
+            "\nDiese Feldnamen können als `search_field` an operation="
+            "'features_by_attribute' übergeben werden."
         )
     else:
         lines.append("Keine abfragbaren Felder gemeldet.")
@@ -307,7 +529,7 @@ def format_feature_detail(data: dict[str, Any]) -> str:
 # ---------------------------------------------------------------------------
 
 
-@log_tool_call("swisstopo_search_layers")
+@log_tool_call("swisstopo_map_query:search_layers")
 async def search_layers(params: SearchLayersInput) -> ToolResponse:
     """Search the swisstopo layer catalogue."""
     try:
@@ -337,7 +559,7 @@ async def search_layers(params: SearchLayersInput) -> ToolResponse:
         return ToolResponse.error(handle_api_error(e, "Layer-Suche"))
 
 
-@log_tool_call("swisstopo_identify_features")
+@log_tool_call("swisstopo_map_query:features_at_point")
 async def identify_features(params: IdentifyInput) -> ToolResponse:
     """Identify features at a coordinate."""
     try:
@@ -365,14 +587,14 @@ async def identify_features(params: IdentifyInput) -> ToolResponse:
             else (
                 f"Keine Features von «{params.layers}» an dieser Position. Der Layer "
                 "deckt diesen Punkt womöglich nicht ab — tolerance erhöhen (Suchradius "
-                "in Pixeln) oder die Layer-ID via swisstopo_search_layers prüfen."
+                "in Pixeln) oder die Layer-ID via operation='search_layers' prüfen."
             ),
         )
     except Exception as e:
         return ToolResponse.error(handle_api_error(e, "Feature-Identifikation"))
 
 
-@log_tool_call("swisstopo_find_features")
+@log_tool_call("swisstopo_map_query:features_by_attribute")
 async def find_features(params: FindFeaturesInput) -> ToolResponse:
     """Find features by attribute value."""
     try:
@@ -394,7 +616,7 @@ async def find_features(params: FindFeaturesInput) -> ToolResponse:
             if results
             else (
                 f"Kein Feature mit {params.search_field}=«{params.search_text}» in "
-                f"{params.layer}. Mit swisstopo_layer_info die zulässigen Feldnamen "
+                f"{params.layer}. Mit operation='layer_info' die zulässigen Feldnamen "
                 "und Beispielwerte dieses Layers prüfen, oder contains=True setzen."
             ),
         )
@@ -402,7 +624,7 @@ async def find_features(params: FindFeaturesInput) -> ToolResponse:
         return ToolResponse.error(handle_api_error(e, "Feature-Suche"))
 
 
-@log_tool_call("swisstopo_get_feature")
+@log_tool_call("swisstopo_map_query:feature_by_id")
 async def get_feature(params: GetFeatureInput) -> ToolResponse:
     """Get full details for a single feature."""
     try:
@@ -420,7 +642,7 @@ async def get_feature(params: GetFeatureInput) -> ToolResponse:
                 None if records else
                 f"Feature '{params.feature_id}' existiert im Layer "
                 f"'{params.layer}' nicht. Feature-IDs mit "
-                "swisstopo_identify_features oder swisstopo_find_features "
+                "operation='features_at_point' oder 'features_by_attribute' "
                 "ermitteln — sie sind layer-spezifisch."
             ),
         )
@@ -538,7 +760,7 @@ async def municipality_at(params: MunicipalityAtInput) -> ToolResponse:
         )
 
 
-@log_tool_call("swisstopo_layer_info")
+@log_tool_call("swisstopo_map_query:layer_info")
 async def layer_info(
     params: LayerInfoInput, ctx: Context | None = None
 ) -> ToolResponse:
@@ -596,3 +818,75 @@ async def layer_info(
         return ToolResponse.ok(format_layer_info(meta), [meta], match_type="exact")
     except Exception as e:
         return ToolResponse.error(handle_api_error(e, "Layer-Info"))
+
+
+# ---------------------------------------------------------------------------
+# Dispatcher for the merged tool (audit ARCH-006)
+#
+# Deliberately *not* wrapped in @log_tool_call. Each operation handler above
+# keeps its own decorator, relabelled `swisstopo_map_query:<operation>`, so logs
+# and traces still carry which of the five ran. Merging five tools into one
+# normally costs exactly that granularity — here it does not, and one span per
+# call is emitted rather than two nested ones.
+# ---------------------------------------------------------------------------
+
+
+async def map_query(params: MapQueryInput, ctx: Context | None = None) -> ToolResponse:
+    """Route one validated MapQueryInput to the handler for its operation.
+
+    The sub-models are rebuilt rather than bypassed. They carry the per-field
+    constraints that have accumulated on this surface — the deprecated-`sr`
+    check on the point path among them — and validating twice is cheap next to
+    an HTTP round trip.
+    """
+    if params.operation == "search_layers":
+        assert params.query is not None  # enforced by _check_operation
+        return await search_layers(
+            SearchLayersInput(query=params.query, lang=params.lang, limit=params.limit)
+        )
+
+    if params.operation == "layer_info":
+        assert params.layer is not None
+        return await layer_info(
+            LayerInfoInput(layer=params.layer, lang=params.lang), ctx
+        )
+
+    if params.operation == "features_at_point":
+        assert params.layers is not None
+        return await identify_features(
+            IdentifyInput(
+                layers=params.layers,
+                tolerance=params.tolerance,
+                lat=params.lat,
+                lon=params.lon,
+                easting=params.easting,
+                northing=params.northing,
+            )
+        )
+
+    if params.operation == "features_by_attribute":
+        assert params.layer is not None
+        assert params.search_text is not None
+        assert params.search_field is not None
+        return await find_features(
+            FindFeaturesInput(
+                layer=params.layer,
+                search_text=params.search_text,
+                search_field=params.search_field,
+                contains=params.contains,
+            )
+        )
+
+    if params.operation == "feature_by_id":
+        assert params.layer is not None
+        assert params.feature_id is not None
+        return await get_feature(
+            GetFeatureInput(
+                layer=params.layer, feature_id=params.feature_id, sr=params.sr
+            )
+        )
+
+    # Spelled out rather than left as a trailing else: adding an operation to
+    # MapQueryOperation and _OPERATION_FIELDS without a branch here would
+    # otherwise land silently in whichever handler happened to be last.
+    raise ValueError(f"Unbehandelte operation: {params.operation!r}")

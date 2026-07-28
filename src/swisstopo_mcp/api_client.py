@@ -118,9 +118,25 @@ def _resolve(hostname: str) -> tuple[str, ...]:
 def assert_resolved_ip_public(hostname: str) -> None:
     """Raise PermissionError if a host resolves into a private/link-local range.
 
-    Resolution failures are deliberately *not* fatal — the caller is about to
-    make the request anyway, and httpx will surface a connection error with a
-    better message than a masked PermissionError would.
+    **On resolution failure this returns rather than raising, deliberately.**
+    The audit (SEC-004) called it out as "a documented weakening rather than a
+    closed criterion" and asked for a decision instead of an inherited default,
+    so: it stays, and the reasoning is that failing closed here would buy
+    nothing.
+
+    A name that does not resolve is a name nothing can connect to. The guard's
+    job is to reject a host that resolves *somewhere it should not*, and a
+    `gaierror` is the absence of an answer, not a suspicious one — there is no
+    address for an attacker to have supplied. Raising would convert every
+    transient DNS outage into a `PermissionError` reading "blocked by the
+    SSRF/DNS-rebinding guard", which is a false accusation and sends whoever
+    reads the log looking for an attack instead of a resolver.
+
+    What makes this safe is that it is not the last line of defence. The host
+    still had to be on `ALLOWED_HOSTS`, the scheme still had to be https, and
+    when pinning is on (the default since 0.4.0) `PinnedTransport` re-runs this
+    check against the addresses it is about to connect to. An unresolvable name
+    reaches the connection attempt and fails there, with httpx's message.
     """
     try:
         addresses = _resolve(hostname)
@@ -162,14 +178,21 @@ def assert_host_allowed(url: str) -> None:
 # checked, while keeping SNI and the Host header on the original hostname so
 # certificate validation is unaffected.
 #
-# Two deliberate limits:
+# **On by default since 0.4.0** (`SWISSTOPO_PIN_DNS=0` to disable). It was
+# off, on the reasoning that a control rewriting every outbound request should
+# be verified before being switched on — but that left the window open in the
+# configuration almost everyone runs, which is the one the audit judges.
 #
-# 1. **Off by default** (`SWISSTOPO_PIN_DNS`). It rewrites the target of every
-#    outbound request; a default-on control that breaks egress is worse than the
-#    narrow risk it closes. Enable it once verified in your environment.
-# 2. **Inert behind a forward proxy.** When HTTPS_PROXY is set the proxy does the
+# Two limits keep default-on from being a liability, and both are enforced here
+# rather than assumed:
+#
+# 1. **Inert behind a forward proxy.** When HTTPS_PROXY is set the proxy does the
 #    resolving, so client-side pinning cannot apply — silently pinning anyway
 #    would just break CONNECT.
+# 2. **It never turns a resolvable host into an unreachable one.** A name that
+#    does not resolve, or resolves to nothing, falls through to the unpinned
+#    path; and when a name resolves to several addresses the transport tries
+#    them in turn rather than betting the request on the first one.
 
 
 def _proxy_configured() -> bool:
@@ -181,8 +204,23 @@ def _proxy_configured() -> bool:
     )
 
 
+def _body_is_replayable(request: httpx.Request) -> bool:
+    """True when the request body is buffered in memory and can be sent again.
+
+    Trying a second address means sending the request a second time, which is
+    only correct for a fully-buffered body. A streaming body has already been
+    consumed by the first attempt, so a "retry" would put a truncated request on
+    the wire — worse than the connection error it is trying to recover from.
+    """
+    try:
+        request.content
+    except httpx.RequestNotRead:
+        return False
+    return True
+
+
 class PinnedTransport(httpx.AsyncHTTPTransport):
-    """Connect to the pre-validated IP, keeping SNI and Host on the hostname."""
+    """Connect to a pre-validated IP, keeping SNI and Host on the hostname."""
 
     async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
         host = request.url.host
@@ -197,14 +235,43 @@ class PinnedTransport(httpx.AsyncHTTPTransport):
         if not addresses:
             return await super().handle_async_request(request)
 
-        # Reuse the address the SSRF guard already vetted (SEC-004).
+        # Reuse the addresses the SSRF guard already vetted (SEC-004). It raises
+        # if *any* answer is private, so every candidate tried below is covered
+        # — not merely the one that happens to be first.
         assert_resolved_ip_public(host)
-        address = addresses[0]
 
         request.headers["Host"] = host
         request.extensions = {**dict(request.extensions), "sni_hostname": host}
-        request.url = request.url.copy_with(host=address)
-        return await super().handle_async_request(request)
+
+        # Walk the list rather than committing to addresses[0]. getaddrinfo has
+        # no obligation to return a reachable family first: an AAAA-first answer
+        # in an IPv4-only network made the request fail outright, and unpinned
+        # httpx would have moved on to the next address by itself. Pinning must
+        # not be the reason a working host becomes unreachable — that is what
+        # made default-on defensible (SEC-005).
+        candidates = addresses if _body_is_replayable(request) else addresses[:1]
+        original = request.url
+        last_error: Exception | None = None
+        for address in candidates:
+            request.url = original.copy_with(host=address)
+            try:
+                return await super().handle_async_request(request)
+            except (httpx.ConnectError, httpx.ConnectTimeout) as exc:
+                # Connect-phase only: nothing reached the peer, so the next
+                # address gets a clean attempt. A read error or an HTTP-level
+                # failure means the request *was* delivered and must propagate.
+                last_error = exc
+                _log.debug(
+                    "pinned_connect_failed",
+                    host=host,
+                    address=address,
+                    error_type=type(exc).__name__,
+                )
+
+        # Report the hostname the caller asked for, not the last IP tried.
+        request.url = original
+        assert last_error is not None  # the loop runs at least once
+        raise last_error
 
 
 def _is_ip_literal(host: str) -> bool:

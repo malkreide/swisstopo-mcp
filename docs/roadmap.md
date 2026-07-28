@@ -63,8 +63,14 @@ server as the base.
       `swisstopo_layer_info`; tool budget raised 20 → 25.
 - [x] `swisstopo_oereb_at` collapses the coordinate → EGRID → extract chain into
       one call (ARCH-007). The aggregation rationale per tool cluster lives in
-      the README; the open candidate is merging the five api3 tools, which is a
-      breaking change for a future major release (ARCH-006).
+      the README.
+- [x] Merged the five api3 tools into `swisstopo_map_query` with an `operation`
+      discriminator (ARCH-006, breaking, 0.4.0). 24 → 20 tools, and the last
+      obvious 1:1 API mapping is gone. Two earlier entries here recorded this as
+      a future-major candidate; this was that major. Operations are named for
+      questions (`features_at_point`, not `identify`), a field belonging to
+      another operation is refused rather than ignored, and each operation keeps
+      its own log/trace label so per-operation observability survives the merge.
 - [x] Deprecated and **archived** `swiss-geodata-mcp` (2026-07-27). No external
       users, so no alias-shim period was needed — plan §7.2.
 - [x] Re-run the audit against the changed surface — run

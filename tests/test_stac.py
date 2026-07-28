@@ -390,3 +390,21 @@ async def test_live_search_swissalti3d():
     assert len(result.summary) > 0
     # Should find something
     assert "Keine Geodaten gefunden" not in result.summary
+
+
+@pytest.mark.live
+async def test_live_get_collection_detail():
+    """OPS-001: `get_collection` had no live test, so a STAC schema change in
+    the detail endpoint would have surfaced as a user-facing bug. Chained on
+    the search so the collection id cannot go stale."""
+    found = await search_geodata(SearchGeodataInput(query="swissALTI3D"))
+    if not found.results:
+        pytest.skip("STAC search returned nothing today")
+    collection_id = found.results[0].get("id")
+    if not collection_id:
+        pytest.skip("upstream result carries no collection id")
+    result = await get_collection(GetCollectionInput(collection_id=collection_id))
+    assert result.is_error is False, result.summary
+    assert result.match_type in {"exact", "none"}
+    if result.match_type == "none":
+        assert result.note

@@ -54,6 +54,10 @@ dev = [
     # reads no YAML. It was available transitively in the dev sandbox, which is
     # why the gap only surfaced in CI.
     "PyYAML>=6.0",
+    # Test-only: the protocol-boundary tests validate structuredContent against
+    # each tool's outputSchema (OBS-001). It arrives transitively via mcp, but
+    # depending on that is how the PyYAML gap reached CI.
+    "jsonschema>=4.0",
 ]
 
 [project.scripts]

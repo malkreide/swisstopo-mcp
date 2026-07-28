@@ -69,3 +69,59 @@ no live test, so the nightly job cannot detect contract drift for them —
 and the ÖREB cluster, the most fragile upstream in the server, is among
 them. Unit-side depth is excellent; the respx criterion is met in spirit
 for six modules only.
+
+---
+
+### Remediation Status (2026-07-28, follow-up PR)
+
+**Closed, with one part verified only by structure and said so below.**
+
+**Per-tool coverage.** Every one of the 24 tools now has a live test, or is
+listed as exempt with a reason — currently one entry, `swisstopo_map_url`, which
+builds a URL locally and has no upstream to drift. `tests/test_live_coverage.py`
+maps tools to live tests and fails on an uncovered one, so the gap cannot
+reopen. The exemption list is asserted non-stale, and the mapping's own premise
+(the `swisstopo_` prefix) is asserted too, since a tool without it would be
+silently reported as covered-by-accident.
+
+The sweep found **seven** uncovered tools, not the ten the finding lists —
+`layer_info` and `municipality_at` had since gained live tests, and `map_url` is
+the exemption. New tests: the three ÖREB tools, `find_features`, `get_feature`,
+`get_collection`, `search_address`. Live-marked tests went 25 → 33.
+
+Three of the new ones are **chained rather than pinned**: `get_feature` resolves
+its id through `find_features`, `get_collection` through `search_geodata`, and
+`get_oereb_extract` through `get_egrid`. A hardcoded feature id rots, and a
+rotted id produces a nightly false alarm, which is how a drift detector gets
+muted.
+
+**Verified against real upstreams from this sandbox:** `find_features`,
+`get_feature`, `get_collection`, `search_address` — all pass, together with the
+existing api3/STAC/OpenPLZ live tests (10/10).
+
+**Not verified here: the three ÖREB tests.** `oereb.geo.zh.ch` is unreachable
+from this environment — a direct probe returns a connection failure while
+`api3.geo.admin.ch` returns 302, so it is the sandbox's egress policy, not the
+tests. They are structurally correct (models accept the arguments, assertions
+match the envelope contract) and will first execute on the nightly runner. I am
+stating this rather than implying they were exercised.
+
+**The fragile reporting path.** The finding's third gap was that the pinned
+action tags could not be verified, and that the failure-reporting step — which
+only runs `if: failure()` — would therefore fail silently for exactly the reader
+who needed it. I could not verify `actions/*` tags either: this session's GitHub
+scope covers only this repository.
+
+So the risk was removed instead. The step no longer uses
+`actions/github-script@v8`; it runs `gh`, which ships on the runner and needs no
+pin, keeping the same deduplication. The job now declares `issues: write`
+explicitly rather than relying on the repository's default token scope — another
+thing that would have been discovered on a night when the tests had already
+failed. Five tests hold the properties: no third-party action on the
+failure-only path, the permission is declared, dedup is present, and the script
+passes `bash -n`. The remaining pins are `actions/*` on the always-executed
+path, where a bad tag fails the first run loudly.
+
+**Unchanged:** respx still covers 6 of 27 test files. That gap is about *unit*
+fidelity rather than drift detection, and widening it is a larger piece of work
+than this finding's subject.

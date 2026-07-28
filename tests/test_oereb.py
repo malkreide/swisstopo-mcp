@@ -6,6 +6,7 @@ import pytest
 from pydantic import ValidationError
 
 from swisstopo_mcp.config import settings
+from swisstopo_mcp.models import OEREB_LICENSE, OEREB_SOURCE
 from swisstopo_mcp.oereb import (
     OEREB_ENDPOINTS,
     GetEgridInput,
@@ -849,3 +850,64 @@ class TestOerebAt:
         monkeypatch.setattr(settings, "oereb_cantons", "ZH")
         m = OerebAtInput(easting=2683531.0, northing=1247914.0, canton="ZH")
         assert m.as_lv95 == (2683531.0, 1247914.0)
+
+
+# ---------------------------------------------------------------------------
+# Live tests (audit OPS-001)
+#
+# The nightly run had no coverage of this cluster at all, which is the sharpest
+# gap it could have had: the cantonal ÖREB endpoints are the only per-canton,
+# per-format upstream in this server, they are operated by cantons rather than
+# by the Confederation, and their response shape is the thing most likely to
+# change without notice. Everything else here talks to api3.geo.admin.ch.
+#
+# These are deliberately shallow. The job is contract drift — did the endpoint
+# move, did the payload stop parsing — not correctness of a particular parcel.
+# ---------------------------------------------------------------------------
+
+# Zürich, Bederstrasse area. A point inside canton ZH, which is the one canton
+# enabled by default.
+ZH_LAT, ZH_LON = 47.360966, 8.525343
+
+
+@pytest.mark.live
+class TestOerebLive:
+    async def test_get_egrid_resolves_a_zurich_point(self):
+        result = await get_egrid(GetEgridInput(lat=ZH_LAT, lon=ZH_LON, canton="ZH"))
+        assert result.is_error is False, result.summary
+        # An empty answer is legitimate on a parcel boundary, so the contract
+        # assertion is on the envelope, not on finding a parcel.
+        assert result.source == OEREB_SOURCE
+        assert result.match_type in {"exact", "none"}
+        if result.results:
+            egrid = result.results[0].get("egrid")
+            assert isinstance(egrid, str) and egrid, "EGRID field shape changed"
+
+    async def test_oereb_at_returns_one_call_answer(self):
+        """The aggregate is the tool a caller should reach for; if the chain it
+        collapses breaks upstream, this is where it shows."""
+        result = await oereb_at(OerebAtInput(lat=ZH_LAT, lon=ZH_LON, canton="ZH"))
+        assert result.is_error is False, result.summary
+        assert result.source == OEREB_SOURCE
+        assert result.license == OEREB_LICENSE
+        assert result.match_type in {"exact", "none"}
+        if result.match_type == "none":
+            assert result.note, "an empty ÖREB answer must carry a next step"
+
+    async def test_get_oereb_extract_accepts_a_resolved_egrid(self):
+        """Chained on purpose: a hardcoded EGRID would rot, and resolving it
+        first is also what exercises the pair the aggregate replaced."""
+        located = await get_egrid(GetEgridInput(lat=ZH_LAT, lon=ZH_LON, canton="ZH"))
+        if not located.results:
+            pytest.skip("no parcel at the probe point today")
+        egrid = located.results[0]["egrid"]
+        result = await get_oereb_extract(GetOerebExtractInput(egrid=egrid, canton="ZH"))
+        assert result.is_error is False, result.summary
+        assert result.source == OEREB_SOURCE
+
+    async def test_unsupported_canton_fails_cleanly(self):
+        """Not an upstream call — but it pins the behaviour a caller hits almost
+        everywhere in Switzerland, since only ZH is enabled by default."""
+        result = await get_egrid(GetEgridInput(lat=46.95, lon=7.45, canton="XX"))
+        assert result.is_error is True
+        assert "ZH" in result.summary

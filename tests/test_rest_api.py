@@ -248,7 +248,7 @@ class TestFormatFeatureDetail:
 
 class TestSearchLayersHandler:
     async def test_search_layers_mocked(self, monkeypatch):
-        async def mock_request(path, params=None):
+        async def mock_request(path, params=None, **_):
             return {
                 "results": [
                     {
@@ -266,7 +266,7 @@ class TestSearchLayersHandler:
         assert "ch.bfs.gebaeude_wohnungs_register" in result.summary
 
     async def test_search_layers_empty(self, monkeypatch):
-        async def mock_request(path, params=None):
+        async def mock_request(path, params=None, **_):
             return {"results": []}
 
         monkeypatch.setattr("swisstopo_mcp.rest_api.geo_admin_request", mock_request)
@@ -276,7 +276,7 @@ class TestSearchLayersHandler:
 
 class TestIdentifyFeaturesHandler:
     async def test_identify_mocked(self, monkeypatch):
-        async def mock_request(path, params=None):
+        async def mock_request(path, params=None, **_):
             return {
                 "results": [
                     {
@@ -295,7 +295,7 @@ class TestIdentifyFeaturesHandler:
         assert "9999" in result.summary
 
     async def test_identify_empty(self, monkeypatch):
-        async def mock_request(path, params=None):
+        async def mock_request(path, params=None, **_):
             return {"results": []}
 
         monkeypatch.setattr("swisstopo_mcp.rest_api.geo_admin_request", mock_request)
@@ -307,7 +307,7 @@ class TestIdentifyFeaturesHandler:
 
 class TestFindFeaturesHandler:
     async def test_find_mocked(self, monkeypatch):
-        async def mock_request(path, params=None):
+        async def mock_request(path, params=None, **_):
             return {
                 "results": [
                     {
@@ -328,7 +328,7 @@ class TestFindFeaturesHandler:
 
 class TestGetFeatureHandler:
     async def test_get_feature_mocked(self, monkeypatch):
-        async def mock_request(path, params=None):
+        async def mock_request(path, params=None, **_):
             return {
                 "feature": {
                     "featureId": "42",
@@ -345,7 +345,7 @@ class TestGetFeatureHandler:
     async def test_get_feature_error(self, monkeypatch):
         import httpx
 
-        async def mock_request(path, params=None):
+        async def mock_request(path, params=None, **_):
             resp = httpx.Response(404, request=httpx.Request("GET", "http://test"))
             raise httpx.HTTPStatusError("Not found", request=resp.request, response=resp)
 
@@ -377,3 +377,48 @@ async def test_live_identify():
     # May or may not find features at this exact point, but should not error
     assert isinstance(result, ToolResponse)
     assert len(result.summary) > 0
+
+
+# ---------------------------------------------------------------------------
+# Live tests added for OPS-001: find_features and get_feature had none, so the
+# nightly run could not see an attribute-query or feature-detail contract
+# change. Both are chained rather than hardcoded — a pinned feature id would
+# rot, and resolving one first is what exercises the pair as a caller uses it.
+# ---------------------------------------------------------------------------
+
+# Municipality boundaries: a stable federal layer with a searchable name field.
+_COMMUNE_LAYER = "ch.swisstopo.swissboundaries3d-gemeinde-flaeche.fill"
+
+
+@pytest.mark.live
+async def test_live_find_features_by_attribute():
+    result = await find_features(
+        FindFeaturesInput(
+            layer=_COMMUNE_LAYER,
+            search_text="Zürich",
+            search_field="gemname",
+        )
+    )
+    assert result.is_error is False, result.summary
+    assert result.match_type in {"exact", "none"}
+    if result.match_type == "none":
+        assert result.note, "an empty attribute search must carry a next step"
+
+
+@pytest.mark.live
+async def test_live_get_feature_detail():
+    """Chained on find_features so the id cannot go stale."""
+    found = await find_features(
+        FindFeaturesInput(
+            layer=_COMMUNE_LAYER, search_text="Zürich", search_field="gemname"
+        )
+    )
+    if not found.results:
+        pytest.skip("attribute search returned nothing today")
+    feature_id = found.results[0].get("featureId") or found.results[0].get("id")
+    if feature_id is None:
+        pytest.skip("upstream result carries no usable feature id")
+    result = await get_feature(
+        GetFeatureInput(layer=_COMMUNE_LAYER, feature_id=str(feature_id))
+    )
+    assert result.is_error is False, result.summary

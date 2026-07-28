@@ -85,3 +85,72 @@ resolvers block HAProxy would fail to start against them. The nominal checklist
 items (reads the header, 100k table, explicit TTL) are satisfied, so this is not
 a fail — but calling it a deployable session-affinity config is not supportable.
 Partial.
+
+---
+
+### Remediation Status (2026-07-28, follow-up PR)
+
+**Closed for both defects; the failover criterion is met by documented manual
+procedure, not by an automated test, and that limit is stated rather than
+papered over.**
+
+**1. The stick-table was never populated.** `stick on` is shorthand for
+`stick match` + `stick store-**request**`, and the MCP session id is minted in
+the *response* to `initialize`. Replaced with the canonical pattern for a
+server-generated identifier:
+
+```
+stick store-response res.hdr(Mcp-Session-Id)
+stick match          req.hdr(Mcp-Session-Id)
+```
+
+**2. The backends named nothing this repository creates.**
+`deploy/statefulset.yaml` now ships a StatefulSet plus a **headless** Service —
+a ClusterIP Service hides pods behind one virtual IP, which defeats per-pod
+affinity by construction. `haproxy.cfg` uses `server-template` against that
+Service through a `resolvers kube-dns` section, so pods that do not exist yet are
+DOWN rather than a startup failure. `deploy/haproxy-deployment.yaml` runs
+HAProxy with the config and exposes `swisstopo-mcp-lb`.
+
+**3. The duplication that made this a three-file error.** The same defective
+snippet was in `deploy/ingress-sticky-sessions.yaml` as "Option A (preferred)"
+and pointed at from `docs/deployment.md`. The snippet is **removed**, not
+corrected: the working config belongs in one place, and duplicating it is how
+one mistake came to exist three times. That manifest is now scoped honestly to
+browser clients, with a note that MCP hosts are not browsers — the finding's
+SCALE-002 point.
+
+**4. Tests, and what they can and cannot show.**
+`tests/test_deploy_manifests.py` holds the properties that were actually wrong,
+all of them *cross-file* — which is why nothing caught them:
+
+- `stick store-response` present, `stick match` present, no bare `stick on`;
+- a `resolvers` section exists;
+- the backends reference the headless Service **this repo defines**, read out of
+  the manifest rather than hardcoded, and the StatefulSet's `serviceName`
+  matches it;
+- none of the invented hostnames remain;
+- the StatefulSet's pod and container security contexts equal the Deployment's,
+  so SEC-007's hardening cannot drift when a manifest is copied;
+- the ConfigMap the HAProxy Deployment mounts is the one the documented
+  `kubectl create configmap` command builds — the exact defect SEC-021 had in
+  `egress-proxy.yaml`;
+- ports agree between `bind`, the container port and the Service target;
+- every new artefact is referenced from `docs/deployment.md`.
+
+Verified against the original config: removing `store-response` and restoring
+the invented hostnames fails three tests; reinstating `stick on` fails two more.
+
+**These tests cannot prove HAProxy routes correctly.** That needs a running
+cluster, so `docs/deployment.md` now carries a "Verifying affinity" procedure —
+open a session, send ten follow-ups on its id, expect ten `200`s with three
+replicas, and inspect the stick-table over the admin socket. The check's Modus 2
+is satisfied by a documented manual verification, which is the honest position:
+claiming an automated failover test would be the same kind of overstatement this
+finding was about.
+
+**One thing the finding did not ask for, stated because it matters:** affinity
+routes sessions, it does not replicate them. A pod that dies takes its sessions
+with it and clients must re-initialise. `docs/deployment.md` says so explicitly
+under "Failover is a deliberate non-goal" — surviving pod loss needs the shared
+session store that remains unimplemented.

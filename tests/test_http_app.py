@@ -165,3 +165,66 @@ class TestTransportSecurityRequests:
         ) as c:
             response = await c.get("/healthz", headers={"Host": "evil.example.com"})
         assert response.status_code == 200
+
+
+# ---------------------------------------------------------------------------
+# Session idle timeout (audit SEC-009)
+#
+# The SDK's default is `session_idle_timeout=None`: a session lives until the
+# process restarts. Every client that disconnects without sending `DELETE /mcp`
+# — a crash, a closed laptop, a killed container — therefore leaks one for the
+# lifetime of the pod. Not a confidentiality problem here (all tools are
+# stateless reads over public data), but unbounded growth is still unbounded.
+# ---------------------------------------------------------------------------
+
+
+class TestSessionIdleTimeout:
+    @staticmethod
+    def _fresh_manager():
+        """Force a rebuild — the manager is built once and cached."""
+        from swisstopo_mcp import server
+
+        server.mcp._session_manager = None
+        server._install_session_manager()
+        return server.mcp._session_manager
+
+    def test_timeout_is_set_explicitly(self):
+        """The criterion is an *explicit* TTL, not whatever the SDK defaults to."""
+        assert self._fresh_manager().session_idle_timeout == 1800.0
+
+    def test_timeout_comes_from_settings(self, monkeypatch):
+        from swisstopo_mcp.config import settings
+
+        monkeypatch.setattr(settings, "session_idle_timeout", 900.0)
+        assert self._fresh_manager().session_idle_timeout == 900.0
+
+    def test_zero_restores_the_sdk_default(self, monkeypatch):
+        """An operator who wants the old unbounded behaviour can have it, but
+        has to ask for it."""
+        from swisstopo_mcp.config import settings
+
+        monkeypatch.setattr(settings, "session_idle_timeout", 0.0)
+        assert self._fresh_manager().session_idle_timeout is None
+
+    def test_transport_security_survives_the_custom_manager(self):
+        """Building the manager ourselves must not drop the DNS-rebinding
+        protection the SDK would have wired up (SDK-004 / SEC-005)."""
+        manager = self._fresh_manager()
+        assert manager.security_settings is not None
+        assert manager.security_settings.enable_dns_rebinding_protection is True
+
+    def test_build_http_app_installs_it(self):
+        from swisstopo_mcp import server
+
+        server.mcp._session_manager = None
+        server.build_http_app([])
+        assert server.mcp._session_manager is not None
+        assert server.mcp._session_manager.session_idle_timeout == 1800.0
+
+    def teardown_method(self):
+        """Leave the module-level manager rebuilt with real settings, so test
+        order cannot leak a 900-second or disabled manager into other tests."""
+        from swisstopo_mcp import server
+
+        server.mcp._session_manager = None
+        server._install_session_manager()

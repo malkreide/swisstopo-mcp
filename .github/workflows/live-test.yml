@@ -9,9 +9,19 @@ on:
     - cron: "0 4 * * *"
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   live-tests:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # Needed by the failure step to file the drift issue. Declared explicitly
+      # rather than relying on the repository's default token scope, which can
+      # be read-only — and which would only be discovered on a night when the
+      # tests had already failed.
+      issues: write
     steps:
       - uses: actions/checkout@v7
 
@@ -26,34 +36,35 @@ jobs:
       - name: Run live tests
         run: pytest tests/ -m live -v
 
+      # The failure path only executes when something is already broken, so it
+      # must not itself depend on anything that could be broken. It previously
+      # used actions/github-script@v8: a third-party action whose tag resolution
+      # is never exercised on a green run, so a bad pin would have failed
+      # silently for exactly the reader who needed the report (audit OPS-001).
+      # `gh` ships on the runner and needs no pin.
       - name: Report failure
         if: failure()
-        uses: actions/github-script@v8
-        with:
-          script: |
-            const title = 'Nightly live API tests failed';
-            const body = [
-              'The nightly `live` suite failed against the real upstream APIs.',
-              '',
-              'This usually means one of:',
-              '- an upstream contract change (renamed attribute, dropped field),',
-              '- a transient upstream outage,',
-              '- the polynomial-vs-REFRAME deviation exceeding one metre.',
-              '',
-              `Run: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
-            ].join('\n');
-            const existing = await github.rest.issues.listForRepo({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              state: 'open',
-              labels: 'live-test-failure',
-            });
-            if (existing.data.length === 0) {
-              await github.rest.issues.create({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                title,
-                body,
-                labels: ['live-test-failure'],
-              });
-            }
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          # Deduplicate: one open issue at a time, not one per night.
+          if [ -n "$(gh issue list --label live-test-failure --state open --json number --jq '.[].number')" ]; then
+            echo "An open live-test-failure issue already exists; not filing another."
+            exit 0
+          fi
+          gh issue create \
+            --title "Nightly live API tests failed" \
+            --label live-test-failure \
+            --body "$(cat <<EOF
+          The nightly \`live\` suite failed against the real upstream APIs.
+
+          This usually means one of:
+          - an upstream contract change (renamed attribute, dropped field),
+          - a transient upstream outage,
+          - the polynomial-vs-REFRAME deviation exceeding one metre.
+
+          Run: ${RUN_URL}
+          EOF
+          )"

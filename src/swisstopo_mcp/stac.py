@@ -34,6 +34,10 @@ class GetCollectionInput(BaseModel):
     collection_id: str = Field(
         ...,
         min_length=2,
+        # A pattern constrains the charset, not the size. This value is
+        # interpolated into an upstream URL *path*, so an unbounded string of
+        # otherwise-legal characters would be forwarded verbatim (SEC-018).
+        max_length=128,
         pattern=ID_PATTERN,
         description="Collection-ID (z.B. 'ch.swisstopo.swissalti3d')",
     )
@@ -177,6 +181,13 @@ async def get_collection(params: GetCollectionInput) -> ToolResponse:
             format_collection_detail(collection),
             records,
             match_type="exact" if records else "none",
+            note=(
+                None
+                if records
+                else f"Collection '{params.collection_id}' lieferte keine Details. "
+                "ID mit swisstopo_search_geodata verifizieren — STAC-IDs sind "
+                "vollqualifiziert, z.B. 'ch.swisstopo.swissalti3d'."
+            ),
         )
     except Exception as e:
         return ToolResponse.error(handle_api_error(e, f"Collection '{params.collection_id}'"))

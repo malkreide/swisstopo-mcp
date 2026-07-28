@@ -12,7 +12,9 @@ Alle Endpunkte sind offen (kein API-Schluessel erforderlich, ausser OEREB-Kanton
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
+from typing import Any
 
+from mcp import types
 from mcp.server.fastmcp import Context, FastMCP
 from mcp.server.transport_security import TransportSecuritySettings
 from mcp.types import ToolAnnotations
@@ -92,7 +94,41 @@ async def lifespan(server: FastMCP):
         yield
 
 
-mcp = FastMCP(
+class _SwisstopoMCP(FastMCP):
+    """FastMCP that maps the envelope's `is_error` onto the protocol flag.
+
+    Handled execution errors are returned as a `ToolResponse` with
+    `is_error: true` rather than raised, which is what keeps them out of the
+    JSON-RPC error channel — the separation OBS-001 asks for. But the SDK builds
+    a `CallToolResult` with `isError=False` for any tool that returns normally,
+    so the payload field was the *only* signal: a spec-conformant client reading
+    `CallToolResult.isError` saw success for every handled error and would pass
+    a German error string downstream as though it were geodata (audit OBS-001).
+
+    The lowlevel `call_tool` handler returns a `CallToolResult` unchanged when
+    the registered handler produces one, so building it here is the supported
+    seam. Note this bypasses the SDK's output-schema validation on the error
+    path only; the payload is a `ToolResponse` this server constructed, so it
+    conforms by construction, and `tests/test_protocol_errors.py` asserts the
+    structured content still validates.
+    """
+
+    async def call_tool(  # type: ignore[override]
+        self, name: str, arguments: dict[str, Any]
+    ) -> Any:
+        result = await super().call_tool(name, arguments)
+        if isinstance(result, tuple) and len(result) == 2:
+            content, structured = result
+            if isinstance(structured, dict) and structured.get("is_error") is True:
+                return types.CallToolResult(
+                    content=list(content),
+                    structuredContent=structured,
+                    isError=True,
+                )
+        return result
+
+
+mcp = _SwisstopoMCP(
     "swisstopo_mcp",
     lifespan=lifespan,
     # Without this the SDK keeps its localhost-only default list and rejects
@@ -472,16 +508,20 @@ async def swisstopo_municipality_at(params: MunicipalityAtInput) -> ToolResponse
         openWorldHint=True,
     ),
 )
-async def swisstopo_layer_info(params: LayerInfoInput) -> ToolResponse:
+async def swisstopo_layer_info(
+    params: LayerInfoInput, ctx: Context | None = None
+) -> ToolResponse:
     """Listet die abfragbaren Felder und die Legende eines Layers auf.
 
     <use_case>Bindeglied zwischen swisstopo_search_layers und
     swisstopo_find_features: zeigt, welche Feldnamen als search_field zulässig
     sind, statt sie raten zu müssen.</use_case>
     <important_notes>Fehlt die Legende, werden die Felder trotzdem
-    zurückgegeben (legend = null).</important_notes>
+    zurückgegeben (legend = null). Das Feld legend_status unterscheidet dabei
+    "ok", "empty" (Layer hat keine Legende) und "unavailable" (Abruf
+    fehlgeschlagen).</important_notes>
     """
-    return await layer_info(params)
+    return await layer_info(params, ctx)
 
 
 # --- Coordinate Tools ---
@@ -658,7 +698,9 @@ from swisstopo_mcp.overpass import QueryOsmFeaturesInput, query_osm_features  # 
         openWorldHint=True,
     ),
 )
-async def query_osm_features_tool(params: QueryOsmFeaturesInput) -> ToolResponse:
+async def query_osm_features_tool(
+    params: QueryOsmFeaturesInput, ctx: Context | None = None
+) -> ToolResponse:
     """Findet OpenStreetMap-POIs (Schulen, Spielplätze, Apotheken …) im Umkreis.
 
     <use_case>Beantwortet «Welche Schulhäuser/Spielplätze liegen im Umkreis von R
@@ -668,7 +710,7 @@ async def query_osm_features_tool(params: QueryOsmFeaturesInput) -> ToolResponse
     nicht swisstopo. Overpass hat Rate-Limits/Timeouts — kleiner Radius bevorzugt;
     bei Überlastung kommt eine sprechende Fehlermeldung statt Daten.</important_notes>
     """
-    return await query_osm_features(params)
+    return await query_osm_features(params, ctx)
 
 
 # --- OpenPLZ: administrative address level (PLZ → Gemeinde/BFS → Bezirk → Kanton) ---
@@ -715,7 +757,9 @@ async def lookup_postal_code_tool(params: LookupPostalCodeInput) -> ToolResponse
         openWorldHint=True,
     ),
 )
-async def find_commune_tool(params: FindCommuneInput) -> ToolResponse:
+async def find_commune_tool(
+    params: FindCommuneInput, ctx: Context | None = None
+) -> ToolResponse:
     """Löst Gemeinden auf: Name→BFS-Nummer, BFS-Nummer→Name, oder alle Gemeinden eines Kantons/Bezirks.
 
     <use_case>Vier Modi (genau einen Parameter angeben): `name` (Name →
@@ -729,7 +773,7 @@ async def find_commune_tool(params: FindCommuneInput) -> ToolResponse:
     weil der Pfad sonst still eine leere Liste liefert. Gemeindelisten sind
     vollständig (interne Pagination), nicht auf 10 Einträge gekürzt.</important_notes>
     """
-    return await find_commune(params)
+    return await find_commune(params, ctx)
 
 
 @mcp.tool(
@@ -754,6 +798,39 @@ async def search_address_tool(params: SearchAddressInput) -> ToolResponse:
     return await search_address(params)
 
 
+def _install_session_manager() -> None:
+    """Give the Streamable-HTTP session manager an explicit idle timeout.
+
+    The SDK's default is `session_idle_timeout=None`: a session lives until the
+    process restarts. Every client that disconnects without sending
+    `DELETE /mcp` — a crash, a closed laptop, a killed container — therefore
+    leaks one for the lifetime of the pod. Nothing about that is a
+    confidentiality problem here (all 24 tools are stateless reads over public
+    data), but unbounded growth is still unbounded (audit SEC-009).
+
+    FastMCP exposes no setting for it and builds the manager lazily —
+    `streamable_http_app()` only constructs one `if self._session_manager is
+    None` — so pre-populating it is how the timeout gets in. Measured against a
+    running server: with the timeout set, an idle session is reaped and returns
+    404, while activity pushes the deadline back.
+
+    `SWISSTOPO_SESSION_IDLE_TIMEOUT=0` restores the SDK's unbounded behaviour.
+    """
+    from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
+
+    if mcp._session_manager is not None:  # pragma: no cover - built once
+        return
+
+    timeout = settings.session_idle_timeout
+    mcp._session_manager = StreamableHTTPSessionManager(
+        app=mcp._mcp_server,
+        json_response=mcp.settings.json_response,
+        stateless=mcp.settings.stateless_http,
+        security_settings=mcp.settings.transport_security,
+        session_idle_timeout=timeout if timeout > 0 else None,
+    )
+
+
 def build_http_app(allowed_origins: list[str] | None = None):
     """Build the Streamable-HTTP ASGI app with CORS configured (SDK-004).
 
@@ -776,6 +853,7 @@ def build_http_app(allowed_origins: list[str] | None = None):
     async def _healthz(_request):
         return JSONResponse({"status": "ok"})
 
+    _install_session_manager()
     app = mcp.streamable_http_app()
 
     sdk_lifespan = app.router.lifespan_context

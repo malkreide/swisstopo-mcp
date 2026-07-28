@@ -69,3 +69,42 @@ The server invented its own payload field instead, and then documented
 protocol behaviour (-32602) that a runtime probe shows the SDK does not
 produce. Partial rather than pass because a spec-conformant client cannot
 distinguish a handled error from a success without parsing the JSON body.
+
+---
+
+### Remediation Status (2026-07-28, follow-up PR)
+
+**Closed.** Reproduced first over a real stdio session: a handled execution
+error (unsupported ÖREB canton) returned `isError: False` with
+`"is_error": true` in the payload — the divergence exactly as reported.
+
+`_SwisstopoMCP` subclasses `FastMCP` and overrides `call_tool` to return a
+`CallToolResult(isError=True)` when the envelope says so. The seam is supported
+rather than a monkeypatch: the lowlevel `call_tool` handler passes a
+`CallToolResult` through unchanged when the registered handler produces one
+(`Server.call_tool`, `if isinstance(results, types.CallToolResult)`).
+
+Verified over a real session after the change: handled error → `isError=True`
+with the envelope, source and licence intact; success → `isError=False`,
+unchanged; unknown tool → still an error result.
+
+**The gap that let this ship is closed too.** No test crossed the protocol
+boundary — everything called handlers or `mcp.call_tool` directly, which is why
+the divergence and the wrong `-32602` documentation both went unnoticed.
+`tests/test_protocol_errors.py` drives a real client session over in-memory
+streams. Nine tests: the flag is set, the payload and protocol flags agree, the
+envelope survives, an empty result is *not* an error, success is unaffected, and
+the actual unknown-tool / invalid-argument behaviour is pinned so an SDK upgrade
+that changes it is visible. Three verified to fail against the previous
+implementation.
+
+One deliberate trade-off, stated because it is easy to miss: returning a
+`CallToolResult` bypasses the SDK's output-schema validation on the error path.
+The payload is a `ToolResponse` this server constructed, so it conforms by
+construction — but "by construction" is the kind of claim this audit has
+repeatedly falsified, so a test fetches the tool's `outputSchema` from
+`tools/list` and validates the error envelope against it.
+
+The READMEs' `-32602` claim was already corrected in the `2026-07-27T162602-Z`
+batch; the caveat paragraph about the payload-only flag is now removed, since it
+no longer applies.

@@ -33,6 +33,9 @@ class MapUrlInput(BaseModel):
     zoom: int = Field(default=8, ge=1, le=13, description="Zoomstufe 1-13")
     layers: str | None = Field(
         default=None,
+        # Comma-separated list, so the bound is generous — but it is a bound
+        # (SEC-018). A pattern restricts the charset, not the length.
+        max_length=512,
         pattern=ID_PATTERN,
         description="Layer-IDs kommagetrennt (z.B. 'ch.are.bauzonen')",
     )

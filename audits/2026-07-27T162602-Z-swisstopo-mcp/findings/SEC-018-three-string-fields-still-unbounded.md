@@ -72,3 +72,46 @@ Downgraded to partial on one concrete, reproducible point: the claim that
 length bounds were added does not hold for three string fields, one of
 which (collection_id) lands directly in an upstream URL path. Small fix,
 but the claim currently says more than the code does.
+
+---
+
+### Remediation Status (2026-07-28, follow-up PR)
+
+**Closed.** The three named fields got a `max_length`: `collection_id` 128
+(the sharp one — it is interpolated into an upstream URL *path*), `origins` 128,
+`layers` 512 (a comma-separated list, so a generous bound, but a bound).
+
+More usefully, the property is now enforced rather than the instances. A sweep
+walks every `*Input` model across the ten tool modules, collects every field
+whose annotation admits `str`, and fails if one has no `max_length`. It asserts
+it found at least 20 models and 15 string fields first, so it cannot pass
+vacuously.
+
+**The sweep immediately found three fields this audit run did not name:**
+`ListLayersInput.source`, `LookupPostalCodeInput.postal_code` and
+`FindCommuneInput.district`. All three turned out to be genuinely bounded — by
+anchored fixed-width patterns (`^(swisstopo|geodienste|oereb)$`, `^\d{4}$`,
+`^\d{1,4}$`) rather than by `max_length` — so they are exempt. But the
+exemption is checked, not merely declared: a second test asserts every exempt
+field has an anchored pattern with no unbounded quantifier. Adding
+`search_text` to the exempt set to test that guard produced
+*"pattern has an unbounded quantifier — add max_length instead"*.
+
+Both directions verified against deliberate defects: removing `max_length` from
+`collection_id` named the field, and the bogus exemption was rejected.
+
+Also from the gap list:
+
+- **`origins` is now an actual enum.** The description promised seven values
+  while the pattern accepted any lowercase-alphanumeric-comma string. A
+  `Literal` cannot express a comma-separated list, so a `field_validator`
+  checks each member against `ORIGINS` and the error names the allowed set.
+- **`TEXT_PATTERN`'s charset is now documented as deliberate.** It admits
+  `;` `&` `/` `%` because real Swiss addresses contain them
+  ("Rue de l'Hôpital 3/5"). The comment states the conditions that make that
+  safe — no shell, no SQL, httpx does the parameter encoding — so that a future
+  tool building a command by interpolation is visibly out of contract rather
+  than silently covered.
+
+Ten tests added. The `origins` validator changes a tool's input schema, so
+`tool-hashes.json` was regenerated.

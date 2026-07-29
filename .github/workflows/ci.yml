@@ -47,3 +47,6 @@ jobs:
       # network layer cannot drift from the code layer unnoticed.
       - name: Egress ACL snapshot
         run: python scripts/render_egress_acl.py --check
+
+      - name: Versions-Sync (pyproject ↔ server.json / README / src)
+        run: python scripts/check_version_sync.py

@@ -19,7 +19,7 @@ import json
 import re
 from typing import Literal
 
-from mcp.server.fastmcp import Context
+from mcp.server.mcpserver import Context
 from pydantic import BaseModel, ConfigDict, Field
 
 from swisstopo_mcp.api_client import (

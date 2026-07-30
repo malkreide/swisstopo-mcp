@@ -38,7 +38,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from mcp.server.fastmcp import Context
+from mcp.server.mcpserver import Context
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from swisstopo_mcp.api_client import TEXT_PATTERN, handle_api_error, openplz_request

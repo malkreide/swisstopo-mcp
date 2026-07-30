@@ -330,12 +330,14 @@ class TestSessionsAreConfinedToOneProcess:
     async def _two_replicas():
         from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
 
-        from swisstopo_mcp.server import mcp
+        # mcp 2.x: transport_security is no longer a setting on the server, so
+        # the replicas read the same builder the real app is given.
+        from swisstopo_mcp.server import _transport_security, mcp
 
         return [
             StreamableHTTPSessionManager(
-                app=mcp._mcp_server,
-                security_settings=mcp.settings.transport_security,
+                app=mcp._lowlevel_server,
+                security_settings=_transport_security(),
             )
             for _ in range(2)
         ]

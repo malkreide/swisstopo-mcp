@@ -76,12 +76,17 @@ class TestFastMCPStructuredOutput:
         from swisstopo_mcp.server import mcp
 
         tools = {t.name: t for t in await mcp.list_tools()}
-        assert tools["swisstopo_geocode"].outputSchema is not None
+        assert tools["swisstopo_geocode"].output_schema is not None
 
-        _content, structured = await mcp.call_tool("swisstopo_geocode", {"params": {"search_text": "Bern"}})
+        # mcp 2.x returns a CallToolResult, not the 1.x (content, structured)
+        # tuple — unpacking it raised "too many values to unpack".
+        result = await mcp.call_tool("swisstopo_geocode", {"params": {"search_text": "Bern"}})
+        structured = result.structured_content
         assert structured["source"] == SWISSTOPO_SOURCE
         assert structured["count"] == 1
         assert structured["match_type"] == "exact"
+        # The content block still comes along; the tuple carried it positionally.
+        assert result.content
 
 
 class TestProtocolErrors:

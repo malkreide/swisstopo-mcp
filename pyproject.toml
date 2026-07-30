@@ -26,9 +26,17 @@ classifiers = [
 ]
 
 dependencies = [
-    # Pinned to the 1.x major so an SDK update cannot silently change the
-    # negotiated MCP protocol version (ARCH-012). Dependabot proposes bumps.
-    "mcp[cli]>=1.28.1,<2.0.0",
+    # Pinned to one major so an SDK update cannot silently change the negotiated
+    # MCP protocol version (ARCH-012). Dependabot proposes bumps.
+    # Now the 2.x major (`mcp.server.mcpserver`). The floor is hard: 2.0.0
+    # removed `mcp.server.fastmcp` with no compatibility shim, so this code
+    # cannot run on 1.x — a `>=1.x` range would let a resolver pick a version
+    # that fails at import.
+    # 2.x serves two protocol eras: the legacy `initialize` handshake caps at
+    # 2025-11-25 (what the READMEs document), the modern envelope era reaches
+    # 2026-07-28. `tests/test_protocol_version.py` pins both, and measures the
+    # handshake ceiling against a live server rather than a constant name.
+    "mcp[cli]>=2.0.0,<3",
     "httpx>=0.27.0",
     "pydantic>=2.0.0",
     "pydantic-settings>=2.0.0",

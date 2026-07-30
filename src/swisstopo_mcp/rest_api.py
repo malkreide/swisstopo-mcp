@@ -6,7 +6,7 @@ import html
 import re
 from typing import Any, Literal
 
-from mcp.server.fastmcp import Context
+from mcp.server.mcpserver import Context
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from swisstopo_mcp.api_client import (

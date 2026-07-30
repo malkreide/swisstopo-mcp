@@ -44,7 +44,7 @@ class TestTheCatalogueResource:
         assert [str(r.uri) for r in resources] == [CATALOGUE_URI]
 
     def test_it_declares_json(self, resources):
-        assert resources[0].mimeType == "application/json"
+        assert resources[0].mime_type == "application/json"
 
     def test_its_description_names_the_equivalent_tool(self, resources):
         """A resource that duplicates a tool without saying so is a second way
@@ -205,11 +205,35 @@ class TestTheResourceDoesNotPublishAnOutageAsAnEmptyCatalogue:
         monkeypatch.setattr(gd, "load_geodienste_catalog", unavailable)
 
     async def test_an_upstream_outage_raises(self, monkeypatch):
+        """The point stands under mcp 2.x: an outage is an error, not a document.
+
+        What changed is how much of it reaches the client. 1.x let the server's
+        own message through, so the detail was in ``str(excinfo.value)``. 2.x
+        replaces it on purpose — the SDK does
+        ``raise ResourceError(f"Error reading resource {uri}") from exc``, with
+        the comment "we should not leak the exception to the client".
+
+        So the client now sees a generic message and the detail survives only
+        server-side, on ``__cause__``. Both halves are asserted: raising at all
+        is the behaviour this test exists for, and the chained cause is where
+        the actionable hint went.
+        """
         self._break_upstream(monkeypatch)
         async with server_resources():
             with pytest.raises(Exception) as excinfo:
                 list(await mcp.read_resource(CATALOGUE_URI))
-        assert "list_available_layers" in str(excinfo.value)
+
+        # What the client is told: the URI, and nothing about the upstream.
+        assert str(CATALOGUE_URI) in str(excinfo.value)
+        # What the server keeps: the tool's own diagnostic, via `from exc`.
+        causes = []
+        err = excinfo.value
+        while err is not None:
+            causes.append(str(err))
+            err = err.__cause__
+        assert any("list_available_layers" in c for c in causes), (
+            f"the upstream diagnostic was lost entirely, not just sanitised: {causes}"
+        )
 
     async def test_it_does_not_return_an_empty_document(self, monkeypatch):
         """The specific failure: a well-formed JSON body claiming zero layers."""

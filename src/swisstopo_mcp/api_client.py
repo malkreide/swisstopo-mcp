@@ -285,7 +285,7 @@ def _is_ip_literal(host: str) -> bool:
 # --- HTTP Client ---
 #
 # A single AsyncClient is created once per process (see `server_resources()` in
-# server.py, which is reference-counted precisely because the FastMCP lifespan
+# server.py, which is reference-counted precisely because the MCPServer lifespan
 # runs per session on the HTTP transport — SDK-001) and reused across all tool
 # calls for connection pooling. When no shared client is registered (e.g. in
 # unit tests or when a handler is called outside the server lifespan) we fall

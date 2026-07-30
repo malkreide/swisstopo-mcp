@@ -57,7 +57,7 @@ def test_set_shared_client_registers_and_clears():
 # Concurrent-session ownership (audit SDK-001)
 #
 # The tests above exercise set/get in isolation and cannot see the defect that
-# actually shipped: under streamable-http the FastMCP lifespan runs once per MCP
+# actually shipped: under streamable-http the MCPServer lifespan runs once per MCP
 # *session*, not once per process. Each new session overwrote the shared client,
 # and the first session to disconnect closed it and shut tracing down for every
 # session still connected — silently degrading them to a fresh client per tool

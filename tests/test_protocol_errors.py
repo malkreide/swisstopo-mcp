@@ -18,7 +18,7 @@ import json
 from contextlib import asynccontextmanager
 
 import jsonschema
-from mcp.shared.memory import create_connected_server_and_client_session
+from mcp.client import Client
 
 from swisstopo_mcp.server import mcp
 
@@ -28,7 +28,7 @@ async def session():
     """Used inline rather than as a fixture: the underlying anyio cancel scope
     must be entered and exited in the same task, and a yielding fixture does
     not guarantee that under pytest-asyncio."""
-    async with create_connected_server_and_client_session(mcp._mcp_server) as client:
+    async with Client(mcp) as client:
         yield client
 
 
@@ -41,7 +41,7 @@ class TestHandledErrorsSetTheProtocolFlag:
                 "swisstopo_get_egrid",
                 {"params": {"lat": 47.0, "lon": 8.5, "canton": "XX"}},
             )
-            assert result.isError is True
+            assert result.is_error is True
 
     async def test_payload_and_protocol_flags_agree(self):
         async with session() as s:
@@ -50,7 +50,7 @@ class TestHandledErrorsSetTheProtocolFlag:
                 {"params": {"lat": 47.0, "lon": 8.5, "canton": "XX"}},
             )
             payload = json.loads(result.content[0].text)
-            assert payload["is_error"] is result.isError
+            assert payload["is_error"] is result.is_error
 
     async def test_error_result_keeps_its_structured_content(self):
         """Setting the flag must not cost the envelope — attribution on the
@@ -60,9 +60,9 @@ class TestHandledErrorsSetTheProtocolFlag:
                 "swisstopo_get_egrid",
                 {"params": {"lat": 47.0, "lon": 8.5, "canton": "XX"}},
             )
-            assert result.structuredContent is not None
-            assert result.structuredContent["source"] == "ÖREB-Kataster (Kanton)"
-            assert result.structuredContent["license"] == "Kantonale ÖREB-Nutzungsbedingungen"
+            assert result.structured_content is not None
+            assert result.structured_content["source"] == "ÖREB-Kataster (Kanton)"
+            assert result.structured_content["license"] == "Kantonale ÖREB-Nutzungsbedingungen"
             assert result.content, "content blocks must survive"
 
     async def test_structured_content_still_matches_the_output_schema(self):
@@ -70,14 +70,14 @@ class TestHandledErrorsSetTheProtocolFlag:
         here rather than assuming the envelope conforms."""
         async with session() as s:
             tools = {t.name: t for t in (await s.list_tools()).tools}
-            schema = tools["swisstopo_get_egrid"].outputSchema
+            schema = tools["swisstopo_get_egrid"].output_schema
             assert schema is not None
 
             result = await s.call_tool(
                 "swisstopo_get_egrid",
                 {"params": {"lat": 47.0, "lon": 8.5, "canton": "XX"}},
             )
-            jsonschema.validate(instance=result.structuredContent, schema=schema)
+            jsonschema.validate(instance=result.structured_content, schema=schema)
 
 
 class TestSuccessIsUnaffected:
@@ -86,9 +86,9 @@ class TestSuccessIsUnaffected:
             result = await s.call_tool(
                 "swisstopo_map_url", {"params": {"lat": 47.37, "lon": 8.54, "zoom": 10}}
             )
-            assert result.isError is False
-            assert result.structuredContent is not None
-            assert result.structuredContent["count"] == 1
+            assert result.is_error is False
+            assert result.structured_content is not None
+            assert result.structured_content["count"] == 1
 
     async def test_empty_result_is_not_an_error(self, monkeypatch):
         """`match_type: "none"` is a valid answer, not a failure — the
@@ -101,8 +101,8 @@ class TestSuccessIsUnaffected:
             result = await s.call_tool(
                 "swisstopo_geocode", {"params": {"search_text": "zzzznope"}}
             )
-            assert result.isError is False
-            assert result.structuredContent["match_type"] == "none"
+            assert result.is_error is False
+            assert result.structured_content["match_type"] == "none"
 
 
 class TestProtocolErrorsAreDistinct:
@@ -115,14 +115,14 @@ class TestProtocolErrorsAreDistinct:
     async def test_unknown_tool_is_an_error_result(self):
         async with session() as s:
             result = await s.call_tool("does_not_exist", {})
-            assert result.isError is True
+            assert result.is_error is True
 
     async def test_invalid_arguments_are_an_error_result(self):
         async with session() as s:
             result = await s.call_tool(
                 "swisstopo_geocode", {"params": {"search_text": "x"}}
             )
-            assert result.isError is True
+            assert result.is_error is True
 
     async def test_a_handled_error_is_not_a_protocol_error(self):
         """The separation the check is actually about: an upstream failure must
@@ -132,7 +132,7 @@ class TestProtocolErrorsAreDistinct:
                 "swisstopo_get_egrid",
                 {"params": {"lat": 47.0, "lon": 8.5, "canton": "XX"}},
             )
-            assert result.isError is True
-            assert result.structuredContent is not None, (
+            assert result.is_error is True
+            assert result.structured_content is not None, (
                 "a handled error keeps its envelope; a protocol error would not"
             )

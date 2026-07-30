@@ -15,7 +15,7 @@ from contextlib import asynccontextmanager
 from typing import Any
 
 from mcp import types
-from mcp.server.fastmcp import Context, FastMCP
+from mcp.server.mcpserver import Context, MCPServer
 from mcp.server.transport_security import TransportSecuritySettings
 from mcp.types import ToolAnnotations
 
@@ -31,7 +31,7 @@ _log = get_logger("swisstopo_mcp.server")
 
 # Process-wide resources (shared httpx client + tracing), reference-counted.
 #
-# The FastMCP lifespan is *not* a per-process hook: under streamable-http the
+# The MCPServer lifespan is *not* a per-process hook: under streamable-http the
 # SDK runs it once per MCP **session** (measured — three `initialize` POSTs
 # produced three startups, and a `DELETE /mcp` on one of three open sessions
 # produced one shutdown). Owning the client directly in that lifespan meant each
@@ -83,7 +83,7 @@ async def server_resources():
 
 
 @asynccontextmanager
-async def lifespan(server: FastMCP):
+async def lifespan(server: MCPServer):
     """MCP session lifespan.
 
     On stdio this runs once, because the process serves one session. On
@@ -94,54 +94,68 @@ async def lifespan(server: FastMCP):
         yield
 
 
-class _SwisstopoMCP(FastMCP):
-    """FastMCP that maps the envelope's `is_error` onto the protocol flag.
+class _SwisstopoMCP(MCPServer):
+    """MCPServer that maps the envelope's `is_error` onto the protocol flag.
 
     Handled execution errors are returned as a `ToolResponse` with
     `is_error: true` rather than raised, which is what keeps them out of the
     JSON-RPC error channel — the separation OBS-001 asks for. But the SDK builds
     a `CallToolResult` with `isError=False` for any tool that returns normally,
     so the payload field was the *only* signal: a spec-conformant client reading
-    `CallToolResult.isError` saw success for every handled error and would pass
+    `CallToolResult.is_error` saw success for every handled error and would pass
     a German error string downstream as though it were geodata (audit OBS-001).
 
-    The lowlevel `call_tool` handler returns a `CallToolResult` unchanged when
-    the registered handler produces one, so building it here is the supported
-    seam. Note this bypasses the SDK's output-schema validation on the error
-    path only; the payload is a `ToolResponse` this server constructed, so it
-    conforms by construction, and `tests/test_protocol_errors.py` asserts the
-    structured content still validates.
+    mcp 2.x changed the seam, and the 1.x version of this override would have
+    become a silent pass-through: it matched on the `(content, structured)`
+    tuple 1.x returned, while 2.x hands back a `CallToolResult` that never
+    matches — so every handled error would again have reported `is_error:
+    false` with no test noticing. (The signature would also have broken
+    outright: the SDK now calls `call_tool(name, arguments, context)`.)
+
+    Since 2.x already returns a validated `CallToolResult`, the flag is flipped
+    on a copy instead of rebuilding the result. That is strictly better than
+    the 1.x approach, which bypassed the SDK's output-schema validation on the
+    error path; nothing is reconstructed here, so nothing skips validation.
+    `tests/test_protocol_errors.py` asserts the structured content still
+    validates.
     """
 
     async def call_tool(  # type: ignore[override]
-        self, name: str, arguments: dict[str, Any]
+        self,
+        name: str,
+        arguments: dict[str, Any],
+        context: Context | None = None,
     ) -> Any:
-        result = await super().call_tool(name, arguments)
-        if isinstance(result, tuple) and len(result) == 2:
-            content, structured = result
+        result = await super().call_tool(name, arguments, context)
+        if isinstance(result, types.CallToolResult) and not result.is_error:
+            structured = result.structured_content
             if isinstance(structured, dict) and structured.get("is_error") is True:
-                return types.CallToolResult(
-                    content=list(content),
-                    structuredContent=structured,
-                    isError=True,
-                )
+                return result.model_copy(update={"is_error": True})
         return result
+
+
+def _transport_security() -> TransportSecuritySettings:
+    """Host/Origin allow-list for the HTTP transport (audit SDK-004 / SEC-005).
+
+    Without this the SDK keeps its localhost-only default list and rejects
+    every MCP request behind an ingress: 403 on a configured Origin, 421 on
+    the forwarded Host, while /healthz stays 200 so the readiness probe hides
+    it. DNS-rebinding protection stays ON — the fix is to feed it the
+    deployment's real hosts and origins, never to disable it (SEC-005 depends
+    on it).
+
+    Under mcp 2.x this is a per-app kwarg rather than a constructor argument.
+    """
+    return TransportSecuritySettings(
+        enable_dns_rebinding_protection=True,
+        allowed_hosts=settings.allowed_hosts_list,
+        allowed_origins=settings.transport_origins_list,
+    )
 
 
 mcp = _SwisstopoMCP(
     "swisstopo_mcp",
     lifespan=lifespan,
-    # Without this the SDK keeps its localhost-only default list and rejects
-    # every MCP request behind an ingress: 403 on a configured Origin, 421 on
-    # the forwarded Host, while /healthz stays 200 so the readiness probe hides
-    # it (audit SDK-004 / SCALE-001). DNS-rebinding protection stays ON — the
-    # fix is to feed it the deployment's real hosts and origins, never to
-    # disable it (SEC-005 depends on it).
-    transport_security=TransportSecuritySettings(
-        enable_dns_rebinding_protection=True,
-        allowed_hosts=settings.allowed_hosts_list,
-        allowed_origins=settings.transport_origins_list,
-    ),
     instructions=(
         "Swiss federal geodata server with 20 tools. "
         "swisstopo_map_query is the national map catalogue (api3.geo.admin.ch) and "
@@ -196,10 +210,10 @@ from swisstopo_mcp.geocoding import (  # noqa: E402
     name="swisstopo_geocode",
     annotations=ToolAnnotations(
         title="Adresse geocodieren",
-        readOnlyHint=True,
-        destructiveHint=False,
-        idempotentHint=True,
-        openWorldHint=True,
+        read_only_hint=True,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=True,
     ),
 )
 async def swisstopo_geocode(params: GeocodeInput) -> ToolResponse:
@@ -216,10 +230,10 @@ async def swisstopo_geocode(params: GeocodeInput) -> ToolResponse:
     name="swisstopo_reverse_geocode",
     annotations=ToolAnnotations(
         title="Koordinaten zu Adresse",
-        readOnlyHint=True,
-        destructiveHint=False,
-        idempotentHint=True,
-        openWorldHint=True,
+        read_only_hint=True,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=True,
     ),
 )
 async def swisstopo_reverse_geocode(params: ReverseGeocodeInput) -> ToolResponse:
@@ -245,10 +259,10 @@ from swisstopo_mcp.rest_api import (  # noqa: E402
     name="swisstopo_map_query",
     annotations=ToolAnnotations(
         title="Nationaler Kartenkatalog: Layer und Features",
-        readOnlyHint=True,
-        destructiveHint=False,
-        idempotentHint=True,
-        openWorldHint=True,
+        read_only_hint=True,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=True,
     ),
 )
 async def swisstopo_map_query(
@@ -289,10 +303,10 @@ from swisstopo_mcp.stac import (  # noqa: E402
     name="swisstopo_search_geodata",
     annotations=ToolAnnotations(
         title="Geodaten suchen",
-        readOnlyHint=True,
-        destructiveHint=False,
-        idempotentHint=True,
-        openWorldHint=True,
+        read_only_hint=True,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=True,
     ),
 )
 async def swisstopo_search_geodata(params: SearchGeodataInput) -> ToolResponse:
@@ -310,10 +324,10 @@ async def swisstopo_search_geodata(params: SearchGeodataInput) -> ToolResponse:
     name="swisstopo_get_collection",
     annotations=ToolAnnotations(
         title="Geodaten-Details abrufen",
-        readOnlyHint=True,
-        destructiveHint=False,
-        idempotentHint=True,
-        openWorldHint=True,
+        read_only_hint=True,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=True,
     ),
 )
 async def swisstopo_get_collection(params: GetCollectionInput) -> ToolResponse:
@@ -333,10 +347,10 @@ from swisstopo_mcp.wmts import MapUrlInput, build_map_url  # noqa: E402
     name="swisstopo_map_url",
     annotations=ToolAnnotations(
         title="Karten-URL generieren",
-        readOnlyHint=True,
-        destructiveHint=False,
-        idempotentHint=True,
-        openWorldHint=True,
+        read_only_hint=True,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=True,
     ),
 )
 async def swisstopo_map_url(params: MapUrlInput) -> ToolResponse:
@@ -361,10 +375,10 @@ from swisstopo_mcp.height import (  # noqa: E402
     name="swisstopo_get_height",
     annotations=ToolAnnotations(
         title="Höhe abfragen",
-        readOnlyHint=True,
-        destructiveHint=False,
-        idempotentHint=True,
-        openWorldHint=True,
+        read_only_hint=True,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=True,
     ),
 )
 async def swisstopo_get_height(params: HeightInput) -> ToolResponse:
@@ -382,10 +396,10 @@ async def swisstopo_get_height(params: HeightInput) -> ToolResponse:
     name="swisstopo_elevation_profile",
     annotations=ToolAnnotations(
         title="Höhenprofil berechnen",
-        readOnlyHint=True,
-        destructiveHint=False,
-        idempotentHint=True,
-        openWorldHint=True,
+        read_only_hint=True,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=True,
     ),
 )
 async def swisstopo_elevation_profile(params: ElevationProfileInput, ctx: Context) -> ToolResponse:
@@ -403,10 +417,10 @@ async def swisstopo_elevation_profile(params: ElevationProfileInput, ctx: Contex
     name="swisstopo_zoning_at",
     annotations=ToolAnnotations(
         title="Bauzone an Koordinate",
-        readOnlyHint=True,
-        destructiveHint=False,
-        idempotentHint=True,
-        openWorldHint=True,
+        read_only_hint=True,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=True,
     ),
 )
 async def swisstopo_zoning_at(params: ZoningAtInput) -> ToolResponse:
@@ -426,10 +440,10 @@ async def swisstopo_zoning_at(params: ZoningAtInput) -> ToolResponse:
     name="swisstopo_municipality_at",
     annotations=ToolAnnotations(
         title="Gemeinde an Koordinate",
-        readOnlyHint=True,
-        destructiveHint=False,
-        idempotentHint=True,
-        openWorldHint=True,
+        read_only_hint=True,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=True,
     ),
 )
 async def swisstopo_municipality_at(params: MunicipalityAtInput) -> ToolResponse:
@@ -455,10 +469,10 @@ from swisstopo_mcp.coords import (  # noqa: E402
     name="swisstopo_convert_coordinates",
     annotations=ToolAnnotations(
         title="Koordinaten umrechnen (REFRAME)",
-        readOnlyHint=True,
-        destructiveHint=False,
-        idempotentHint=True,
-        openWorldHint=True,
+        read_only_hint=True,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=True,
     ),
 )
 async def swisstopo_convert_coordinates(params: ConvertCoordinatesInput) -> ToolResponse:
@@ -490,10 +504,10 @@ from swisstopo_mcp.oereb import (  # noqa: E402
     name="swisstopo_get_egrid",
     annotations=ToolAnnotations(
         title="Grundstück-ID (EGRID) ermitteln",
-        readOnlyHint=True,
-        destructiveHint=False,
-        idempotentHint=True,
-        openWorldHint=True,
+        read_only_hint=True,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=True,
     ),
 )
 async def swisstopo_get_egrid(params: GetEgridInput) -> ToolResponse:
@@ -511,10 +525,10 @@ async def swisstopo_get_egrid(params: GetEgridInput) -> ToolResponse:
     name="swisstopo_get_oereb_extract",
     annotations=ToolAnnotations(
         title="ÖREB-Auszug abrufen",
-        readOnlyHint=True,
-        destructiveHint=False,
-        idempotentHint=True,
-        openWorldHint=True,
+        read_only_hint=True,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=True,
     ),
 )
 async def swisstopo_get_oereb_extract(params: GetOerebExtractInput, ctx: Context) -> ToolResponse:
@@ -532,10 +546,10 @@ async def swisstopo_get_oereb_extract(params: GetOerebExtractInput, ctx: Context
     name="swisstopo_oereb_at",
     annotations=ToolAnnotations(
         title="ÖREB-Auszug an Koordinate",
-        readOnlyHint=True,
-        destructiveHint=False,
-        idempotentHint=True,
-        openWorldHint=True,
+        read_only_hint=True,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=True,
     ),
 )
 async def swisstopo_oereb_at(params: OerebAtInput, ctx: Context) -> ToolResponse:
@@ -564,10 +578,10 @@ from swisstopo_mcp.geodata import (  # noqa: E402
     name="swisstopo_list_available_layers",
     annotations=ToolAnnotations(
         title="Verfügbare Geodaten-Layer auflisten",
-        readOnlyHint=True,
-        destructiveHint=False,
-        idempotentHint=True,
-        openWorldHint=True,
+        read_only_hint=True,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=True,
     ),
 )
 async def list_available_layers_tool(params: ListLayersInput) -> ToolResponse:
@@ -585,10 +599,10 @@ async def list_available_layers_tool(params: ListLayersInput) -> ToolResponse:
     name="swisstopo_query_geodata",
     annotations=ToolAnnotations(
         title="Geodaten abfragen (Fassade)",
-        readOnlyHint=True,
-        destructiveHint=False,
-        idempotentHint=True,
-        openWorldHint=True,
+        read_only_hint=True,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=True,
     ),
 )
 async def query_geodata_tool(params: QueryGeodataInput) -> ToolResponse:
@@ -612,10 +626,10 @@ from swisstopo_mcp.overpass import QueryOsmFeaturesInput, query_osm_features  # 
     name="swisstopo_query_osm_features",
     annotations=ToolAnnotations(
         title="OpenStreetMap-POIs abfragen (Overpass)",
-        readOnlyHint=True,
-        destructiveHint=False,
-        idempotentHint=True,
-        openWorldHint=True,
+        read_only_hint=True,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=True,
     ),
 )
 async def query_osm_features_tool(
@@ -648,10 +662,10 @@ from swisstopo_mcp.openplz import (  # noqa: E402
     name="swisstopo_lookup_postal_code",
     annotations=ToolAnnotations(
         title="PLZ zu Gemeinde/BFS-Nummer auflösen",
-        readOnlyHint=True,
-        destructiveHint=False,
-        idempotentHint=True,
-        openWorldHint=True,
+        read_only_hint=True,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=True,
     ),
 )
 async def lookup_postal_code_tool(params: LookupPostalCodeInput) -> ToolResponse:
@@ -671,10 +685,10 @@ async def lookup_postal_code_tool(params: LookupPostalCodeInput) -> ToolResponse
     name="swisstopo_find_commune",
     annotations=ToolAnnotations(
         title="Gemeinde auflösen (Name ↔ BFS-Nummer, Kanton/Bezirk)",
-        readOnlyHint=True,
-        destructiveHint=False,
-        idempotentHint=True,
-        openWorldHint=True,
+        read_only_hint=True,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=True,
     ),
 )
 async def find_commune_tool(
@@ -700,10 +714,10 @@ async def find_commune_tool(
     name="swisstopo_search_address",
     annotations=ToolAnnotations(
         title="Adressen/Orte per Volltext suchen",
-        readOnlyHint=True,
-        destructiveHint=False,
-        idempotentHint=True,
-        openWorldHint=True,
+        read_only_hint=True,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=True,
     ),
 )
 async def search_address_tool(params: SearchAddressInput) -> ToolResponse:
@@ -837,7 +851,7 @@ Für kantonale Datensätze statt Bundesdaten zeigt
 anbietet."""
 
 
-def _install_session_manager() -> None:
+def _install_session_manager(app, security: TransportSecuritySettings) -> None:
     """Give the Streamable-HTTP session manager an explicit idle timeout.
 
     The SDK's default is `session_idle_timeout=None`: a session lives until the
@@ -847,27 +861,56 @@ def _install_session_manager() -> None:
     confidentiality problem here (all 20 tools are stateless reads over public
     data), but unbounded growth is still unbounded (audit SEC-009).
 
-    FastMCP exposes no setting for it and builds the manager lazily —
-    `streamable_http_app()` only constructs one `if self._session_manager is
-    None` — so pre-populating it is how the timeout gets in. Measured against a
-    running server: with the timeout set, an idle session is reaped and returns
-    404, while activity pushes the deadline back.
+    There is still no setting for it, and mcp 2.x changed how it gets in. In
+    1.x the app built the manager lazily — `if self._session_manager is None` —
+    so pre-populating the attribute before calling `streamable_http_app()` was
+    enough. 2.x builds one *unconditionally*, overwrites the attribute, hands
+    that object to the route's ASGI app and closes the app lifespan over the
+    same local variable. Pre-populating is a plain no-op there, which would
+    have dropped this mitigation silently. So the manager is swapped in after
+    the app exists, in both places the SDK wired its own into:
+
+      1. `StreamableHTTPASGIApp.session_manager` — serves the requests.
+      2. the app lifespan — starts the manager's task group and the reaper.
+
+    Both are private SDK surface. The mismatch is loud rather than silent: if
+    the route stops being a `StreamableHTTPASGIApp`, this raises instead of
+    leaving a server that looks configured and is not.
 
     `SWISSTOPO_SESSION_IDLE_TIMEOUT=0` restores the SDK's unbounded behaviour.
     """
-    from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
-
-    if mcp._session_manager is not None:  # pragma: no cover - built once
-        return
+    from mcp.server.streamable_http_manager import (
+        StreamableHTTPASGIApp,
+        StreamableHTTPSessionManager,
+    )
 
     timeout = settings.session_idle_timeout
-    mcp._session_manager = StreamableHTTPSessionManager(
-        app=mcp._mcp_server,
-        json_response=mcp.settings.json_response,
-        stateless=mcp.settings.stateless_http,
-        security_settings=mcp.settings.transport_security,
-        session_idle_timeout=timeout if timeout > 0 else None,
+    if timeout <= 0:
+        return
+
+    manager = StreamableHTTPSessionManager(
+        app=mcp._lowlevel_server,
+        security_settings=security,
+        session_idle_timeout=timeout,
     )
+    mcp._lowlevel_server._session_manager = manager
+
+    asgi_apps = [
+        r.endpoint
+        for r in app.routes
+        if isinstance(getattr(r, "endpoint", None), StreamableHTTPASGIApp)
+    ]
+    if not asgi_apps:  # pragma: no cover - defensive
+        raise RuntimeError(
+            "No StreamableHTTPASGIApp route found; the idle-session timeout "
+            "(SEC-009) could not be installed. The SDK's app layout changed."
+        )
+    for asgi_app in asgi_apps:
+        asgi_app.session_manager = manager
+
+    # The SDK set `lifespan=lambda app: session_manager.run()` over the manager
+    # it built. Point it at ours, or the replacement never starts its reaper.
+    app.router.lifespan_context = lambda _scoped_app: manager.run()
 
 
 def build_http_app(allowed_origins: list[str] | None = None):
@@ -892,8 +935,14 @@ def build_http_app(allowed_origins: list[str] | None = None):
     async def _healthz(_request):
         return JSONResponse({"status": "ok"})
 
-    _install_session_manager()
-    app = mcp.streamable_http_app()
+    # mcp 2.x: transport_security is a per-app kwarg, not a constructor arg.
+    security = _transport_security()
+    app = mcp.streamable_http_app(
+        transport_security=security, host=settings.http_host
+    )
+    # Must run before `sdk_lifespan` is captured below: it replaces the app's
+    # lifespan, and the wrapper has to see the replacement, not the original.
+    _install_session_manager(app, security)
 
     sdk_lifespan = app.router.lifespan_context
 

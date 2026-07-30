@@ -46,7 +46,7 @@ async def collect() -> dict[str, str]:
                 {
                     "name": tool.name,
                     "description": _normalise_description(tool.description),
-                    "schema": tool.inputSchema,
+                    "schema": tool.input_schema,
                 },
                 sort_keys=True,
                 ensure_ascii=False,

@@ -2,7 +2,7 @@
 
 Every tool returns a `ToolResponse`: machine-readable structured fields
 (`results`, `count`, `match_type`, `source`, `license`, `provenance`) plus a
-human-readable Markdown `summary`. FastMCP emits this as structured content
+human-readable Markdown `summary`. MCPServer emits this as structured content
 *and* a JSON text block, so clients get both.
 """
 from __future__ import annotations

@@ -2,7 +2,7 @@
 """ÖREB Cadastre tools for cantonal ÖREB services."""
 from __future__ import annotations
 
-from mcp.server.fastmcp import Context
+from mcp.server.mcpserver import Context
 from pydantic import BaseModel, ConfigDict, Field
 
 from swisstopo_mcp.api_client import (

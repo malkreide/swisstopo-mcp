@@ -7,6 +7,72 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Migrated to the `mcp` 2.x server API.** Pin `>=1.28.1,<2` → `>=2.0.0,<3`;
+  `FastMCP` → `MCPServer` (`mcp.server.mcpserver`). The floor is hard: 2.0.0
+  removed `mcp.server.fastmcp` with no compatibility shim, so this code cannot
+  run on 1.x, and a `>=1.x` range would let a resolver pick a version that
+  fails at import.
+
+- **The session idle timeout (SEC-009) had to be reinstalled differently, or it
+  would have vanished silently.** 1.x built the Streamable-HTTP session manager
+  lazily — `streamable_http_app()` only constructed one `if
+  self._session_manager is None` — so pre-populating that attribute was enough.
+  2.x builds one *unconditionally*, overwrites the attribute, hands it to the
+  route's ASGI app and closes the app lifespan over the same local object. The
+  1.x approach is a plain no-op under 2.x: no error, just unbounded session
+  growth again.
+
+  The manager is now swapped in *after* the app exists, in both places the SDK
+  wired its own into — the route's `StreamableHTTPASGIApp.session_manager` and
+  the app lifespan. Missing either one is silent in a different way: re-pointing
+  only the route leaves requests served by our manager while the lifespan starts
+  the SDK's, so the reaper never runs on the live sessions. A test enters the
+  real lifespan and asserts `_has_started` on the *serving* manager, which is
+  the only assertion that separates the two cases. Both halves are
+  mutation-tested.
+
+- **`_SwisstopoMCP.call_tool()` would have become a silent no-op (OBS-001).**
+  The override mapped the envelope's `is_error` onto the protocol flag by
+  matching 1.x's `(content, structured)` tuple return. 2.x returns a
+  `CallToolResult`, which never matches — so every handled error would have
+  reported `is_error: false` again, and no test on the payload field would have
+  noticed. (The signature would also have broken outright: 2.x calls
+  `call_tool(name, arguments, context)`.)
+
+  The flag is now flipped on a copy of the already-validated result. That is
+  strictly better than the 1.x approach, which rebuilt the result and thereby
+  bypassed the SDK's output-schema validation on the error path.
+
+- **Resource errors are sanitised by the SDK now — a client-visible change.**
+  2.x raises `ResourceError(f"Error reading resource {uri}") from exc`, with the
+  comment "we should not leak the exception to the client". So on a geodienste
+  outage the catalogue resource still errors rather than publishing `count: 0`
+  (which is the point of that guard), but the actionable hint the server put in
+  the message no longer reaches the client — it survives only server-side on
+  `__cause__`. The test asserts both halves.
+
+- **Protocol drift guard split across the two eras (ARCH-012).** 2.x serves a
+  legacy `initialize` handshake capping at 2025-11-25 *and* a modern
+  per-request-envelope era reaching 2026-07-28, over the same server.
+  `LATEST_PROTOCOL_VERSION` aliases the modern one, so the old single assertion
+  compared the documented value against the wrong constant and failed. Both
+  eras are pinned separately now, and the handshake ceiling is measured against
+  a live server: a legacy client asking for `2026-07-28` gets `2025-11-25` back,
+  and older clients keep their own revision.
+
+- **`transport_security` is a per-app kwarg**, no longer a constructor argument
+  or a readable setting; `streamable_http_app()` also receives the real bind
+  host, since 2.x would otherwise auto-enable a loopback-only allow-list and
+  reject every request to a non-loopback bind with HTTP 421.
+
+  Verified against all four CI gates: **866 passed / 38 deselected, 0 failed**;
+  `ruff check src/ tests/` clean; `mypy src/` clean; and
+  `scripts/snapshot_tool_hashes.py --check` reports `tool-hashes.json is up to
+  date (20 tools)` — no tool contract moved. Run in a venv built the way CI
+  builds it (`pip install -e ".[dev]"`).
+
 ### Changed — BREAKING
 
 - **The five api3 tools are now one tool with an `operation` argument (audit

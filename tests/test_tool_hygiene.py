@@ -107,9 +107,9 @@ def _model_facing_text(tool_list: Any) -> list[tuple[str, str]]:
     for tool in tool_list:
         texts.append((f"{tool.name}:name", tool.name))
         texts.append((f"{tool.name}:description", tool.description or ""))
-        texts.extend(_schema_descriptions(tool.inputSchema, f"{tool.name}:input"))
-        if tool.outputSchema:
-            texts.extend(_schema_descriptions(tool.outputSchema, f"{tool.name}:output"))
+        texts.extend(_schema_descriptions(tool.input_schema, f"{tool.name}:input"))
+        if tool.output_schema:
+            texts.extend(_schema_descriptions(tool.output_schema, f"{tool.name}:output"))
     texts.append(("server:instructions", mcp.instructions or ""))
     return texts
 
@@ -150,7 +150,7 @@ class TestEveryToolIsReadOnly:
     """SEC-014's deferral rests on this. If it ever fails, the deferral is void."""
 
     def test_all_tools_declare_read_only(self, tools):
-        offenders = [t.name for t in tools if not (t.annotations and t.annotations.readOnlyHint)]
+        offenders = [t.name for t in tools if not (t.annotations and t.annotations.read_only_hint)]
         assert offenders == [], (
             f"Tools without readOnlyHint: {offenders}. SEC-014's risk-bounding "
             "argument assumes a read-only surface — re-evaluate the deferral in "
@@ -159,7 +159,7 @@ class TestEveryToolIsReadOnly:
 
     def test_no_tool_is_destructive(self, tools):
         offenders = [
-            t.name for t in tools if t.annotations and t.annotations.destructiveHint
+            t.name for t in tools if t.annotations and t.annotations.destructive_hint
         ]
         assert offenders == []
 
@@ -318,9 +318,9 @@ class TestThisFileContainsNoLiteralInvisibles:
 # ---------------------------------------------------------------------------
 # Read-only as a property, not a declaration (audit SEC-014)
 #
-# `TestEveryToolIsReadOnly` above reads `t.annotations.readOnlyHint` — a value
+# `TestEveryToolIsReadOnly` above reads `t.annotations.read_only_hint` — a value
 # the tool asserts about itself. A future tool that performs a write while still
-# carrying `readOnlyHint=True` passes it. The premise SEC-014's whole deferral
+# carrying `read_only_hint=True` passes it. The premise SEC-014's whole deferral
 # rests on was therefore one indirection away from what the gate checked, and
 # the re-audit verified the property by hand rather than by test.
 #

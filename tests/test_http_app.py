@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 import httpx
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 from starlette.middleware.cors import CORSMiddleware
 
 from swisstopo_mcp.config import Settings
-from swisstopo_mcp.server import build_http_app, mcp
+from swisstopo_mcp.server import _transport_security, build_http_app, mcp
 
 
 def _cors_kwargs(app):
@@ -71,18 +71,18 @@ _HEADERS = {
 
 
 def _probe_app():
-    """A throwaway FastMCP carrying the *same* transport-security settings as the
+    """A throwaway MCPServer carrying the *same* transport-security settings as the
     real server, so each test gets a fresh session manager.
 
     `build_http_app()` reuses the module-level `mcp`, whose session manager
     refuses to `.run()` twice — sharing one lifespan across tests instead trips
     an anyio cancel-scope error on teardown.
+
+    mcp 2.x: `transport_security` moved off the constructor onto the app, so
+    the probe passes it to `streamable_http_app()` instead.
     """
-    probe = FastMCP(
-        "swisstopo_mcp_probe",
-        transport_security=mcp.settings.transport_security,
-    )
-    return probe.streamable_http_app()
+    probe = MCPServer("swisstopo_mcp_probe")
+    return probe.streamable_http_app(transport_security=_transport_security())
 
 
 async def _post_mcp(extra_headers: dict[str, str]) -> int:
@@ -100,18 +100,29 @@ async def _post_mcp(extra_headers: dict[str, str]) -> int:
 
 
 class TestTransportSecurityIsWired:
-    def test_fastmcp_got_transport_security(self):
+    """mcp 2.x: the allow-list is an app kwarg, so these read the builder.
+
+    In 1.x the same facts were asserted against ``mcp.settings.transport_security``.
+    That field no longer exists — and a stale read would raise ``AttributeError``
+    rather than quietly pass, so nothing here can silently stop checking.
+    """
+
+    def test_server_got_transport_security(self):
         """Guards the fix itself: without this the SDK falls back to its
         localhost-only default and every proxied request fails."""
-        assert mcp.settings.transport_security is not None
+        assert _transport_security() is not None
 
     def test_dns_rebinding_protection_stays_on(self):
         """SEC-005 depends on it — the fix is to feed the middleware the right
         lists, never to switch it off."""
-        assert mcp.settings.transport_security.enable_dns_rebinding_protection is True
+        assert _transport_security().enable_dns_rebinding_protection is True
 
     def test_deployment_host_reaches_the_middleware(self):
-        assert "127.0.0.1:*" in mcp.settings.transport_security.allowed_hosts
+        assert "127.0.0.1:*" in _transport_security().allowed_hosts
+
+    def test_settings_no_longer_carries_transport_security(self):
+        """Pins why the assertions above moved off ``mcp.settings``."""
+        assert not hasattr(mcp.settings, "transport_security")
 
 
 class TestTransportSecuritySettings:
@@ -179,52 +190,80 @@ class TestTransportSecurityRequests:
 
 
 class TestSessionIdleTimeout:
-    @staticmethod
-    def _fresh_manager():
-        """Force a rebuild — the manager is built once and cached."""
-        from swisstopo_mcp import server
+    """mcp 2.x changed how this mitigation gets installed.
 
-        server.mcp._session_manager = None
-        server._install_session_manager()
-        return server.mcp._session_manager
+    1.x built the session manager lazily (`if self._session_manager is None`),
+    so pre-populating the attribute before `streamable_http_app()` was enough.
+    2.x builds one *unconditionally*, overwrites the attribute, hands that
+    object to the route's ASGI app and closes the app lifespan over the same
+    local variable. Pre-populating is a plain no-op there — the timeout would
+    have vanished silently.
+
+    So these tests read the manager that actually serves requests, off the
+    route, instead of trusting a private attribute to still be the live one.
+    """
+
+    @staticmethod
+    def _serving_manager(app):
+        """The manager the route will actually dispatch to."""
+        from mcp.server.streamable_http_manager import StreamableHTTPASGIApp
+
+        for route in app.routes:
+            endpoint = getattr(route, "endpoint", None)
+            if isinstance(endpoint, StreamableHTTPASGIApp):
+                return endpoint.session_manager
+        raise AssertionError("no StreamableHTTPASGIApp route on the built app")
 
     def test_timeout_is_set_explicitly(self):
         """The criterion is an *explicit* TTL, not whatever the SDK defaults to."""
-        assert self._fresh_manager().session_idle_timeout == 1800.0
+        manager = self._serving_manager(build_http_app([]))
+        assert manager.session_idle_timeout == 1800.0
 
     def test_timeout_comes_from_settings(self, monkeypatch):
         from swisstopo_mcp.config import settings
 
         monkeypatch.setattr(settings, "session_idle_timeout", 900.0)
-        assert self._fresh_manager().session_idle_timeout == 900.0
+        assert self._serving_manager(build_http_app([])).session_idle_timeout == 900.0
 
     def test_zero_restores_the_sdk_default(self, monkeypatch):
         """An operator who wants the old unbounded behaviour can have it, but
-        has to ask for it."""
+        has to ask for it. Then no custom manager is installed at all and the
+        SDK's own (unbounded) one stays in place."""
         from swisstopo_mcp.config import settings
 
         monkeypatch.setattr(settings, "session_idle_timeout", 0.0)
-        assert self._fresh_manager().session_idle_timeout is None
+        assert self._serving_manager(build_http_app([])).session_idle_timeout is None
 
     def test_transport_security_survives_the_custom_manager(self):
         """Building the manager ourselves must not drop the DNS-rebinding
         protection the SDK would have wired up (SDK-004 / SEC-005)."""
-        manager = self._fresh_manager()
+        manager = self._serving_manager(build_http_app([]))
         assert manager.security_settings is not None
         assert manager.security_settings.enable_dns_rebinding_protection is True
 
-    def test_build_http_app_installs_it(self):
+    async def test_the_lifespan_starts_our_manager_not_the_sdks(self):
+        """The load-bearing case for the 2.x rewrite.
+
+        The SDK sets `lifespan=lambda app: session_manager.run()` over the
+        manager *it* built. Re-pointing only the route would leave requests
+        served by our manager while the lifespan started the SDK's — so the
+        reaper would never run on the sessions actually being served, and every
+        other assertion in this class would still pass.
+
+        `run()` is what flips `_has_started`, so entering the real lifespan and
+        checking that flag on the *serving* manager is the only assertion that
+        distinguishes the two. Verified by mutation: dropping the lifespan
+        re-point makes this test — and only this test — fail.
+        """
         from swisstopo_mcp import server
 
-        server.mcp._session_manager = None
-        server.build_http_app([])
-        assert server.mcp._session_manager is not None
-        assert server.mcp._session_manager.session_idle_timeout == 1800.0
-
-    def teardown_method(self):
-        """Leave the module-level manager rebuilt with real settings, so test
-        order cannot leak a 900-second or disabled manager into other tests."""
-        from swisstopo_mcp import server
-
-        server.mcp._session_manager = None
-        server._install_session_manager()
+        app = build_http_app([])
+        served = self._serving_manager(app)
+        assert served is server.mcp._lowlevel_server._session_manager
+        assert served._has_started is False
+        async with app.router.lifespan_context(app):
+            assert served._has_started is True, (
+                "the app lifespan started a different session manager than the "
+                "one serving requests — the idle-session reaper (SEC-009) would "
+                "never run on the live sessions"
+            )

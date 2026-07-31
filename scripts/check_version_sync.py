@@ -69,10 +69,40 @@ def code_lines(text: str) -> list[str]:
     return lines
 
 
+def norm(token: str) -> str:
+    """Kleingeschrieben und ohne Trennzeichen — zum Vergleich von Produkt-Token
+    und Dist-Namen.
+
+    Das Produkt-Token im User-Agent ist nicht immer der Dist-Name:
+    `swisstopo-mcp` sendet `SwisstopoMCP/0.1`. Ein wörtlicher Vergleich liess
+    dort ein hartkodiertes Literal als sauber durchgehen — genau das Versagen,
+    gegen das dieser Check existiert.
+    """
+    return re.sub(r"[^a-z0-9]", "", token.lower())
+
+
+# Irgendein Produkt-Token, gefolgt von einer gepunkteten Zahl. Welches davon
+# uns gehört, entscheidet der normalisierte Vergleich mit dem Dist-Namen —
+# fremde Token (`Mozilla/5.0`, `httpx/0.27`) fallen so heraus.
+_UA = re.compile(r"""([A-Za-z][A-Za-z0-9_.+-]*)/(\d+\.\d[^\s"']*)""")
+
+
+def own_ua_versions(line: str, dist: str) -> list[str]:
+    """Versionen aus den User-Agents, deren Produkt-Token uns gehört.
+
+    Eigene Funktion, damit die Zeile auch bei `line-length = 88` passt: im
+    Portfolio stehen 88, 100 und 120 nebeneinander, und `ruff format` zieht
+    einen Ausdruck zusammen, sobald er in die jeweilige Breite passt. Eine
+    mehrzeilige Comprehension waere damit in der einen Haelfte der Repos
+    formatgerecht und in der anderen nicht.
+    """
+    return [m.group(2) for m in _UA.finditer(line) if norm(m.group(1)) == norm(dist)]
+
+
 def find_hardcoded(dist: str) -> list[tuple[str, int, str]]:
     """Manuell gepflegte Versionen in `src/`.
 
-    Zwei Formen kommen im Portfolio vor: der User-Agent (`<dist>/1.2.3`) und
+    Zwei Formen kommen im Portfolio vor: der User-Agent (`<token>/1.2.3`) und
     die `__version__`-Zuweisung. Die Projekt-URL trägt denselben Namen, aber
     keine Ziffer danach — deshalb verlangt das Muster eine gepunktete Zahl.
 
@@ -85,12 +115,11 @@ def find_hardcoded(dist: str) -> list[tuple[str, int, str]]:
     if not SRC.is_dir():
         return hits
 
-    ua = re.compile(rf"{re.escape(dist)}/(\d+\.\d[^\s\"']*)")
     dunder = re.compile(r"""__version__\s*=\s*["']([^"']+)["']""")
 
     for path in sorted(SRC.rglob("*.py")):
         for lineno, line in enumerate(code_lines(path.read_text(encoding="utf-8")), start=1):
-            values = [m.group(1) for m in ua.finditer(line)]
+            values = own_ua_versions(line, dist)
             for m in dunder.finditer(line):
                 if re.match(r"\d+\.\d", m.group(1)):
                     values.append(m.group(1))

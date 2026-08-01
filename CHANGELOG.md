@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-07-30
+
 ### Changed
 
 - **Migrated to the `mcp` 2.x server API.** Pin `>=1.28.1,<2` → `>=2.0.0,<3`;

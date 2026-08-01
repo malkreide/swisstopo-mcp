@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The ruff cap was a downgrade in disguise (`<0.16` → `<0.17`).** The bound
+  was picked from the floor rather than from the version actually in use. The
+  rest of the portfolio runs ruff 0.16.x; `<0.16` pinned this repo back to
+  0.15 instead of freezing it where it was. A cap is meant to stop CI turning
+  red without a code change, not to move the toolchain backwards.
+
+  Verified against ruff 0.16.1 before raising the bound — `ruff check src/
+  tests/` passes, so the wider cap changes nothing about what the linter
+  accepts here.
+
 - **The version-sync check was blind to the one drift it exists for, on this
   repo specifically.** `check_version_sync.py` built its User-Agent pattern
   from the distribution name — `re.compile(rf"{re.escape(dist)}/(\d+\.\d…)")`

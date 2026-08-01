@@ -55,11 +55,16 @@ dev = [
     "pytest-asyncio>=0.23.0",
     "pytest-cov>=5.0.0",
     "respx>=0.21.0",
-    # Capped at the next minor: ruff is pre-1.0, so its minors are where rule
-    # behaviour and new checks within the selected E/F/W/I/UP families land. An
-    # open upper bound turns CI red on a ruff release with no change of ours.
-    # Dependabot proposes the bump, so the cap is a review gate, not a freeze.
-    "ruff>=0.4.0,<0.16",
+    # Capped: ruff is pre-1.0, so its minors are where rule behaviour and new
+    # checks within the selected E/F/W/I/UP families land. An open upper bound
+    # turns CI red on a ruff release with no change of ours. Dependabot proposes
+    # the bump, so the cap is a review gate, not a freeze.
+    #
+    # The bound sits above the minor actually in use (0.16.x), not below it. A
+    # cap picked from the floor rather than from reality reads as a freeze but
+    # acts as a downgrade — the rest of the portfolio runs 0.16.x, and `<0.16`
+    # quietly pulled this repo back to 0.15 instead of pinning where it was.
+    "ruff>=0.4.0,<0.17",
     "mypy>=1.10.0",
     # Test-only: the egress-ACL test parses deploy/smokescreen-acl.yaml the way
     # the proxy would (SEC-021). Not a runtime dependency — the server itself

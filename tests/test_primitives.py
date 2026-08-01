@@ -23,6 +23,7 @@ import asyncio
 import json
 
 import pytest
+from mcp.server.mcpserver.exceptions import ResourceError, ResourceNotFoundError
 
 from swisstopo_mcp.server import mcp, server_resources
 
@@ -220,9 +221,16 @@ class TestTheResourceDoesNotPublishAnOutageAsAnEmptyCatalogue:
         """
         self._break_upstream(monkeypatch)
         async with server_resources():
-            with pytest.raises(Exception) as excinfo:
+            with pytest.raises(ResourceError) as excinfo:
                 list(await mcp.read_resource(CATALOGUE_URI))
 
+        # `ResourceError` alone does not pin this: `ResourceNotFoundError`
+        # subclasses it, so a typo in CATALOGUE_URI would keep the test green
+        # while proving only that unknown URIs are rejected. The read has to
+        # fail because the *upstream* broke, which is a found resource.
+        assert not isinstance(excinfo.value, ResourceNotFoundError), (
+            "the resource was not found at all — this no longer tests the outage path"
+        )
         # What the client is told: the URI, and nothing about the upstream.
         assert str(CATALOGUE_URI) in str(excinfo.value)
         # What the server keeps: the tool's own diagnostic, via `from exc`.

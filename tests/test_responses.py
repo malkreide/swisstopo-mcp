@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import pytest
+from mcp.server.mcpserver.exceptions import ToolError
+from pydantic import ValidationError
 
 from swisstopo_mcp.geocoding import GeocodeInput, geocode
 from swisstopo_mcp.height import HeightInput, get_height
@@ -25,8 +27,12 @@ class TestToolResponseModel:
         assert r.count == 0 and r.results == []
 
     def test_extra_fields_forbidden(self):
-        with pytest.raises(Exception):
+        # A bare ValidationError would also pass if `summary` were renamed and
+        # the model rejected a *missing* field instead. The field name and the
+        # error code together pin it to `extra="forbid"`.
+        with pytest.raises(ValidationError, match="bogus") as excinfo:
             ToolResponse(summary="x", bogus=1)  # type: ignore[call-arg]
+        assert "extra_forbidden" in str(excinfo.value)
 
 
 class TestHandlerEnvelopes:
@@ -100,14 +106,22 @@ class TestProtocolErrors:
     async def test_invalid_params_raises(self):
         from swisstopo_mcp.server import mcp
 
-        with pytest.raises(Exception):
+        # `ToolError` alone does not pin this: an unknown tool raises the same
+        # type (see the test below), so a typo in the tool name would keep this
+        # green while testing nothing. `match` ties the failure to the rejected
+        # field, and the chained ValidationError to *why* it was rejected.
+        with pytest.raises(ToolError, match="search_text") as excinfo:
             # search_text below min_length -> validation / -32602
             await mcp.call_tool("swisstopo_geocode", {"params": {"search_text": "x"}})
+        assert isinstance(excinfo.value.__cause__, ValidationError)
+        assert "string_too_short" in str(excinfo.value)
 
     async def test_unknown_tool_raises(self):
         from swisstopo_mcp.server import mcp
 
-        with pytest.raises(Exception):
+        # Without `match` this would also pass if the tool existed and merely
+        # failed to execute — the opposite of what the test is named for.
+        with pytest.raises(ToolError, match="Unknown tool"):
             await mcp.call_tool("does_not_exist", {})
 
 

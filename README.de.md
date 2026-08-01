@@ -1,6 +1,6 @@
 > 🇨🇭 **Teil des [Swiss Public Data MCP Portfolios](https://github.com/malkreide)**
 
-# 🗺️ swisstopo-mcp
+# swisstopo-mcp
 
 ![Version](https://img.shields.io/badge/version-0.4.0-blue)
 [![Lizenz: MIT](https://img.shields.io/badge/Lizenz-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -318,7 +318,7 @@ swisstopo-mcp/
 
 ---
 
-## Sicherheit & Compliance
+## Sicherheit & Grenzen
 
 Die vollständige Sicherheitsrichtlinie und Sicherheitslage ist in
 [SECURITY.de.md](SECURITY.de.md) dokumentiert.

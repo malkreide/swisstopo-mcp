@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **The version-sync check was blind to the one drift it exists for, on this
+  repo specifically.** `check_version_sync.py` built its User-Agent pattern
+  from the distribution name — `re.compile(rf"{re.escape(dist)}/(\d+\.\d…)")`
+  with `dist = "swisstopo-mcp"`. But the product token this server actually
+  sends is `SwisstopoMCP`, so the pattern matched nothing in `src/`, and the
+  check reported "keine hartkodierte Version in src/" without ever having
+  looked. A hardcoded `SwisstopoMCP/0.1` would have passed as clean — which is
+  exactly the incident recorded at `api_client.py`: the literal read
+  `SwisstopoMCP/0.1` while the package was at 0.3.0, so every outbound request
+  to geo.admin.ch, REFRAME, STAC, Overpass and OpenPLZ misidentified itself.
+
+  The comparison is now normalised (lowercased, non-alphanumerics stripped) in
+  `norm()`, applied by `own_ua_versions()`. The regex matches any product
+  token followed by a dotted number, and ownership is decided by comparing the
+  normalised token against the normalised dist name — so foreign tokens
+  (`Mozilla/5.0`, `httpx/0.27`) still fall out rather than being reported as
+  our own version.
+
+  Confirmed against a fixture pinning `SwisstopoMCP/0.1` at version 0.4.0:
+  exit 0 before, exit 1 after; and across the portfolio's repos still exit 0,
+  so the sharper match introduced no false positives. This is CI tooling only —
+  the shipped server is unaffected, and the current tree passes because
+  `USER_AGENT` is derived from `__version__` rather than hand-maintained.
+
 ## [0.4.0] - 2026-07-30
 
 ### Changed

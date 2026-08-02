@@ -278,3 +278,86 @@ class TestOversizedValuesRejected:
     def test_origins_length_capped(self):
         with pytest.raises(ValidationError):
             GeocodeInput(search_text="Bern", origins="address," * 100)
+
+
+# ---------------------------------------------------------------------------
+# Aggregate / delegate constraint agreement
+#
+# Two tools collapse a multi-step chain and re-validate the caller's values by
+# constructing the underlying tool's input model: `swisstopo_oereb_at` builds a
+# `GetOerebExtractInput`, and `swisstopo_map_query` builds one of five REST
+# inputs. That means every passed-through field is validated twice, against two
+# separately written Field() definitions.
+#
+# When they disagree the failure is silent in one direction and ugly in the
+# other. Stricter aggregate: input the underlying tool accepts is rejected at
+# the door, which is what happened to `topics` — the charset was fixed on
+# `GetOerebExtractInput` and left broken on `OerebAtInput`, so the one-call
+# tool could not name a theme while the two-call chain could. Looser aggregate:
+# the value passes the outer model and blows up as an unexpected
+# ValidationError inside the handler, surfacing as an internal error.
+#
+# Descriptions are deliberately *not* compared — an aggregate annotates which
+# operation a field belongs to ("nur features_at_point"), and that divergence
+# is the point of it.
+# ---------------------------------------------------------------------------
+
+
+def _delegation_pairs():
+    from swisstopo_mcp.oereb import GetEgridInput, GetOerebExtractInput, OerebAtInput
+    from swisstopo_mcp.rest_api import (
+        FindFeaturesInput,
+        GetFeatureInput,
+        IdentifyInput,
+        LayerInfoInput,
+        MapQueryInput,
+        SearchLayersInput,
+    )
+
+    return [
+        # oereb.py: oereb_at() -> get_oereb_extract(), and the EGRID lookup it
+        # resolves the coordinate with first.
+        (OerebAtInput, GetOerebExtractInput),
+        (OerebAtInput, GetEgridInput),
+        # rest_api.py: map_query() dispatches to one of five.
+        (MapQueryInput, SearchLayersInput),
+        (MapQueryInput, LayerInfoInput),
+        (MapQueryInput, IdentifyInput),
+        (MapQueryInput, FindFeaturesInput),
+        (MapQueryInput, GetFeatureInput),
+    ]
+
+
+def _shared_fields():
+    for aggregate, delegate in _delegation_pairs():
+        for field in sorted(set(aggregate.model_fields) & set(delegate.model_fields)):
+            yield pytest.param(
+                aggregate,
+                delegate,
+                field,
+                id=f"{aggregate.__name__}->{delegate.__name__}.{field}",
+            )
+
+
+class TestAggregatesValidateLikeTheirDelegates:
+    @pytest.mark.parametrize("aggregate,delegate,field", list(_shared_fields()))
+    def test_constraints_agree(self, aggregate, delegate, field):
+        def constraints(model):
+            return sorted(str(m) for m in model.model_fields[field].metadata)
+
+        assert constraints(aggregate) == constraints(delegate), (
+            f"{aggregate.__name__}.{field} and {delegate.__name__}.{field} "
+            "validate differently, but the first is handed straight to the "
+            "second. Whichever is right, both must say it."
+        )
+
+    def test_the_pairs_cover_every_field_that_is_passed_through(self):
+        """Guards the guard: a new field on an aggregate that its delegate also
+        has must land in the parametrisation above, not sit outside it."""
+        covered = {p.values[2] for p in _shared_fields()}
+        assert {"canton", "lang", "topics"} <= covered, (
+            "the ÖREB pass-through fields dropped out of the check"
+        )
+        assert {"layer", "lat", "lon", "limit"} <= covered, (
+            "the map_query pass-through fields dropped out of the check"
+        )

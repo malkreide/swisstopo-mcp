@@ -230,22 +230,22 @@ class TestGetOerebExtractInput:
         m = GetOerebExtractInput(egrid="CH767982496078", canton="ZH", topics=topics)
         assert m.topics == topics
 
-    def test_both_oereb_tools_validate_topics_identically(self):
-        """`swisstopo_oereb_at` collapses the two-step chain, so it takes the
-        same filter. The two field definitions were separate copies, and the
-        charset fix landed on one of them only — a caller using the one-call
-        tool still could not name a theme. They share one constant now; this
-        fails if they drift apart again."""
+    def test_the_one_call_tool_accepts_the_same_theme_codes(self):
+        """`swisstopo_oereb_at` collapses the two-step chain, so a caller must
+        be able to name a theme there too — it could not, when the charset fix
+        landed on `GetOerebExtractInput` alone.
+
+        The general guard now lives in
+        `tests/test_input_validation.py::TestAggregatesValidateLikeTheirDelegates`,
+        which compares every passed-through field of both aggregates. This one
+        stays because it pins the behaviour rather than the constraint: it
+        fails even if someone keeps the two definitions in sync at a value that
+        rejects real codes.
+        """
         from swisstopo_mcp.oereb import OerebAtInput
 
-        def spec(model):
-            field = model.model_fields["topics"]
-            return (
-                [str(m) for m in field.metadata],
-                field.description,
-            )
-
-        assert spec(OerebAtInput) == spec(GetOerebExtractInput)
+        m = OerebAtInput(lat=47.3769, lon=8.5417, canton="ZH", topics="ch.Nutzungsplanung")
+        assert m.topics == "ch.Nutzungsplanung"
 
     def test_lang_default_de(self):
         m = GetOerebExtractInput(egrid="CH767982496078", canton="ZH")

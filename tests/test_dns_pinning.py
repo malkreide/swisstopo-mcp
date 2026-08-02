@@ -414,14 +414,25 @@ class TestPinnedTlsHandshake:
 
     def test_handshake_fails_without_hostname_sni(self):
         """The failure mode the SNI preservation exists to avoid: presenting the
-        IP as the server name makes the certificate mismatch."""
+        IP as the server name breaks the handshake.
+
+        Which way it breaks depends on the edge node the runner resolves to, so
+        the assertion is on `ssl.SSLError` rather than on one subclass. Passing
+        an IP literal as `server_hostname` makes Python omit the SNI extension
+        entirely; a node that serves a default certificate then fails
+        verification (`SSLCertVerificationError`, "IP address mismatch"), while
+        one that requires SNI to pick a certificate has nothing to send and
+        aborts with a handshake-failure alert instead. Pinning on the first
+        turned this into a red nightly the day CI started resolving to the
+        second. Both outcomes are the same fact: no SNI, no usable connection.
+        """
         import socket
         import ssl
 
         host = "api3.geo.admin.ch"
         ip = socket.getaddrinfo(host, 443, proto=socket.IPPROTO_TCP)[0][4][0]
         context = ssl.create_default_context()
-        with pytest.raises(ssl.SSLCertVerificationError):
+        with pytest.raises(ssl.SSLError):
             with socket.create_connection((ip, 443), timeout=10) as sock:
                 context.wrap_socket(sock, server_hostname=ip)
 

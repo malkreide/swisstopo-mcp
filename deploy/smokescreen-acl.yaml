@@ -25,7 +25,7 @@ services:
       - geodesy.geo.admin.ch
       - geodienste.ch
       - map.geo.admin.ch
-      - oereb.geo.zh.ch
+      - maps.zh.ch
       - openplzapi.org
       - overpass.osm.ch
       - wmts.geo.admin.ch

@@ -1,5 +1,6 @@
 # tests/test_coords.py
 """Tests for the REFRAME coordinate-conversion tool."""
+
 from __future__ import annotations
 
 import httpx
@@ -32,9 +33,7 @@ class TestConvertCoordinatesInput:
         assert m.direction == "wgs84_to_lv95"
 
     def test_accepts_lv95_input(self):
-        m = ConvertCoordinatesInput(
-            easting=LV95_E, northing=LV95_N, direction="lv95_to_wgs84"
-        )
+        m = ConvertCoordinatesInput(easting=LV95_E, northing=LV95_N, direction="lv95_to_wgs84")
         assert m.direction == "lv95_to_wgs84"
 
     def test_rejects_unknown_direction(self):
@@ -48,9 +47,7 @@ class TestConvertCoordinatesInput:
     def test_rejects_lv95_values_in_wgs84_direction(self):
         """LV95 magnitudes with the WGS84 direction must fail, not silently convert."""
         with pytest.raises(ValidationError):
-            ConvertCoordinatesInput(
-                easting=LV95_E, northing=LV95_N, direction="wgs84_to_lv95"
-            )
+            ConvertCoordinatesInput(easting=LV95_E, northing=LV95_N, direction="wgs84_to_lv95")
 
     def test_rejects_wgs84_values_in_lv95_direction(self):
         with pytest.raises(ValidationError):
@@ -114,9 +111,7 @@ class TestConvertCoordinates:
     @respx.mock
     async def test_wgs84_to_lv95(self):
         respx.get(f"{REFRAME_BASE}/wgs84tolv95").mock(
-            return_value=httpx.Response(
-                200, json={"easting": str(LV95_E), "northing": str(LV95_N)}
-            )
+            return_value=httpx.Response(200, json={"easting": str(LV95_E), "northing": str(LV95_N)})
         )
         out = await convert_coordinates(
             ConvertCoordinatesInput(easting=WGS84_LON, northing=WGS84_LAT)
@@ -139,9 +134,7 @@ class TestConvertCoordinates:
             )
         )
         out = await convert_coordinates(
-            ConvertCoordinatesInput(
-                easting=LV95_E, northing=LV95_N, direction="lv95_to_wgs84"
-            )
+            ConvertCoordinatesInput(easting=LV95_E, northing=LV95_N, direction="lv95_to_wgs84")
         )
         rec = out.results[0]
         assert rec["lat"] == pytest.approx(WGS84_LAT)
@@ -171,9 +164,7 @@ class TestConvertCoordinates:
 
     @respx.mock
     async def test_upstream_500_is_handled_error(self):
-        respx.get(f"{REFRAME_BASE}/wgs84tolv95").mock(
-            return_value=httpx.Response(500, text="boom")
-        )
+        respx.get(f"{REFRAME_BASE}/wgs84tolv95").mock(return_value=httpx.Response(500, text="boom"))
         out = await convert_coordinates(
             ConvertCoordinatesInput(easting=WGS84_LON, northing=WGS84_LAT)
         )

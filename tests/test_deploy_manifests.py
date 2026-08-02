@@ -20,6 +20,7 @@ manifests, and nothing checked that. These tests do. They cannot prove HAProxy
 routes correctly — that needs a running cluster, and the manual procedure is in
 docs/deployment.md — but they hold every property that was actually wrong.
 """
+
 from __future__ import annotations
 
 import pathlib
@@ -114,8 +115,7 @@ class TestBackendsResolveToSomethingThisRepoShips:
         sts = _by_kind(docs, "StatefulSet")
         headless = _by_kind(docs, "Service")
         assert sts["spec"]["serviceName"] == headless["metadata"]["name"], (
-            "a StatefulSet only gets stable per-pod DNS from the Service named "
-            "in spec.serviceName"
+            "a StatefulSet only gets stable per-pod DNS from the Service named in spec.serviceName"
         )
 
     def test_no_invented_hostnames_remain(self, haproxy_cfg):
@@ -224,8 +224,7 @@ class TestTheEgressProxySidecarMountsWhatItReads:
         deployment = _by_kind(_load("egress-proxy.yaml"), "Deployment")
         volume = deployment["spec"]["template"]["spec"]["volumes"][0]
         assert volume["configMap"]["name"] in self._manifest(), (
-            "the Deployment mounts a ConfigMap the documented create command "
-            "does not build"
+            "the Deployment mounts a ConfigMap the documented create command does not build"
         )
 
     def test_every_file_the_args_name_is_supplied_by_the_configmap(self):
@@ -388,9 +387,7 @@ class TestSessionsAreConfinedToOneProcess:
             ) as client_a:
                 await client_a.post("/mcp", headers=MCP_HEADERS, json=INITIALIZE)
             assert len(replica_a._server_instances) == 1
-            assert replica_b._server_instances == {}, (
-                "state leaked between replicas"
-            )
+            assert replica_b._server_instances == {}, "state leaked between replicas"
 
 
 class TestTheDeploymentStaysAtOneReplica:

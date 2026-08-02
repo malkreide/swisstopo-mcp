@@ -1,6 +1,7 @@
 # tests/test_openplz.py
 """OpenPLZ administrative-address tools: input validation, happy paths, the
 abbreviation→key resolution, pagination, retry/timeout and graceful degradation."""
+
 from __future__ import annotations
 
 import httpx
@@ -151,9 +152,7 @@ class TestBfsBlockMapping:
 class TestLookupPostalCode:
     @respx.mock
     async def test_happy_path_exposes_bfs_top_level(self):
-        respx.get(f"{BASE}/Localities").mock(
-            return_value=httpx.Response(200, json=LOCALITY_8001)
-        )
+        respx.get(f"{BASE}/Localities").mock(return_value=httpx.Response(200, json=LOCALITY_8001))
         res = await lookup_postal_code(LookupPostalCodeInput(postal_code="8001"))
         assert isinstance(res, ToolResponse)
         assert res.count == 1

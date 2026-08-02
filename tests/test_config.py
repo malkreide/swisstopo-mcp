@@ -1,5 +1,6 @@
 # tests/test_config.py
 """Tests for the pydantic-settings configuration (audit finding ARCH-004)."""
+
 from __future__ import annotations
 
 from swisstopo_mcp.config import Settings

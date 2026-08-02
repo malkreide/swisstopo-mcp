@@ -34,6 +34,7 @@ Known findings from the live probe (2026-07-20) — see also CHANGELOG:
   ``key`` (it is the historized-directory record id). The join key is the current
   ``key``; ``historicalCode`` is intentionally not surfaced as a top-level field.
 """
+
 from __future__ import annotations
 
 from typing import Any
@@ -61,15 +62,15 @@ OPENPLZ_MAX_RECORDS = 2000  # safety cap across paged fetches (largest canton �
 # against the live commune list, so a former/merged number simply degrades to an
 # explanatory note rather than a wrong answer.
 _CANTON_BFS_BLOCK_STARTS: tuple[tuple[int, str], ...] = (
-    (1, "1"),      # ZH
-    (301, "2"),    # BE
-    (1001, "3"),   # LU
-    (1201, "4"),   # UR
-    (1301, "5"),   # SZ
-    (1401, "6"),   # OW
-    (1501, "7"),   # NW
-    (1601, "8"),   # GL
-    (1701, "9"),   # ZG
+    (1, "1"),  # ZH
+    (301, "2"),  # BE
+    (1001, "3"),  # LU
+    (1201, "4"),  # UR
+    (1301, "5"),  # SZ
+    (1401, "6"),  # OW
+    (1501, "7"),  # NW
+    (1601, "8"),  # GL
+    (1701, "9"),  # ZG
     (2001, "10"),  # FR
     (2401, "11"),  # SO
     (2701, "12"),  # BS
@@ -398,13 +399,16 @@ def _format_communes(title: str, records: list[dict[str, Any]], note: str = "") 
 def _format_addresses(query: str, records: list[dict[str, Any]], total: int) -> str:
     if not records:
         return (
-            f"Keine Treffer für «{query}». Versuche einen kürzeren oder "
-            f"allgemeineren Suchbegriff."
+            f"Keine Treffer für «{query}». Versuche einen kürzeren oder allgemeineren Suchbegriff."
         )
     shown = len(records)
     header = f"**Volltextsuche «{query}»** — {shown} von {total} Treffer(n) angezeigt:"
-    lines = [header, "", "| Bezeichnung | PLZ | Ort | Gemeinde | BFS-Nr | Kanton |",
-             "|-------------|-----|-----|----------|--------|--------|"]
+    lines = [
+        header,
+        "",
+        "| Bezeichnung | PLZ | Ort | Gemeinde | BFS-Nr | Kanton |",
+        "|-------------|-----|-----|----------|--------|--------|",
+    ]
     for r in records:
         lines.append(
             f"| {r.get('name') or '–'} | {r.get('postal_code') or '–'} | "
@@ -432,8 +436,9 @@ async def lookup_postal_code(params: LookupPostalCodeInput) -> ToolResponse:
             records,
             match_type="exact" if records else "none",
             note=(
-                None if records else
-                f"PLZ {params.postal_code} ist im BFS-Verzeichnis unbekannt. "
+                None
+                if records
+                else f"PLZ {params.postal_code} ist im BFS-Verzeichnis unbekannt. "
                 "Vierstellige Schweizer PLZ prüfen, oder den Ortsnamen mit "
                 "swisstopo_find_commune bzw. swisstopo_search_address suchen."
             ),
@@ -470,8 +475,9 @@ async def _find_by_name(name: str, ctx: Any | None = None) -> ToolResponse:
         records,
         match_type="exact" if records else "none",
         note=(
-            None if records else
-            f"Keine Gemeinde namens «{name}». Schreibweise prüfen (Umlaute, "
+            None
+            if records
+            else f"Keine Gemeinde namens «{name}». Schreibweise prüfen (Umlaute, "
             "Bindestriche), oder mit swisstopo_search_address nach der amtlichen "
             "Bezeichnung suchen."
         ),
@@ -500,9 +506,7 @@ async def _find_by_bfs(bfs_number: int, ctx: Any | None = None) -> ToolResponse:
             source=OPENPLZ_SOURCE,
             license=OPENPLZ_LICENSE,
         )
-    communes, _total, truncated = await _fetch_all_pages(
-        f"/Cantons/{canton_key}/Communes", ctx=ctx
-    )
+    communes, _total, truncated = await _fetch_all_pages(f"/Cantons/{canton_key}/Communes", ctx=ctx)
     match = [c for c in communes if str(c.get("key")) == str(bfs_number)]
     records = [_commune_record(c) for c in match]
     note = ""
@@ -526,9 +530,7 @@ async def _find_by_bfs(bfs_number: int, ctx: Any | None = None) -> ToolResponse:
 
 async def _list_by_canton(canton: str, ctx: Any | None = None) -> ToolResponse:
     canton_key = await _resolve_canton_key(canton, ctx)
-    communes, total, truncated = await _fetch_all_pages(
-        f"/Cantons/{canton_key}/Communes", ctx=ctx
-    )
+    communes, total, truncated = await _fetch_all_pages(f"/Cantons/{canton_key}/Communes", ctx=ctx)
     records = [_commune_record(c) for c in communes]
     note = ""
     if not records:
@@ -550,9 +552,7 @@ async def _list_by_canton(canton: str, ctx: Any | None = None) -> ToolResponse:
 
 
 async def _list_by_district(district: str, ctx: Any | None = None) -> ToolResponse:
-    communes, total, truncated = await _fetch_all_pages(
-        f"/Districts/{district}/Communes", ctx=ctx
-    )
+    communes, total, truncated = await _fetch_all_pages(f"/Districts/{district}/Communes", ctx=ctx)
     records = [_commune_record(c) for c in communes]
     note = ""
     if not records:
@@ -574,9 +574,7 @@ async def _list_by_district(district: str, ctx: Any | None = None) -> ToolRespon
 
 
 @log_tool_call("swisstopo_find_commune")
-async def find_commune(
-    params: FindCommuneInput, ctx: Context | None = None
-) -> ToolResponse:
+async def find_commune(params: FindCommuneInput, ctx: Context | None = None) -> ToolResponse:
     """Resolve a commune both directions (name↔BFS number) or list a unit's communes."""
     try:
         if params.name is not None:
@@ -609,8 +607,9 @@ async def search_address(params: SearchAddressInput) -> ToolResponse:
             records,
             match_type="exact" if records else "none",
             note=(
-                None if records else
-                f"Keine Treffer für «{params.query}». Kürzeren Suchbegriff "
+                None
+                if records
+                else f"Keine Treffer für «{params.query}». Kürzeren Suchbegriff "
                 "versuchen (nur Strassen- oder Ortsname), oder swisstopo_geocode "
                 "für die Adresssuche über das Bundes-SearchServer nutzen."
             ),

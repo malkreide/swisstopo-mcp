@@ -1,5 +1,6 @@
 # tests/test_egress_allowlist.py
 """Regression tests for SEC-021: code-layer egress allow-list."""
+
 from __future__ import annotations
 
 import socket
@@ -61,11 +62,14 @@ class TestSchemeIsValidated:
         with pytest.raises(PermissionError, match="Nicht-HTTPS"):
             assert_host_allowed("http://api3.geo.admin.ch/rest/services/height")
 
-    @pytest.mark.parametrize("url", [
-        "file:///etc/passwd",
-        "ftp://api3.geo.admin.ch/x",
-        "gopher://api3.geo.admin.ch/x",
-    ])
+    @pytest.mark.parametrize(
+        "url",
+        [
+            "file:///etc/passwd",
+            "ftp://api3.geo.admin.ch/x",
+            "gopher://api3.geo.admin.ch/x",
+        ],
+    )
     def test_non_http_schemes_are_rejected(self, url):
         with pytest.raises(PermissionError):
             assert_host_allowed(url)
@@ -75,15 +79,20 @@ class TestResolvedIpGuard:
     def test_private_resolution_is_blocked(self, monkeypatch):
         """A host on the allow-list that resolves to a private range is DNS
         rebinding, not a legitimate move."""
-        monkeypatch.setattr(
-            api_client, "_resolve", lambda host: ("127.0.0.1",)
-        )
+        monkeypatch.setattr(api_client, "_resolve", lambda host: ("127.0.0.1",))
         with pytest.raises(PermissionError, match="interne Adresse"):
             api_client.assert_resolved_ip_public("api3.geo.admin.ch")
 
-    @pytest.mark.parametrize("address", [
-        "10.1.2.3", "172.16.0.9", "192.168.1.1", "169.254.169.254", "::1",
-    ])
+    @pytest.mark.parametrize(
+        "address",
+        [
+            "10.1.2.3",
+            "172.16.0.9",
+            "192.168.1.1",
+            "169.254.169.254",
+            "::1",
+        ],
+    )
     def test_each_blocked_range(self, monkeypatch, address):
         monkeypatch.setattr(api_client, "_resolve", lambda host: (address,))
         with pytest.raises(PermissionError):
@@ -119,9 +128,7 @@ class TestTheFailOpenOnResolutionError:
         """The boundary. A partial answer is an answer, and the split-horizon
         case — one real address plus one pointing at loopback — is precisely
         the shape a rebinding attack takes."""
-        monkeypatch.setattr(
-            api_client, "_resolve", lambda host: ("185.19.28.1", "127.0.0.1")
-        )
+        monkeypatch.setattr(api_client, "_resolve", lambda host: ("185.19.28.1", "127.0.0.1"))
         with pytest.raises(PermissionError, match="interne Adresse"):
             api_client.assert_resolved_ip_public("api3.geo.admin.ch")
 
@@ -131,9 +138,7 @@ class TestTheFailOpenOnResolutionError:
         monkeypatch.setattr(api_client, "_resolve", lambda host: ())
         api_client.assert_resolved_ip_public("api3.geo.admin.ch")
 
-    def test_the_guard_is_not_the_only_thing_between_a_url_and_egress(
-        self, monkeypatch
-    ):
+    def test_the_guard_is_not_the_only_thing_between_a_url_and_egress(self, monkeypatch):
         """Why the fail-open is affordable: an unresolvable host still had to
         clear the scheme check and the frozenset before reaching it."""
 
@@ -207,9 +212,7 @@ class TestGeneratedProxyAcl:
 
         import yaml
 
-        path = (
-            pathlib.Path(__file__).resolve().parent.parent / "deploy" / "smokescreen-acl.yaml"
-        )
+        path = pathlib.Path(__file__).resolve().parent.parent / "deploy" / "smokescreen-acl.yaml"
         return yaml.safe_load(path.read_text(encoding="utf-8"))
 
     def test_acl_parses_as_a_single_service(self):

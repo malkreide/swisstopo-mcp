@@ -1,5 +1,6 @@
 # tests/test_oereb.py
 """Tests for ÖREB Cadastre module (no live network calls)."""
+
 from __future__ import annotations
 
 import pytest
@@ -288,18 +289,14 @@ class TestUnsupportedCanton:
 
     async def test_get_oereb_extract_unsupported_canton(self, monkeypatch):
         monkeypatch.setattr(settings, "oereb_cantons", "ZH")
-        result = await get_oereb_extract(
-            GetOerebExtractInput(egrid="CH767982496078", canton="BE")
-        )
+        result = await get_oereb_extract(GetOerebExtractInput(egrid="CH767982496078", canton="BE"))
         assert "BE" in result.summary
         assert "nicht unterstützt" in result.summary or "nicht" in result.summary
         assert "oereb.cadastre.ch" in result.summary
 
     async def test_get_oereb_extract_unknown_canton(self, monkeypatch):
         monkeypatch.setattr(settings, "oereb_cantons", "ZH")
-        result = await get_oereb_extract(
-            GetOerebExtractInput(egrid="CH767982496078", canton="XX")
-        )
+        result = await get_oereb_extract(GetOerebExtractInput(egrid="CH767982496078", canton="XX"))
         assert "XX" in result.summary
         assert "oereb.cadastre.ch" in result.summary
 
@@ -487,9 +484,15 @@ class TestGetOerebExtractHandler:
             }
         }
 
-    def _make_restriction(self, topic="Nutzungsplanung", description="Wohnzone W2",
-                          authority="Gemeinde Zürich", legal="Bau- und Zonenordnung",
-                          code="ch.Nutzungsplanung", subcode=None):
+    def _make_restriction(
+        self,
+        topic="Nutzungsplanung",
+        description="Wohnzone W2",
+        authority="Gemeinde Zürich",
+        legal="Bau- und Zonenordnung",
+        code="ch.Nutzungsplanung",
+        subcode=None,
+    ):
         theme = {"Code": code, "Text": [{"Language": "de", "Text": topic}]}
         if subcode:
             theme["SubCode"] = subcode
@@ -506,9 +509,7 @@ class TestGetOerebExtractHandler:
     async def test_returns_markdown_extract(self, monkeypatch):
         monkeypatch.setattr(settings, "oereb_cantons", "ZH,BE")
         _mock_client(monkeypatch, self._make_extract_response([self._make_restriction()]))
-        result = await get_oereb_extract(
-            GetOerebExtractInput(egrid="CH767982496078", canton="ZH")
-        )
+        result = await get_oereb_extract(GetOerebExtractInput(egrid="CH767982496078", canton="ZH"))
         assert "## ÖREB-Auszug für CH767982496078" in result.summary
         assert "Nutzungsplanung" in result.summary
         assert "Wohnzone W2" in result.summary
@@ -523,9 +524,7 @@ class TestGetOerebExtractHandler:
             monkeypatch,
             self._make_extract_response([self._make_restriction()], wrapper="extract"),
         )
-        result = await get_oereb_extract(
-            GetOerebExtractInput(egrid="CH507635214670", canton="BE")
-        )
+        result = await get_oereb_extract(GetOerebExtractInput(egrid="CH507635214670", canton="BE"))
         assert result.match_type == "exact"
         assert "Wohnzone W2" in result.summary
 
@@ -536,9 +535,7 @@ class TestGetOerebExtractHandler:
         restriction = self._make_restriction()
         restriction["Map"] = {"ReferenceWMS": [{"Language": "de", "Text": "https://" + "x" * 5000}]}
         _mock_client(monkeypatch, self._make_extract_response([restriction]))
-        result = await get_oereb_extract(
-            GetOerebExtractInput(egrid="CH767982496078", canton="ZH")
-        )
+        result = await get_oereb_extract(GetOerebExtractInput(egrid="CH767982496078", canton="ZH"))
         record = result.results[0]
         assert record == {
             "theme": "Nutzungsplanung",
@@ -555,18 +552,14 @@ class TestGetOerebExtractHandler:
     async def test_no_restrictions_returns_empty_message(self, monkeypatch):
         monkeypatch.setattr(settings, "oereb_cantons", "ZH,BE")
         _mock_client(monkeypatch, self._make_extract_response([]))
-        result = await get_oereb_extract(
-            GetOerebExtractInput(egrid="CH767982496078", canton="ZH")
-        )
+        result = await get_oereb_extract(GetOerebExtractInput(egrid="CH767982496078", canton="ZH"))
         assert "Keine" in result.summary
 
     async def test_404_egrid_not_found(self, monkeypatch):
         monkeypatch.setattr(settings, "oereb_cantons", "ZH,BE")
         _mock_client(monkeypatch, None, status_code=404)
         # Valid EGRID format (alphanumeric) but non-existent -> upstream 404.
-        result = await get_oereb_extract(
-            GetOerebExtractInput(egrid="CH000000000000", canton="ZH")
-        )
+        result = await get_oereb_extract(GetOerebExtractInput(egrid="CH000000000000", canton="ZH"))
         assert "nicht gefunden" in result.summary or "CH000000000000" in result.summary
 
     async def test_204_egrid_not_found(self, monkeypatch):
@@ -575,9 +568,7 @@ class TestGetOerebExtractHandler:
         monkeypatch.setattr(settings, "oereb_cantons", "ZH,BE")
         result_payload = None
         _mock_client(monkeypatch, result_payload, status_code=204)
-        result = await get_oereb_extract(
-            GetOerebExtractInput(egrid="CH000000000000", canton="ZH")
-        )
+        result = await get_oereb_extract(GetOerebExtractInput(egrid="CH000000000000", canton="ZH"))
         assert result.is_error is False
         assert result.match_type == "none"
         assert "CH000000000000" in result.summary
@@ -595,9 +586,7 @@ class TestGetOerebExtractHandler:
         captured = {}
         _mock_client(monkeypatch, self._make_extract_response([]), capture=captured)
         await get_oereb_extract(
-            GetOerebExtractInput(
-                egrid="CH767982496078", canton="ZH", topics="ch.Nutzungsplanung"
-            )
+            GetOerebExtractInput(egrid="CH767982496078", canton="ZH", topics="ch.Nutzungsplanung")
         )
         assert "TOPICS" not in captured["url"]
 
@@ -617,9 +606,7 @@ class TestGetOerebExtractHandler:
             ),
         )
         result = await get_oereb_extract(
-            GetOerebExtractInput(
-                egrid="CH767982496078", canton="ZH", topics="ch.Nutzungsplanung"
-            )
+            GetOerebExtractInput(egrid="CH767982496078", canton="ZH", topics="ch.Nutzungsplanung")
         )
         assert result.count == 1
         assert "Wohnzone" in result.summary
@@ -690,9 +677,7 @@ class TestGetOerebExtractHandler:
             ),
         )
         result = await get_oereb_extract(
-            GetOerebExtractInput(
-                egrid="CH767982496078", canton="ZH", topics="ch.Waldgrenzen"
-            )
+            GetOerebExtractInput(egrid="CH767982496078", canton="ZH", topics="ch.Waldgrenzen")
         )
         assert result.is_error is False
         assert result.match_type == "none"
@@ -709,9 +694,7 @@ class TestGetOerebExtractHandler:
         monkeypatch.setattr(settings, "oereb_cantons", "ZH,BE")
         _mock_client(monkeypatch, self._make_extract_response([]))
         result = await get_oereb_extract(
-            GetOerebExtractInput(
-                egrid="CH767982496078", canton="ZH", topics="ch.Nutzungsplanung"
-            )
+            GetOerebExtractInput(egrid="CH767982496078", canton="ZH", topics="ch.Nutzungsplanung")
         )
         assert result.match_type == "none"
         assert "unabhängig von einem Themenfilter" in result.note
@@ -753,9 +736,7 @@ class TestGetOerebExtractHandler:
                 response=httpx.Response(500, request=httpx.Request("GET", url)),
             ),
         )
-        result = await get_oereb_extract(
-            GetOerebExtractInput(egrid="CH767982496078", canton="ZH")
-        )
+        result = await get_oereb_extract(GetOerebExtractInput(egrid="CH767982496078", canton="ZH"))
         assert "Fehler" in result.summary
 
     async def test_grouped_by_topic(self, monkeypatch):
@@ -769,9 +750,7 @@ class TestGetOerebExtractHandler:
                 ]
             ),
         )
-        result = await get_oereb_extract(
-            GetOerebExtractInput(egrid="CH767982496078", canton="ZH")
-        )
+        result = await get_oereb_extract(GetOerebExtractInput(egrid="CH767982496078", canton="ZH"))
         assert "### Nutzungsplanung" in result.summary
         assert "### Waldabstand" in result.summary
         assert "Wohnzone" in result.summary
@@ -780,9 +759,7 @@ class TestGetOerebExtractHandler:
     async def test_egrid_in_heading(self, monkeypatch):
         monkeypatch.setattr(settings, "oereb_cantons", "ZH,BE")
         _mock_client(monkeypatch, self._make_extract_response([self._make_restriction()]))
-        result = await get_oereb_extract(
-            GetOerebExtractInput(egrid="CH767982496078", canton="ZH")
-        )
+        result = await get_oereb_extract(GetOerebExtractInput(egrid="CH767982496078", canton="ZH"))
         assert "CH767982496078" in result.summary
 
 
@@ -812,9 +789,7 @@ class TestParseEgridPayload:
 
     def test_uppercase_key(self):
         """Cantonal endpoints disagree on the casing."""
-        assert _parse_egrid_payload({"GetEGRIDResponse": [{"EGRID": "CH2"}]}) == [
-            {"egrid": "CH2"}
-        ]
+        assert _parse_egrid_payload({"GetEGRIDResponse": [{"EGRID": "CH2"}]}) == [{"egrid": "CH2"}]
 
     def test_skips_entries_without_an_egrid(self):
         payload = {"GetEGRIDResponse": [{"number": "1"}, {"egrid": "CH3"}]}
@@ -861,9 +836,7 @@ class TestOerebAt:
     @respx.mock
     async def test_no_parcel_is_a_soft_miss_with_a_hint(self, monkeypatch):
         monkeypatch.setattr(settings, "oereb_cantons", "ZH")
-        respx.get(url__startswith=f"{_ZH}/getegrid/json/").mock(
-            return_value=httpx.Response(204)
-        )
+        respx.get(url__startswith=f"{_ZH}/getegrid/json/").mock(return_value=httpx.Response(204))
         out = await oereb_at(OerebAtInput(lat=47.3769, lon=8.5417, canton="ZH"))
         assert out.is_error is False
         assert out.match_type == "none"
@@ -932,9 +905,7 @@ def both_cantons(monkeypatch):
 @pytest.mark.live
 class TestOerebLive:
     @pytest.mark.parametrize("canton,lat,lon", LIVE_CANTONS)
-    async def test_each_canton_resolves_a_point_to_an_egrid(
-        self, canton, lat, lon, both_cantons
-    ):
+    async def test_each_canton_resolves_a_point_to_an_egrid(self, canton, lat, lon, both_cantons):
         """Same contract, both implementations. `getegrid` is where the 2.0
         envelope first shows up, and BE served it correctly the whole time the
         parser was reading GeoJSON — a BE probe here would have caught that."""
@@ -947,9 +918,7 @@ class TestOerebLive:
             assert isinstance(egrid, str) and egrid, "EGRID field shape changed"
 
     @pytest.mark.parametrize("canton,lat,lon", LIVE_CANTONS)
-    async def test_each_canton_parses_its_extract_envelope(
-        self, canton, lat, lon, both_cantons
-    ):
+    async def test_each_canton_parses_its_extract_envelope(self, canton, lat, lon, both_cantons):
         """The envelope key differs per canton (`Extract` vs `extract`), and
         descending into the wrong node reported every parcel as unencumbered.
         Asserting on `match_type` alone would not catch it — an empty extract is
@@ -960,9 +929,7 @@ class TestOerebLive:
             pytest.skip(f"no parcel at the {canton} probe point today")
         egrid = located.results[0]["egrid"]
 
-        result = await get_oereb_extract(
-            GetOerebExtractInput(egrid=egrid, canton=canton)
-        )
+        result = await get_oereb_extract(GetOerebExtractInput(egrid=egrid, canton=canton))
         assert result.is_error is False, result.summary
         assert result.source == OEREB_SOURCE
         if result.match_type == "exact":
@@ -976,9 +943,7 @@ class TestOerebLive:
             )
 
     @pytest.mark.parametrize("canton,lat,lon", LIVE_CANTONS)
-    async def test_each_canton_answers_the_one_call_aggregate(
-        self, canton, lat, lon, both_cantons
-    ):
+    async def test_each_canton_answers_the_one_call_aggregate(self, canton, lat, lon, both_cantons):
         result = await oereb_at(OerebAtInput(lat=lat, lon=lon, canton=canton))
         assert result.is_error is False, result.summary
         assert result.source == OEREB_SOURCE
@@ -1216,134 +1181,242 @@ class TestOerebEndpointRegistryLive:
 
 # Trimmed from live `/extract/json/` responses, one canton per parsing family.
 _OTHER_CANTON_EXTRACTS = {
-    "GR (pyramid_oereb)": {'GetExtractByIdResponse': {'extract': {'RealEstate': {'RestrictionOnLandownership': [{'Theme': {'Code': 'ch.GR.NutzungsplanungZpGgp',
-                                                                                                     'Text': [{'Language': 'de',
-                                                                                                               'Text': 'Kommunale '
-                                                                                                                       'Nutzungsplanung '
-                                                                                                                       '- '
-                                                                                                                       'Zonenplan '
-                                                                                                                       'und '
-                                                                                                                       'Genereller '
-                                                                                                                       'Gestaltungsplan'}]},
-                                                                                           'LegendText': [{'Language': 'de',
-                                                                                                           'Text': 'Mühlbach '
-                                                                                                                   'überdeckt '
-                                                                                                                   'mit '
-                                                                                                                   'gestalterischem '
-                                                                                                                   'Aufwertungspotential'}],
-                                                                                           'Lawstatus': {'Code': 'inForce',
-                                                                                                         'Text': [{'Language': 'de',
-                                                                                                                   'Text': 'Rechtskräftig'}]},
-                                                                                           'ResponsibleOffice': {'Name': [{'Language': 'de',
-                                                                                                                           'Text': 'Stadt '
-                                                                                                                                   'Chur, '
-                                                                                                                                   'Abteilung '
-                                                                                                                                   'Stadtentwicklung'}],
-                                                                                                                 'OfficeAtWeb': [{'Language': 'de',
-                                                                                                                                  'Text': 'https://www.chur.ch'}]},
-                                                                                           'LegalProvisions': [{'Title': [{'Language': 'de',
-                                                                                                                           'Text': 'Gesamtrevision '
-                                                                                                                                   '(3901_B_OPTO_03072007_RB.PDF)'}]}]}]}}}},
-    "SG (pyramid_oereb)": {'GetExtractByIdResponse': {'extract': {'RealEstate': {'RestrictionOnLandownership': [{'Theme': {'Code': 'ch.Nutzungsplanung',
-                                                                                                     'Text': [{'Language': 'de',
-                                                                                                               'Text': 'Nutzungsplanung '
-                                                                                                                       'Zonenplan'}]},
-                                                                                           'LegendText': [{'Language': 'de',
-                                                                                                           'Text': 'BauG '
-                                                                                                                   'Bestimmte '
-                                                                                                                   'Nutzungsart '
-                                                                                                                   'Art '
-                                                                                                                   '28oct'}],
-                                                                                           'Lawstatus': {'Code': 'inForce',
-                                                                                                         'Text': [{'Language': 'de',
-                                                                                                                   'Text': 'Rechtskräftig'}]},
-                                                                                           'ResponsibleOffice': {'Name': [{'Language': 'de',
-                                                                                                                           'Text': 'Stadt '
-                                                                                                                                   'St.Gallen'}],
-                                                                                                                 'OfficeAtWeb': [{'Language': 'de',
-                                                                                                                                  'Text': 'https://www.stadt.sg.ch'}],
-                                                                                                                 'Street': 'Rathaus',
-                                                                                                                 'Number': 'nan',
-                                                                                                                 'PostalCode': '9001',
-                                                                                                                 'City': 'St.Gallen'},
-                                                                                           'AreaShare': 3850,
-                                                                                           'PartInPercent': 94.1,
-                                                                                           'LegalProvisions': [{'Title': [{'Language': 'de',
-                                                                                                                           'Text': 'Teilzonenplan '
-                                                                                                                                   'Nutzungsplan '
-                                                                                                                                   'Altstadt '
-                                                                                                                                   '- '
-                                                                                                                                   'Genehmigung'}]}]}]}}}},
-    "NE (crdppf)": {'GetExtractByIdResponse': {'extract': {'RealEstate': {'RestrictionOnLandownership': [{'Theme': {'Code': 'ch.Nutzungsplanung',
-                                                                                                     'Text': [{'Language': 'de',
-                                                                                                               'Text': 'Nutzungsplanung '
-                                                                                                                       '(kantonal/kommunal)'}]},
-                                                                                           'LegendText': [{'Language': 'fr',
-                                                                                                           'Text': 'Zone '
-                                                                                                                   "d'utilité "
-                                                                                                                   'publique'}],
-                                                                                           'Lawstatus': {'Code': 'inForce',
-                                                                                                         'Text': [{'Language': 'de',
-                                                                                                                   'Text': 'Rechtskräftig'}]},
-                                                                                           'ResponsibleOffice': {'Name': [{'Language': 'fr',
-                                                                                                                           'Text': 'Service '
-                                                                                                                                   'de '
-                                                                                                                                   "l'aménagement "
-                                                                                                                                   'du '
-                                                                                                                                   'territoire'}],
-                                                                                                                 'OfficeAtWeb': [{'Language': 'fr',
-                                                                                                                                  'Text': 'https://www.ne.ch/scat'}],
-                                                                                                                 'Street': 'Rue '
-                                                                                                                           'de '
-                                                                                                                           'Tivoli',
-                                                                                                                 'Number': '5',
-                                                                                                                 'PostalCode': '2002',
-                                                                                                                 'City': 'Neuchâtel'},
-                                                                                           'AreaShare': 3051,
-                                                                                           'PartInPercent': 100.0,
-                                                                                           'LegalProvisions': [{'Title': [{'Language': 'fr',
-                                                                                                                           'Text': 'Loi '
-                                                                                                                                   'cantonale '
-                                                                                                                                   'sur '
-                                                                                                                                   'la '
-                                                                                                                                   'sauvegarde '
-                                                                                                                                   'du '
-                                                                                                                                   'patrimoine '
-                                                                                                                                   'culturel'}]}]}]}}}},
-    "AG (Eigenbau)": {'GetExtractByIdResponse': {'extract': {'RealEstate': {'RestrictionOnLandownership': [{'Theme': {'Code': 'ch.Nutzungsplanung',
-                                                                                                     'Text': [{'Language': 'de',
-                                                                                                               'Text': 'Nutzungsplanung '
-                                                                                                                       '(kantonal/kommunal)'}]},
-                                                                                           'LegendText': [{'Language': 'de',
-                                                                                                           'Text': 'Totalrevision '
-                                                                                                                   'Erschliessungspläne '
-                                                                                                                   'Plan '
-                                                                                                                   'Nr. '
-                                                                                                                   '11'}],
-                                                                                           'Lawstatus': {'Code': 'inForce',
-                                                                                                         'Text': [{'Language': 'de',
-                                                                                                                   'Text': 'Rechtskräftig'}]},
-                                                                                           'ResponsibleOffice': {'Name': [{'Language': 'de',
-                                                                                                                           'Text': 'Aarau'}],
-                                                                                                                 'OfficeAtWeb': [{'Language': 'de',
-                                                                                                                                  'Text': 'http://www.aarau.ch'}]},
-                                                                                           'AreaShare': 112,
-                                                                                           'PartInPercent': 100.0,
-                                                                                           'LegalProvisions': [{'Title': [{'Language': 'de',
-                                                                                                                           'Text': 'Bundesgesetz '
-                                                                                                                                   'über '
-                                                                                                                                   'die '
-                                                                                                                                   'Raumplanung'}]}]}]}}}},
+    "GR (pyramid_oereb)": {
+        "GetExtractByIdResponse": {
+            "extract": {
+                "RealEstate": {
+                    "RestrictionOnLandownership": [
+                        {
+                            "Theme": {
+                                "Code": "ch.GR.NutzungsplanungZpGgp",
+                                "Text": [
+                                    {
+                                        "Language": "de",
+                                        "Text": "Kommunale "
+                                        "Nutzungsplanung "
+                                        "- "
+                                        "Zonenplan "
+                                        "und "
+                                        "Genereller "
+                                        "Gestaltungsplan",
+                                    }
+                                ],
+                            },
+                            "LegendText": [
+                                {
+                                    "Language": "de",
+                                    "Text": "Mühlbach "
+                                    "überdeckt "
+                                    "mit "
+                                    "gestalterischem "
+                                    "Aufwertungspotential",
+                                }
+                            ],
+                            "Lawstatus": {
+                                "Code": "inForce",
+                                "Text": [{"Language": "de", "Text": "Rechtskräftig"}],
+                            },
+                            "ResponsibleOffice": {
+                                "Name": [
+                                    {
+                                        "Language": "de",
+                                        "Text": "Stadt Chur, Abteilung Stadtentwicklung",
+                                    }
+                                ],
+                                "OfficeAtWeb": [{"Language": "de", "Text": "https://www.chur.ch"}],
+                            },
+                            "LegalProvisions": [
+                                {
+                                    "Title": [
+                                        {
+                                            "Language": "de",
+                                            "Text": "Gesamtrevision (3901_B_OPTO_03072007_RB.PDF)",
+                                        }
+                                    ]
+                                }
+                            ],
+                        }
+                    ]
+                }
+            }
+        }
+    },
+    "SG (pyramid_oereb)": {
+        "GetExtractByIdResponse": {
+            "extract": {
+                "RealEstate": {
+                    "RestrictionOnLandownership": [
+                        {
+                            "Theme": {
+                                "Code": "ch.Nutzungsplanung",
+                                "Text": [{"Language": "de", "Text": "Nutzungsplanung Zonenplan"}],
+                            },
+                            "LegendText": [
+                                {"Language": "de", "Text": "BauG Bestimmte Nutzungsart Art 28oct"}
+                            ],
+                            "Lawstatus": {
+                                "Code": "inForce",
+                                "Text": [{"Language": "de", "Text": "Rechtskräftig"}],
+                            },
+                            "ResponsibleOffice": {
+                                "Name": [{"Language": "de", "Text": "Stadt St.Gallen"}],
+                                "OfficeAtWeb": [
+                                    {"Language": "de", "Text": "https://www.stadt.sg.ch"}
+                                ],
+                                "Street": "Rathaus",
+                                "Number": "nan",
+                                "PostalCode": "9001",
+                                "City": "St.Gallen",
+                            },
+                            "AreaShare": 3850,
+                            "PartInPercent": 94.1,
+                            "LegalProvisions": [
+                                {
+                                    "Title": [
+                                        {
+                                            "Language": "de",
+                                            "Text": "Teilzonenplan "
+                                            "Nutzungsplan "
+                                            "Altstadt "
+                                            "- "
+                                            "Genehmigung",
+                                        }
+                                    ]
+                                }
+                            ],
+                        }
+                    ]
+                }
+            }
+        }
+    },
+    "NE (crdppf)": {
+        "GetExtractByIdResponse": {
+            "extract": {
+                "RealEstate": {
+                    "RestrictionOnLandownership": [
+                        {
+                            "Theme": {
+                                "Code": "ch.Nutzungsplanung",
+                                "Text": [
+                                    {
+                                        "Language": "de",
+                                        "Text": "Nutzungsplanung (kantonal/kommunal)",
+                                    }
+                                ],
+                            },
+                            "LegendText": [{"Language": "fr", "Text": "Zone d'utilité publique"}],
+                            "Lawstatus": {
+                                "Code": "inForce",
+                                "Text": [{"Language": "de", "Text": "Rechtskräftig"}],
+                            },
+                            "ResponsibleOffice": {
+                                "Name": [
+                                    {
+                                        "Language": "fr",
+                                        "Text": "Service de l'aménagement du territoire",
+                                    }
+                                ],
+                                "OfficeAtWeb": [
+                                    {"Language": "fr", "Text": "https://www.ne.ch/scat"}
+                                ],
+                                "Street": "Rue de Tivoli",
+                                "Number": "5",
+                                "PostalCode": "2002",
+                                "City": "Neuchâtel",
+                            },
+                            "AreaShare": 3051,
+                            "PartInPercent": 100.0,
+                            "LegalProvisions": [
+                                {
+                                    "Title": [
+                                        {
+                                            "Language": "fr",
+                                            "Text": "Loi "
+                                            "cantonale "
+                                            "sur "
+                                            "la "
+                                            "sauvegarde "
+                                            "du "
+                                            "patrimoine "
+                                            "culturel",
+                                        }
+                                    ]
+                                }
+                            ],
+                        }
+                    ]
+                }
+            }
+        }
+    },
+    "AG (Eigenbau)": {
+        "GetExtractByIdResponse": {
+            "extract": {
+                "RealEstate": {
+                    "RestrictionOnLandownership": [
+                        {
+                            "Theme": {
+                                "Code": "ch.Nutzungsplanung",
+                                "Text": [
+                                    {
+                                        "Language": "de",
+                                        "Text": "Nutzungsplanung (kantonal/kommunal)",
+                                    }
+                                ],
+                            },
+                            "LegendText": [
+                                {
+                                    "Language": "de",
+                                    "Text": "Totalrevision Erschliessungspläne Plan Nr. 11",
+                                }
+                            ],
+                            "Lawstatus": {
+                                "Code": "inForce",
+                                "Text": [{"Language": "de", "Text": "Rechtskräftig"}],
+                            },
+                            "ResponsibleOffice": {
+                                "Name": [{"Language": "de", "Text": "Aarau"}],
+                                "OfficeAtWeb": [{"Language": "de", "Text": "http://www.aarau.ch"}],
+                            },
+                            "AreaShare": 112,
+                            "PartInPercent": 100.0,
+                            "LegalProvisions": [
+                                {
+                                    "Title": [
+                                        {
+                                            "Language": "de",
+                                            "Text": "Bundesgesetz über die Raumplanung",
+                                        }
+                                    ]
+                                }
+                            ],
+                        }
+                    ]
+                }
+            }
+        }
+    },
 }
 
 # Trimmed from a live `/getegrid/json/` response.
-_GR_EGRID_PAYLOAD = {"GetEGRIDResponse": [{'egrid': 'CH716823867719',
-     'number': '6914',
-     'identDN': 'GR0000003901',
-     'type': {'Code': 'RealEstate',
-              'Text': [{'Language': 'de', 'Text': 'Liegenschaft'},
-                       {'Language': 'it', 'Text': 'Bene immobile'},
-                       {'Language': 'rm', 'Text': 'Bain immobigliar'}]}}]}
+_GR_EGRID_PAYLOAD = {
+    "GetEGRIDResponse": [
+        {
+            "egrid": "CH716823867719",
+            "number": "6914",
+            "identDN": "GR0000003901",
+            "type": {
+                "Code": "RealEstate",
+                "Text": [
+                    {"Language": "de", "Text": "Liegenschaft"},
+                    {"Language": "it", "Text": "Bene immobile"},
+                    {"Language": "rm", "Text": "Bain immobigliar"},
+                ],
+            },
+        }
+    ]
+}
 
 
 class TestOtherCantonalImplementationsParse:
@@ -1384,11 +1457,17 @@ class TestRdppfSvcFamilyIsNotSupported:
     """
 
     # Trimmed from a live VD `/getegrid/json/` response.
-    ITEM_PAYLOAD = {"Item": [{'egrid': 'CH738308453444',
-         'number': 'DP 905',
-         'identDN': 'VD0132000000',
-         'type': {'Code': 0, 'Text': [{'Language': 1, 'Text': 'Bien-fonds'}]},
-         'limit': None}]}
+    ITEM_PAYLOAD = {
+        "Item": [
+            {
+                "egrid": "CH738308453444",
+                "number": "DP 905",
+                "identDN": "VD0132000000",
+                "type": {"Code": 0, "Text": [{"Language": 1, "Text": "Bien-fonds"}]},
+                "limit": None,
+            }
+        ]
+    }
 
     def test_the_item_envelope_is_not_read(self):
         from swisstopo_mcp.oereb import _parse_egrid_payload

@@ -14,6 +14,7 @@ test that merely mentions a name would satisfy it — but it is enough to make a
 uncovered tool visible, and adding a live test that mentions a tool without
 calling it would be a strange thing to do deliberately.
 """
+
 from __future__ import annotations
 
 import ast
@@ -45,9 +46,7 @@ def _live_test_sources() -> dict[str, str]:
         tree = ast.parse(text)
         chunks: list[str] = []
         for node in ast.walk(tree):
-            if not isinstance(
-                node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)
-            ):
+            if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
                 continue
             marked = any(
                 "live" in ast.unparse(dec) and "pytest.mark" in ast.unparse(dec)
@@ -134,9 +133,7 @@ class TestLiveTestsAreExcludedFromPrCi:
     def test_the_marker_is_registered(self):
         import tomllib
 
-        pyproject = tomllib.loads(
-            (TESTS.parent / "pyproject.toml").read_text(encoding="utf-8")
-        )
+        pyproject = tomllib.loads((TESTS.parent / "pyproject.toml").read_text(encoding="utf-8"))
         markers = pyproject["tool"]["pytest"]["ini_options"]["markers"]
         assert any(m.startswith("live:") for m in markers), (
             "an unregistered marker makes `-m live` select nothing silently"
@@ -147,9 +144,9 @@ class TestLiveTestsAreExcludedFromPrCi:
         assert '-m "not live"' in ci
 
     def test_the_nightly_workflow_runs_only_them(self):
-        nightly = (
-            TESTS.parent / ".github" / "workflows" / "live-test.yml"
-        ).read_text(encoding="utf-8")
+        nightly = (TESTS.parent / ".github" / "workflows" / "live-test.yml").read_text(
+            encoding="utf-8"
+        )
         assert "-m live" in nightly
         assert "schedule:" in nightly
         assert "workflow_dispatch:" in nightly
@@ -166,9 +163,7 @@ class TestTheFailureReportingPathIsRobust:
         import yaml
 
         return yaml.safe_load(
-            (TESTS.parent / ".github" / "workflows" / "live-test.yml").read_text(
-                encoding="utf-8"
-            )
+            (TESTS.parent / ".github" / "workflows" / "live-test.yml").read_text(encoding="utf-8")
         )
 
     def _report_step(self) -> dict:
@@ -208,9 +203,7 @@ class TestTheFailureReportingPathIsRobust:
         with tempfile.NamedTemporaryFile("w", suffix=".sh", delete=False) as handle:
             handle.write(script)
             path = handle.name
-        result = subprocess.run(
-            ["bash", "-n", path], capture_output=True, text=True, check=False
-        )
+        result = subprocess.run(["bash", "-n", path], capture_output=True, text=True, check=False)
         assert result.returncode == 0, result.stderr
 
     def test_remaining_pinned_actions_are_first_party(self):
@@ -227,8 +220,7 @@ class TestTheFailureReportingPathIsRobust:
         for step in steps:
             if "uses" in step:
                 assert step.get("if") != "failure()", (
-                    "an action on the failure-only path is never exercised by a "
-                    "green run"
+                    "an action on the failure-only path is never exercised by a green run"
                 )
 
 
@@ -290,9 +282,7 @@ class TestPhaseDeclarationsAgree:
             text = (ROOT / name).read_text(encoding="utf-8")
             if re.search(r"Phase[\s-]1[\s-](read-only|Read-only)", text):
                 offenders.append(name)
-        assert offenders == [], (
-            f"{offenders} still describe the server as a Phase-1 wrapper"
-        )
+        assert offenders == [], f"{offenders} still describe the server as a Phase-1 wrapper"
 
 
 class TestBothReadmesCarryTheSamePhaseTable:

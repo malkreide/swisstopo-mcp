@@ -5,6 +5,7 @@ MCP protocol channel for stdio transport (see OBS-004). Use `configure_logging()
 once at startup and `log_tool_call(...)` to wrap tool handlers with bound,
 per-call context (tool name + correlation id + duration).
 """
+
 from __future__ import annotations
 
 import contextlib
@@ -61,7 +62,9 @@ def get_logger(name: str = "swisstopo_mcp") -> Any:
     return structlog.get_logger(name)
 
 
-def log_tool_call(tool_name: str) -> Callable[[Callable[..., Awaitable[T]]], Callable[..., Awaitable[T]]]:
+def log_tool_call(
+    tool_name: str,
+) -> Callable[[Callable[..., Awaitable[T]]], Callable[..., Awaitable[T]]]:
     """Decorate an async tool handler to log invocation/completion/failure with
     a bound correlation id and duration. Transparent to the return value."""
 

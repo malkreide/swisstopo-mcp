@@ -265,9 +265,7 @@ from swisstopo_mcp.rest_api import (  # noqa: E402
         open_world_hint=True,
     ),
 )
-async def swisstopo_map_query(
-    params: MapQueryInput, ctx: Context | None = None
-) -> ToolResponse:
+async def swisstopo_map_query(params: MapQueryInput, ctx: Context | None = None) -> ToolResponse:
     """Fragt den nationalen Swisstopo-Kartenkatalog ab (500+ Layer): Layer finden, Felder ansehen, Features abfragen.
 
     <use_case>Der übliche Ablauf ist eine Kette: operation='search_layers' liefert
@@ -691,9 +689,7 @@ async def lookup_postal_code_tool(params: LookupPostalCodeInput) -> ToolResponse
         open_world_hint=True,
     ),
 )
-async def find_commune_tool(
-    params: FindCommuneInput, ctx: Context | None = None
-) -> ToolResponse:
+async def find_commune_tool(params: FindCommuneInput, ctx: Context | None = None) -> ToolResponse:
     """Löst Gemeinden auf: Name→BFS-Nummer, BFS-Nummer→Name, oder alle Gemeinden eines Kantons/Bezirks.
 
     <use_case>Vier Modi (genau einen Parameter angeben): `name` (Name →
@@ -937,9 +933,7 @@ def build_http_app(allowed_origins: list[str] | None = None):
 
     # mcp 2.x: transport_security is a per-app kwarg, not a constructor arg.
     security = _transport_security()
-    app = mcp.streamable_http_app(
-        transport_security=security, host=settings.http_host
-    )
+    app = mcp.streamable_http_app(transport_security=security, host=settings.http_host)
     # Must run before `sdk_lifespan` is captured below: it replaces the app's
     # lifespan, and the wrapper has to see the replacement, not the original.
     _install_session_manager(app, security)

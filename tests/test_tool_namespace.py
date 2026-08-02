@@ -7,6 +7,7 @@ it a defence against name shadowing between servers. The server's own
 instructions advertise joins to sibling MCP servers, so generic names like
 `find_commune` were exactly the collision-prone case the check names.
 """
+
 from __future__ import annotations
 
 import importlib.util
@@ -153,9 +154,7 @@ class TestToolBudget:
         root = pathlib.Path(__file__).resolve().parent.parent
         for name in ("README.md", "README.de.md"):
             text = (root / name).read_text(encoding="utf-8")
-            assert str(TOOL_BUDGET) in text, (
-                f"{name} does not mention the budget of {TOOL_BUDGET}"
-            )
+            assert str(TOOL_BUDGET) in text, f"{name} does not mention the budget of {TOOL_BUDGET}"
 
     def test_the_readmes_state_the_actual_count(self, tool_names):
         """The count drifted twice before (13 → 23 → 24 in stale prose)."""

@@ -1,5 +1,6 @@
 # tests/test_logging.py
 """Regression tests for OBS-003: structured logging on stderr."""
+
 from __future__ import annotations
 
 import io

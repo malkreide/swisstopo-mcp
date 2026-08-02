@@ -1,5 +1,6 @@
 # src/swisstopo_mcp/stac.py
 """STAC Catalog tools for data.geo.admin.ch (search + collection details)."""
+
 from __future__ import annotations
 
 from typing import Any

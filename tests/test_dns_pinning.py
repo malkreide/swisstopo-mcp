@@ -19,6 +19,7 @@ opt-in path. Two properties carry that change and are tested here rather than
 argued: the transport turns itself off behind a forward proxy, and it never
 converts a reachable host into an unreachable one.
 """
+
 from __future__ import annotations
 
 import httpx
@@ -185,9 +186,7 @@ class TestAllResolvedAddressesAreTried:
     async def test_falls_through_to_the_second_address(self, monkeypatch):
         """The exact reported shape: IPv6 first, IPv4 second, no IPv6 route."""
         attempts: list[str] = []
-        monkeypatch.setattr(
-            api_client, "_resolve", lambda h: ("2001:db8::1", "185.19.28.1")
-        )
+        monkeypatch.setattr(api_client, "_resolve", lambda h: ("2001:db8::1", "185.19.28.1"))
         monkeypatch.setattr(
             httpx.AsyncHTTPTransport,
             "handle_async_request",
@@ -199,9 +198,7 @@ class TestAllResolvedAddressesAreTried:
 
     async def test_the_first_working_address_stops_the_walk(self, monkeypatch):
         attempts: list[str] = []
-        monkeypatch.setattr(
-            api_client, "_resolve", lambda h: ("185.19.28.1", "185.19.28.2")
-        )
+        monkeypatch.setattr(api_client, "_resolve", lambda h: ("185.19.28.1", "185.19.28.2"))
         monkeypatch.setattr(
             httpx.AsyncHTTPTransport, "handle_async_request", _failing_then_ok(set(), attempts)
         )
@@ -212,9 +209,7 @@ class TestAllResolvedAddressesAreTried:
         """Exhausting the list must surface httpx's error, not a masked one —
         'connection refused' is the truth; a PermissionError would not be."""
         attempts: list[str] = []
-        monkeypatch.setattr(
-            api_client, "_resolve", lambda h: ("185.19.28.1", "185.19.28.2")
-        )
+        monkeypatch.setattr(api_client, "_resolve", lambda h: ("185.19.28.1", "185.19.28.2"))
         monkeypatch.setattr(
             httpx.AsyncHTTPTransport,
             "handle_async_request",
@@ -248,9 +243,7 @@ class TestAllResolvedAddressesAreTried:
             attempts.append(req.url.host)
             raise httpx.ReadError("connection reset", request=req)
 
-        monkeypatch.setattr(
-            api_client, "_resolve", lambda h: ("185.19.28.1", "185.19.28.2")
-        )
+        monkeypatch.setattr(api_client, "_resolve", lambda h: ("185.19.28.1", "185.19.28.2"))
         monkeypatch.setattr(httpx.AsyncHTTPTransport, "handle_async_request", _stub)
         with pytest.raises(httpx.ReadError):
             await PinnedTransport().handle_async_request(_request())
@@ -260,9 +253,7 @@ class TestAllResolvedAddressesAreTried:
         """The walk must not become a way around the SEC-004 guard: a second
         answer pointing at loopback has to be refused before any connection."""
         attempts: list[str] = []
-        monkeypatch.setattr(
-            api_client, "_resolve", lambda h: ("185.19.28.1", "127.0.0.1")
-        )
+        monkeypatch.setattr(api_client, "_resolve", lambda h: ("185.19.28.1", "127.0.0.1"))
         monkeypatch.setattr(
             httpx.AsyncHTTPTransport,
             "handle_async_request",
@@ -325,9 +316,7 @@ class TestTheShippedDefaultDoesNotBreakOrdinaryRequests:
             return httpx.Response(200, json={}, request=req)
 
         monkeypatch.setattr(httpx.AsyncHTTPTransport, "handle_async_request", _stub)
-        await api_client.request_with_retry(
-            "GET", "https://api3.geo.admin.ch/rest/services/test"
-        )
+        await api_client.request_with_retry("GET", "https://api3.geo.admin.ch/rest/services/test")
         assert seen["request"].url.host == "185.19.28.1"
         assert seen["request"].headers["Host"] == "api3.geo.admin.ch"
 
@@ -336,9 +325,7 @@ class TestTheShippedDefaultDoesNotBreakOrdinaryRequests:
         rewrites anything — so pinning cannot be a way past the allow-list, and
         equally cannot cause a legitimate host to be refused as a bare IP."""
         with pytest.raises(PermissionError, match="Allow-List"):
-            await api_client.request_with_retry(
-                "GET", "https://attacker.example.com/x"
-            )
+            await api_client.request_with_retry("GET", "https://attacker.example.com/x")
 
 
 class TestAStreamingBodyIsNeverReplayed:
@@ -368,17 +355,13 @@ class TestAStreamingBodyIsNeverReplayed:
         async def _chunks():
             yield b"chunk"
 
-        monkeypatch.setattr(
-            api_client, "_resolve", lambda h: ("185.19.28.1", "185.19.28.2")
-        )
+        monkeypatch.setattr(api_client, "_resolve", lambda h: ("185.19.28.1", "185.19.28.2"))
         monkeypatch.setattr(
             httpx.AsyncHTTPTransport,
             "handle_async_request",
             _failing_then_ok({"185.19.28.1", "185.19.28.2"}, attempts),
         )
-        request = httpx.Request(
-            "POST", "https://api3.geo.admin.ch/x", content=_chunks()
-        )
+        request = httpx.Request("POST", "https://api3.geo.admin.ch/x", content=_chunks())
         with pytest.raises(httpx.ConnectError):
             await PinnedTransport().handle_async_request(request)
         assert attempts == ["185.19.28.1"]
@@ -397,9 +380,7 @@ class TestAStreamingBodyIsNeverReplayed:
 class TestPinnedTlsHandshake:
     """Connecting to an IP while presenting the hostname as SNI must validate."""
 
-    @pytest.mark.parametrize(
-        "host", ["api3.geo.admin.ch", "geodesy.geo.admin.ch"]
-    )
+    @pytest.mark.parametrize("host", ["api3.geo.admin.ch", "geodesy.geo.admin.ch"])
     def test_handshake_succeeds_with_hostname_sni(self, host):
         import socket
         import ssl

@@ -1,5 +1,6 @@
 # tests/test_geodata.py
 """Tests for the consolidated geodata façade (query_geodata + discovery)."""
+
 from __future__ import annotations
 
 import httpx
@@ -166,9 +167,7 @@ class TestQueryGeodataDispatch:
             else:
                 payload = {
                     "numberMatched": 42,
-                    "features": [
-                        {"properties": {"katasternummer": "ZH-1", "kanton": "ZH"}}
-                    ],
+                    "features": [{"properties": {"katasternummer": "ZH-1", "kanton": "ZH"}}],
                 }
             return httpx.Response(200, json=payload)
 
@@ -198,9 +197,7 @@ class TestQueryGeodataDispatch:
         assert "frei" in r.summary.lower()
 
     async def test_geodienste_bad_layer_format(self):
-        r = await query_geodata(
-            QueryGeodataInput(layer="geodienste:onlytopic", point="47.3,8.5")
-        )
+        r = await query_geodata(QueryGeodataInput(layer="geodienste:onlytopic", point="47.3,8.5"))
         assert r.is_error
         assert "geodienste:" in r.summary
 
@@ -319,9 +316,7 @@ class TestCollectionFanOut:
 
         async def fake_request(method, url, **kwargs):
             if url.endswith("/collections"):
-                return _Resp(
-                    {"collections": [{"id": f"C{i}"} for i in range(collection_count)]}
-                )
+                return _Resp({"collections": [{"id": f"C{i}"} for i in range(collection_count)]})
             cid = url.rsplit("/collections/", 1)[1].split("/")[0]
             recorder["order"].append(cid)
             recorder["in_flight"] += 1
@@ -334,9 +329,7 @@ class TestCollectionFanOut:
             return _Resp(
                 {
                     "numberMatched": n,
-                    "features": [
-                        {"properties": {"id": f"{cid}-{k}"}} for k in range(n)
-                    ],
+                    "features": [{"properties": {"id": f"{cid}-{k}"}} for k in range(n)],
                 }
             )
 
@@ -392,9 +385,7 @@ class TestCollectionFanOut:
         features = {"C0": 1, "C1": 1, "C2": 1, "C3": 1}
         first, _ = await self._run(monkeypatch, 4, features)
         second, _ = await self._run(monkeypatch, 4, features)
-        assert [r["collection"] for r in first.results] == [
-            r["collection"] for r in second.results
-        ]
+        assert [r["collection"] for r in first.results] == [r["collection"] for r in second.results]
         assert [r["collection"] for r in first.results] == ["C0", "C1", "C2", "C3"]
 
     async def test_the_scan_cap_is_not_silent(self, monkeypatch):

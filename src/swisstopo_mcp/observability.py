@@ -21,6 +21,7 @@ string — `?searchText=Seilergraben+76,+Zürich&lat=47.3769`. True of the span 
 write, false of the system we configure. `_scrub_url` and the request hook below
 close that; see `_install_url_scrubber`.
 """
+
 from __future__ import annotations
 
 import os

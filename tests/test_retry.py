@@ -1,5 +1,6 @@
 # tests/test_retry.py
 """Resilience default: exponential-backoff retry (skill Schritt 3.1)."""
+
 from __future__ import annotations
 
 import httpx
@@ -15,6 +16,7 @@ URL = "https://api3.geo.admin.ch/rest/services/test"
 @pytest.fixture(autouse=True)
 def _no_sleep(monkeypatch):
     """Patch out the real 2s/4s/8s backoff so tests run instantly."""
+
     async def fake_sleep(_seconds: float) -> None:
         return None
 

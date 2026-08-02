@@ -29,8 +29,16 @@ jobs:
         run: |
           pytest tests/ -m "not live"
 
+      # Pin ruff so an upstream release cannot change the default rule set or
+      # formatter and break CI on unrelated, untouched code.
+      - name: Install pinned ruff
+        run: pip install ruff==0.16.1
+
       - name: Lint
-        run: ruff check src/ tests/
+        run: ruff check src/ tests/ scripts/
+
+      - name: Format check
+        run: ruff format --check src/ tests/ scripts/
 
       # Type gate for SDK-002: four handlers were annotated `-> str` while
       # returning ToolResponse and nothing caught it.

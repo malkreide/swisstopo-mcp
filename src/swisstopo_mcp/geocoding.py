@@ -1,5 +1,6 @@
 # src/swisstopo_mcp/geocoding.py
 """Geocoding tools for api3.geo.admin.ch (SearchServer, location type)."""
+
 from __future__ import annotations
 
 from typing import Any
@@ -17,9 +18,7 @@ from swisstopo_mcp.models import ToolResponse
 
 # The `origins` values SearchServer accepts. Kept as a frozenset rather than a
 # Literal because the parameter is a comma-separated list (SEC-018).
-ORIGINS = frozenset(
-    {"address", "zipcode", "gg25", "district", "kantone", "gazetteer", "parcel"}
-)
+ORIGINS = frozenset({"address", "zipcode", "gg25", "district", "kantone", "gazetteer", "parcel"})
 
 # ---------------------------------------------------------------------------
 # Input Models
@@ -78,8 +77,7 @@ class GeocodeInput(BaseModel):
         unknown = sorted({m for m in members if m not in ORIGINS})
         if unknown:
             raise ValueError(
-                f"Unbekannte origins: {', '.join(unknown)}. "
-                f"Erlaubt: {', '.join(sorted(ORIGINS))}."
+                f"Unbekannte origins: {', '.join(unknown)}. Erlaubt: {', '.join(sorted(ORIGINS))}."
             )
         return ",".join(members)
 
@@ -100,7 +98,6 @@ class ReverseGeocodeInput(BaseModel):
         # Wires up validate_sr(), which existed but was never called — an
         # arbitrary int used to be forwarded straight upstream (SEC-018).
         return validate_sr(v)
-
 
 
 # ---------------------------------------------------------------------------
@@ -180,9 +177,7 @@ async def geocode(params: GeocodeInput) -> ToolResponse:
         )
         results = data.get("results", [])
         if results:
-            return ToolResponse.ok(
-                format_geocode_results(results), results, match_type="exact"
-            )
+            return ToolResponse.ok(format_geocode_results(results), results, match_type="exact")
 
         # Nothing matched: relax the query and try again before reporting a
         # bare negative (ARCH-003). This is what makes `match_type: "fuzzy"` a
@@ -228,8 +223,7 @@ async def reverse_geocode(params: ReverseGeocodeInput) -> ToolResponse:
     try:
         # Build a ~500 m bounding box (approx. 0.005 degrees)
         bbox = (
-            f"{params.lon - 0.005},{params.lat - 0.005},"
-            f"{params.lon + 0.005},{params.lat + 0.005}"
+            f"{params.lon - 0.005},{params.lat - 0.005},{params.lon + 0.005},{params.lat + 0.005}"
         )
         data = await geo_admin_request(
             "/rest/services/ech/SearchServer",

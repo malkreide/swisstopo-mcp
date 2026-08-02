@@ -29,6 +29,7 @@ The patterns are German and French as well as English on purpose: the
 descriptions in this portfolio are German, and an off-the-shelf English pattern
 list would sail straight past them.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -43,9 +44,7 @@ from swisstopo_mcp.server import mcp
 
 # Zero-width, bidi-override and word-joiner ranges — the classic ways to hide
 # text inside a description that a reviewer reads as clean.
-INVISIBLE = re.compile(
-    "[\u200b-\u200f\u202a-\u202e\u2060-\u2064\ufeff]"
-)
+INVISIBLE = re.compile("[\u200b-\u200f\u202a-\u202e\u2060-\u2064\ufeff]")
 
 OVERRIDE_PATTERNS = [
     # German — the language these descriptions are written in.
@@ -141,8 +140,7 @@ class TestTheScanCoversWhatIsShipped:
 
     def test_the_surface_is_substantial(self, model_text):
         assert len(model_text) > 100, (
-            f"only {len(model_text)} strings collected — the sweep is too narrow "
-            "to be meaningful"
+            f"only {len(model_text)} strings collected — the sweep is too narrow to be meaningful"
         )
 
 
@@ -158,9 +156,7 @@ class TestEveryToolIsReadOnly:
         )
 
     def test_no_tool_is_destructive(self, tools):
-        offenders = [
-            t.name for t in tools if t.annotations and t.annotations.destructive_hint
-        ]
+        offenders = [t.name for t in tools if t.annotations and t.annotations.destructive_hint]
         assert offenders == []
 
 
@@ -197,9 +193,7 @@ class TestNamesAreUnambiguous:
         """`isascii()` catches Cyrillic-in-name but not a non-canonical
         ASCII-compatible form — a fullwidth or ligature character normalises to
         the same name a legitimate tool uses (audit SEC-015)."""
-        offenders = [
-            t.name for t in tools if unicodedata.normalize("NFKC", t.name) != t.name
-        ]
+        offenders = [t.name for t in tools if unicodedata.normalize("NFKC", t.name) != t.name]
         assert offenders == [], f"Tool names that are not NFKC-canonical: {offenders}"
 
 
@@ -223,8 +217,7 @@ class TestLengthBounds:
         bloated = [
             (label, len(text))
             for label, text in model_text
-            if (":input." in label or ":output." in label)
-            and len(text) > MAX_DESCRIPTION_CHARS
+            if (":input." in label or ":output." in label) and len(text) > MAX_DESCRIPTION_CHARS
         ]
         assert bloated == [], f"Schema descriptions over the ceiling: {bloated}"
 
@@ -404,8 +397,7 @@ class TestReadOnlyIsAPropertyNotOnlyAnAnnotation:
         unexpected = [
             f"{module}:{line} {method}"
             for module, line, method in _http_call_methods()
-            if method not in {"GET", "<forwarded>"}
-            and (module, method) not in NON_GET_EXCEPTIONS
+            if method not in {"GET", "<forwarded>"} and (module, method) not in NON_GET_EXCEPTIONS
         ]
         assert unexpected == [], (
             f"non-GET requests with no documented reason: {unexpected}. Add an "

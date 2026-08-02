@@ -1,5 +1,6 @@
 # tests/test_responses.py
 """Regression tests for SDK-002 + CH-004: structured ToolResponse envelope."""
+
 from __future__ import annotations
 
 import pytest

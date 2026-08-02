@@ -12,6 +12,7 @@ irrelevant precision at the cost of a roundtrip per call.
 Where centimetres do matter (cadastral work, parcel boundaries), callers reach
 for this tool explicitly.
 """
+
 from __future__ import annotations
 
 from typing import Any, Literal
@@ -133,8 +134,7 @@ class SwissPointInput(BaseModel):
                     "Unvollständig: easting und northing müssen beide angegeben werden."
                 )
             raise ValueError(
-                "Koordinaten fehlen: entweder lat/lon (WGS84) oder "
-                "easting/northing (LV95) angeben."
+                "Koordinaten fehlen: entweder lat/lon (WGS84) oder easting/northing (LV95) angeben."
             )
 
         if has_lv95:
@@ -250,9 +250,7 @@ def _to_float(value: Any) -> float:
         raise ValueError(f"Erwartet wurde ein numerischer Wert, erhalten: {value!r}") from exc
 
 
-def format_conversion(
-    easting: float, northing: float, direction: str
-) -> str:
+def format_conversion(easting: float, northing: float, direction: str) -> str:
     """Format a conversion result as a human-readable German string."""
     if direction == "wgs84_to_lv95":
         return (

@@ -1,5 +1,6 @@
 # src/swisstopo_mcp/rest_api.py
 """REST API tools for api3.geo.admin.ch (SearchServer, MapServer)."""
+
 from __future__ import annotations
 
 import html
@@ -89,7 +90,9 @@ class FindFeaturesInput(BaseModel):
     layer: str = Field(
         ..., min_length=2, max_length=128, pattern=ID_PATTERN, description="Layer-ID"
     )
-    search_text: str = Field(..., min_length=1, max_length=200, pattern=TEXT_PATTERN, description="Suchwert")
+    search_text: str = Field(
+        ..., min_length=1, max_length=200, pattern=TEXT_PATTERN, description="Suchwert"
+    )
     search_field: str = Field(
         ..., min_length=1, max_length=128, pattern=ID_PATTERN, description="Attributfeld"
     )
@@ -215,9 +218,7 @@ class MapQueryInput(BaseModel):
         min_length=2,
         max_length=128,
         pattern=ID_PATTERN,
-        description=(
-            "Eine Layer-ID (layer_info, features_by_attribute, feature_by_id)."
-        ),
+        description=("Eine Layer-ID (layer_info, features_by_attribute, feature_by_id)."),
     )
 
     # --- features_at_point ---
@@ -304,9 +305,7 @@ class MapQueryInput(BaseModel):
         pattern=LANG_PATTERN,
         description="Sprache: de, fr, it, en (search_layers, layer_info).",
     )
-    limit: int = Field(
-        default=10, ge=1, le=30, description="Max. Trefferzahl (nur search_layers)."
-    )
+    limit: int = Field(default=10, ge=1, le=30, description="Max. Trefferzahl (nur search_layers).")
 
     @field_validator("sr")
     @classmethod
@@ -597,7 +596,8 @@ async def identify_features(params: IdentifyInput) -> ToolResponse:
         )
     except Exception as e:
         return ToolResponse.error(
-            handle_api_error(e, "Feature-Identifikation"), note="Prüfe die Layer-ID: `swisstopo_map_query` mit operation='search_layers' listet die gültigen IDs. Ein Tippfehler in der ID sieht upstream wie ein unbekannter Layer aus und wird als HTTP 400 abgewiesen."
+            handle_api_error(e, "Feature-Identifikation"),
+            note="Prüfe die Layer-ID: `swisstopo_map_query` mit operation='search_layers' listet die gültigen IDs. Ein Tippfehler in der ID sieht upstream wie ein unbekannter Layer aus und wird als HTTP 400 abgewiesen.",
         )
 
 
@@ -629,7 +629,8 @@ async def find_features(params: FindFeaturesInput) -> ToolResponse:
         )
     except Exception as e:
         return ToolResponse.error(
-            handle_api_error(e, "Feature-Suche"), note="Prüfe die Layer-ID: `swisstopo_map_query` mit operation='search_layers' listet die gültigen IDs. Ein Tippfehler in der ID sieht upstream wie ein unbekannter Layer aus und wird als HTTP 400 abgewiesen."
+            handle_api_error(e, "Feature-Suche"),
+            note="Prüfe die Layer-ID: `swisstopo_map_query` mit operation='search_layers' listet die gültigen IDs. Ein Tippfehler in der ID sieht upstream wie ein unbekannter Layer aus und wird als HTTP 400 abgewiesen.",
         )
 
 
@@ -648,8 +649,9 @@ async def get_feature(params: GetFeatureInput) -> ToolResponse:
             records,
             match_type="exact" if records else "none",
             note=(
-                None if records else
-                f"Feature '{params.feature_id}' existiert im Layer "
+                None
+                if records
+                else f"Feature '{params.feature_id}' existiert im Layer "
                 f"'{params.layer}' nicht. Feature-IDs mit "
                 "operation='features_at_point' oder 'features_by_attribute' "
                 "ermitteln — sie sind layer-spezifisch."
@@ -657,7 +659,8 @@ async def get_feature(params: GetFeatureInput) -> ToolResponse:
         )
     except Exception as e:
         return ToolResponse.error(
-            handle_api_error(e, "Feature-Abruf"), note="Prüfe Layer und Feature-ID: operation='features_at_point' oder 'features_by_attribute' liefern gültige IDs für genau diesen Layer. Eine ID aus einem anderen Layer ist hier unbekannt."
+            handle_api_error(e, "Feature-Abruf"),
+            note="Prüfe Layer und Feature-ID: operation='features_at_point' oder 'features_by_attribute' liefern gültige IDs für genau diesen Layer. Eine ID aus einem anderen Layer ist hier unbekannt.",
         )
 
 
@@ -710,8 +713,9 @@ async def zoning_at(params: ZoningAtInput) -> ToolResponse:
             zones,
             match_type="exact" if zones else "none",
             note=(
-                None if zones else
-                "Keine Bauzone an dieser Position — der Punkt liegt ausserhalb "
+                None
+                if zones
+                else "Keine Bauzone an dieser Position — der Punkt liegt ausserhalb "
                 "der Bauzone (Landwirtschafts-/Schutzgebiet) oder ausserhalb der "
                 "Schweiz. swisstopo_municipality_at zeigt, ob der Punkt überhaupt "
                 "in einer Gemeinde liegt; die rechtsverbindliche Nutzungsplanung "
@@ -755,8 +759,9 @@ async def municipality_at(params: MunicipalityAtInput) -> ToolResponse:
             records,
             match_type="exact" if records else "none",
             note=(
-                None if records else
-                "Keine Gemeinde an dieser Position — der Punkt liegt ausserhalb "
+                None
+                if records
+                else "Keine Gemeinde an dieser Position — der Punkt liegt ausserhalb "
                 "der Schweiz oder auf einem See ohne Gemeindezuordnung. "
                 "Koordinaten prüfen (lat/lon, nicht LV95)."
             ),
@@ -772,14 +777,10 @@ async def municipality_at(params: MunicipalityAtInput) -> ToolResponse:
 
 
 @log_tool_call("swisstopo_map_query:layer_info")
-async def layer_info(
-    params: LayerInfoInput, ctx: Context | None = None
-) -> ToolResponse:
+async def layer_info(params: LayerInfoInput, ctx: Context | None = None) -> ToolResponse:
     """Return the queryable fields and the legend of a layer."""
     try:
-        data = await geo_admin_request(
-            f"/rest/services/api/MapServer/{params.layer}", ctx=ctx
-        )
+        data = await geo_admin_request(f"/rest/services/api/MapServer/{params.layer}", ctx=ctx)
         if not isinstance(data, dict):
             return ToolResponse.error(
                 f"Fehler bei Layer-Info: Unerwartetes Antwortformat für '{params.layer}'."
@@ -814,9 +815,7 @@ async def layer_info(
         except Exception as exc:  # noqa: BLE001 - the legend is optional
             meta["legend"] = None
             meta["legend_status"] = "unavailable"
-            _log.warning(
-                "legend_fetch_failed", layer=params.layer, error_type=type(exc).__name__
-            )
+            _log.warning("legend_fetch_failed", layer=params.layer, error_type=type(exc).__name__)
             if ctx is not None:
                 try:
                     await ctx.warning(
@@ -829,7 +828,8 @@ async def layer_info(
         return ToolResponse.ok(format_layer_info(meta), [meta], match_type="exact")
     except Exception as e:
         return ToolResponse.error(
-            handle_api_error(e, "Layer-Info"), note="Prüfe die Layer-ID: `swisstopo_map_query` mit operation='search_layers' listet die gültigen IDs. Ein Tippfehler in der ID sieht upstream wie ein unbekannter Layer aus und wird als HTTP 400 abgewiesen."
+            handle_api_error(e, "Layer-Info"),
+            note="Prüfe die Layer-ID: `swisstopo_map_query` mit operation='search_layers' listet die gültigen IDs. Ein Tippfehler in der ID sieht upstream wie ein unbekannter Layer aus und wird als HTTP 400 abgewiesen.",
         )
 
 
@@ -860,9 +860,7 @@ async def map_query(params: MapQueryInput, ctx: Context | None = None) -> ToolRe
 
     if params.operation == "layer_info":
         assert params.layer is not None
-        return await layer_info(
-            LayerInfoInput(layer=params.layer, lang=params.lang), ctx
-        )
+        return await layer_info(LayerInfoInput(layer=params.layer, lang=params.lang), ctx)
 
     if params.operation == "features_at_point":
         assert params.layers is not None
@@ -894,9 +892,7 @@ async def map_query(params: MapQueryInput, ctx: Context | None = None) -> ToolRe
         assert params.layer is not None
         assert params.feature_id is not None
         return await get_feature(
-            GetFeatureInput(
-                layer=params.layer, feature_id=params.feature_id, sr=params.sr
-            )
+            GetFeatureInput(layer=params.layer, feature_id=params.feature_id, sr=params.sr)
         )
 
     # Spelled out rather than left as a trailing else: adding an operation to

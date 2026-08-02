@@ -1,5 +1,6 @@
 # src/swisstopo_mcp/oereb.py
 """ÖREB Cadastre tools for cantonal ÖREB services."""
+
 from __future__ import annotations
 
 from mcp.server.mcpserver import Context
@@ -89,7 +90,10 @@ class GetOerebExtractInput(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid", strict=True)
 
     egrid: str = Field(
-        ..., min_length=5, max_length=30, pattern=r"^[A-Za-z0-9]+$",
+        ...,
+        min_length=5,
+        max_length=30,
+        pattern=r"^[A-Za-z0-9]+$",
         description="EGRID (z.B. 'CH767982496078')",
     )
     canton: str = Field(
@@ -102,9 +106,7 @@ class GetOerebExtractInput(BaseModel):
     topics: str | None = Field(
         default=None, max_length=200, pattern=TOPICS_PATTERN, description=TOPICS_DESCRIPTION
     )
-    lang: str = Field(
-        default="de", pattern=LANG_PATTERN, description="Sprache: de, fr, it, en"
-    )
+    lang: str = Field(default="de", pattern=LANG_PATTERN, description="Sprache: de, fr, it, en")
 
 
 # ---------------------------------------------------------------------------
@@ -149,9 +151,7 @@ def _egrid_record(entry: dict) -> dict | None:
     if ident:
         record["identDN"] = str(ident)
     municipality = (
-        entry.get("gemeindename")
-        or entry.get("municipality")
-        or entry.get("MunicipalityName")
+        entry.get("gemeindename") or entry.get("municipality") or entry.get("MunicipalityName")
     )
     if municipality:
         record["municipality"] = str(municipality)
@@ -230,8 +230,7 @@ async def get_egrid(params: GetEgridInput) -> ToolResponse:
         records = await _fetch_egrid_records(base, *params.as_lv95)
         if not records:
             return ToolResponse.ok(
-                f"Kein EGRID gefunden für Koordinaten "
-                f"({lat}, {lon}) in Kanton {canton}.",
+                f"Kein EGRID gefunden für Koordinaten ({lat}, {lon}) in Kanton {canton}.",
                 [],
                 match_type="none",
                 note=(
@@ -268,7 +267,9 @@ async def get_egrid(params: GetEgridInput) -> ToolResponse:
         )
 
     except Exception as e:
-        return ToolResponse.error(handle_api_error(e, f"EGRID-Abfrage Kanton {canton}"), source=OEREB_SOURCE)
+        return ToolResponse.error(
+            handle_api_error(e, f"EGRID-Abfrage Kanton {canton}"), source=OEREB_SOURCE
+        )
 
 
 def _parse_restrictions(data: object) -> list[dict]:
@@ -314,9 +315,7 @@ def _matches_topics(record: dict, wanted: set[str]) -> bool:
     unreachable; filtering on the sub-code alone would break ZH outright.
     """
     candidates = {
-        value.lower()
-        for value in (record.get("theme_code"), record.get("theme_subcode"))
-        if value
+        value.lower() for value in (record.get("theme_code"), record.get("theme_subcode")) if value
     }
     return bool(candidates & wanted)
 
@@ -338,9 +337,7 @@ def _restriction_record(restriction: dict, lang: str = "de") -> dict:
         theme_subcode = str(theme.get("SubCode") or theme.get("subCode") or "")
 
     office = restriction.get("ResponsibleOffice")
-    office_name = (
-        _localized_text(office.get("Name"), lang) if isinstance(office, dict) else ""
-    )
+    office_name = _localized_text(office.get("Name"), lang) if isinstance(office, dict) else ""
 
     provisions = restriction.get("LegalProvisions")
     titles = [
@@ -435,9 +432,7 @@ async def get_oereb_extract(
             )
 
         records = [
-            _restriction_record(r, params.lang)
-            for r in restriction_measures
-            if isinstance(r, dict)
+            _restriction_record(r, params.lang) for r in restriction_measures if isinstance(r, dict)
         ]
 
         wanted = _parse_topics(params.topics)
@@ -448,9 +443,7 @@ async def get_oereb_extract(
                 # parcel — that is the same silent-wrong-answer the envelope
                 # parsing produced. Name the codes that are actually on this
                 # extract so the next call can be right.
-                offered = sorted(
-                    {code for r in records for code in (r["theme_code"],) if code}
-                )
+                offered = sorted({code for r in records for code in (r["theme_code"],) if code})
                 return ToolResponse.ok(
                     f"## ÖREB-Auszug für {params.egrid}\n\n"
                     f"Keine Beschränkung im Thema '{params.topics}'. "
@@ -515,7 +508,9 @@ async def get_oereb_extract(
         )
 
     except Exception as e:
-        return ToolResponse.error(handle_api_error(e, f"ÖREB-Auszug Kanton {canton}"), source=OEREB_SOURCE)
+        return ToolResponse.error(
+            handle_api_error(e, f"ÖREB-Auszug Kanton {canton}"), source=OEREB_SOURCE
+        )
 
 
 class OerebAtInput(SwissPointInput):
@@ -533,9 +528,7 @@ class OerebAtInput(SwissPointInput):
     topics: str | None = Field(
         default=None, max_length=200, pattern=TOPICS_PATTERN, description=TOPICS_DESCRIPTION
     )
-    lang: str = Field(
-        default="de", pattern=LANG_PATTERN, description="Sprache: de, fr, it, en"
-    )
+    lang: str = Field(default="de", pattern=LANG_PATTERN, description="Sprache: de, fr, it, en")
 
 
 @log_tool_call("swisstopo_oereb_at")
@@ -581,8 +574,6 @@ async def oereb_at(params: OerebAtInput, ctx: Context | None = None) -> ToolResp
         )
 
     return await get_oereb_extract(
-        GetOerebExtractInput(
-            egrid=egrid, canton=canton, topics=params.topics, lang=params.lang
-        ),
+        GetOerebExtractInput(egrid=egrid, canton=canton, topics=params.topics, lang=params.lang),
         ctx=ctx,
     )

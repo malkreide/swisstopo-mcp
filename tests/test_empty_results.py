@@ -14,6 +14,7 @@ Three layers are asserted here, weakest to strongest:
 3. the tools most likely to legitimately return nothing are driven end to end
    and their notes checked for an actual next step.
 """
+
 from __future__ import annotations
 
 import ast
@@ -62,9 +63,7 @@ class TestEveryCallSiteSuppliesItsOwnNote:
                 ):
                     continue
                 kwargs = {k.arg for k in node.keywords if k.arg}
-                match_type = next(
-                    (k.value for k in node.keywords if k.arg == "match_type"), None
-                )
+                match_type = next((k.value for k in node.keywords if k.arg == "match_type"), None)
                 if match_type is None:
                     continue
                 if "none" in ast.unparse(match_type):
@@ -132,9 +131,7 @@ class TestFuzzyIsNoLongerADeadBranch:
         assert "prüfen" in result.note
 
     async def test_both_empty_is_none_with_a_specific_note(self, monkeypatch):
-        result, calls = await self._geocode(
-            monkeypatch, [{"results": []}, {"results": []}]
-        )
+        result, calls = await self._geocode(monkeypatch, [{"results": []}, {"results": []}])
         assert result.match_type == "none"
         assert len(calls) == 2
         assert result.note != FALLBACK_NOTE

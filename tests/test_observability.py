@@ -5,6 +5,7 @@ The load-bearing property is that tracing is **inert unless configured**: the
 default install and the local stdio workflow must see no behaviour change and
 emit nothing.
 """
+
 from __future__ import annotations
 
 import pytest
@@ -214,9 +215,7 @@ class TestHttpxChildSpansCarryNoArguments:
             spans, "https://api3.geo.admin.ch/rest/services/ech/SearchServer", SECRET_QUERY
         )
         assert emitted, "no httpx span was recorded — the test would pass vacuously"
-        blob = " ".join(
-            f"{k}={v}" for s in emitted for k, v in (s.attributes or {}).items()
-        )
+        blob = " ".join(f"{k}={v}" for s in emitted for k, v in (s.attributes or {}).items())
         assert "Seilergraben" not in blob
         assert "47.3769" not in blob
         assert "searchText" not in blob
@@ -225,9 +224,7 @@ class TestHttpxChildSpansCarryNoArguments:
         emitted = await self._spans_for(
             spans, "https://api3.geo.admin.ch/rest/services/ech/SearchServer", SECRET_QUERY
         )
-        blob = " ".join(
-            f"{k}={v}" for s in emitted for k, v in (s.attributes or {}).items()
-        )
+        blob = " ".join(f"{k}={v}" for s in emitted for k, v in (s.attributes or {}).items())
         assert "api3.geo.admin.ch" in blob
         assert "SearchServer" in blob
 
@@ -239,7 +236,5 @@ class TestHttpxChildSpansCarryNoArguments:
             spans, "https://api3.geo.admin.ch/boom", SECRET_QUERY, fail=True
         )
         assert emitted, "no httpx span was recorded on the error path"
-        blob = " ".join(
-            f"{k}={v}" for s in emitted for k, v in (s.attributes or {}).items()
-        )
+        blob = " ".join(f"{k}={v}" for s in emitted for k, v in (s.attributes or {}).items())
         assert "Seilergraben" not in blob, "query string leaked on the failure path"

@@ -246,6 +246,7 @@ class TestFormatFeatureDetail:
 # Async Handler Tests (mocked)
 # ---------------------------------------------------------------------------
 
+
 class TestSearchLayersHandler:
     async def test_search_layers_mocked(self, monkeypatch):
         async def mock_request(path, params=None, **_):
@@ -299,9 +300,7 @@ class TestIdentifyFeaturesHandler:
             return {"results": []}
 
         monkeypatch.setattr("swisstopo_mcp.rest_api.geo_admin_request", mock_request)
-        result = await identify_features(
-            IdentifyInput(layers="ch.test", lat=47.0, lon=8.0)
-        )
+        result = await identify_features(IdentifyInput(layers="ch.test", lat=47.0, lon=8.0))
         assert "Keine Features gefunden" in result.summary
 
 
@@ -358,6 +357,7 @@ class TestGetFeatureHandler:
 # Live Tests (network required)
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.live
 async def test_live_search_layers():
     result = await search_layers(SearchLayersInput(query="gebaeude"))
@@ -409,16 +409,12 @@ async def test_live_find_features_by_attribute():
 async def test_live_get_feature_detail():
     """Chained on find_features so the id cannot go stale."""
     found = await find_features(
-        FindFeaturesInput(
-            layer=_COMMUNE_LAYER, search_text="Zürich", search_field="gemname"
-        )
+        FindFeaturesInput(layer=_COMMUNE_LAYER, search_text="Zürich", search_field="gemname")
     )
     if not found.results:
         pytest.skip("attribute search returned nothing today")
     feature_id = found.results[0].get("featureId") or found.results[0].get("id")
     if feature_id is None:
         pytest.skip("upstream result carries no usable feature id")
-    result = await get_feature(
-        GetFeatureInput(layer=_COMMUNE_LAYER, feature_id=str(feature_id))
-    )
+    result = await get_feature(GetFeatureInput(layer=_COMMUNE_LAYER, feature_id=str(feature_id)))
     assert result.is_error is False, result.summary

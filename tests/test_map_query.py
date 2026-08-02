@@ -338,6 +338,12 @@ class TestAnUnhandledOperationFailsLoudly:
 
 _COMMUNE_LAYER = "ch.swisstopo.swissboundaries3d-gemeinde-flaeche.fill"
 
+# A layer whose feature IDs are SLOIDs — `ch:1:sloid:91220::83`. The round-trip
+# below used to run on `_COMMUNE_LAYER` alone, whose IDs are bare integers, and
+# so never touched the charset. `feature_id` rejected every colon, meaning
+# `features_at_point` handed out IDs that `feature_by_id` refused to take back.
+_COLON_ID_LAYER = "ch.bav.haltestellen-oev"
+
 
 @pytest.mark.live
 class TestSwisstopoMapQueryLive:
@@ -402,3 +408,39 @@ class TestSwisstopoMapQueryLive:
             )
         )
         assert result.is_error is False, result.summary
+
+    async def test_a_feature_id_the_server_emits_is_one_it_accepts_back(self):
+        """The pairing `features_at_point` -> `feature_by_id` is the documented
+        way to drill into a hit, so an ID the first call hands out must survive
+        the second. It did not for any layer using SLOIDs: the identifier
+        charset had no colon, and the follow-up died in input validation before
+        a request was made.
+
+        Run on a colon-bearing layer specifically. The sibling test above uses
+        integer IDs, which is why this class was green while the pairing was
+        broken for 201 of the 761 real feature IDs sampled across six layers.
+        """
+        found = await map_query(
+            MapQueryInput(
+                operation="features_at_point",
+                layers=_COLON_ID_LAYER,
+                lat=47.3769,
+                lon=8.5417,
+                tolerance=100,
+            )
+        )
+        if not found.results:
+            pytest.skip("no transit stop near the probe point today")
+        feature_id = found.results[0].get("featureId") or found.results[0].get("id")
+        if feature_id is None:
+            pytest.skip("upstream result carries no usable feature id")
+
+        result = await map_query(
+            MapQueryInput(
+                operation="feature_by_id",
+                layer=_COLON_ID_LAYER,
+                feature_id=str(feature_id),
+            )
+        )
+        assert result.is_error is False, result.summary
+        assert str(feature_id) in result.summary

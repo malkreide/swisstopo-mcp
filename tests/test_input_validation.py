@@ -361,3 +361,79 @@ class TestAggregatesValidateLikeTheirDelegates:
         assert {"layer", "lat", "lon", "limit"} <= covered, (
             "the map_query pass-through fields dropped out of the check"
         )
+
+
+# ---------------------------------------------------------------------------
+# Patterns vs. real values
+#
+# The `topics` charset rejected every valid ÖREB theme code because it was
+# written from imagination rather than from an example. These pin the three
+# other places the same audit found, each with a value taken from a live
+# response rather than invented — an invented value is what let the bug in.
+#
+# The audit that produced them checked every patterned field against real data:
+# 2115 commune names, 1325 street names, 993 localities and 134 district names
+# against TEXT_PATTERN; 896 layer IDs, 100 STAC collection IDs and 109 attribute
+# names against ID_PATTERN; 970 BFS keys and 176 postal codes against their
+# numeric patterns. Those all passed. What follows is what did not.
+# ---------------------------------------------------------------------------
+
+
+class TestIdentifiersTheServerItselfEmits:
+    """`ch.bav.haltestellen-oev` answers with SLOIDs. 201 of the 761 real
+    feature IDs sampled across six layers carry colons, and the identifier
+    charset had none — so `feature_by_id` rejected IDs `features_at_point` had
+    just produced, before any request went out."""
+
+    # Verbatim from a live features_at_point response.
+    SLOID = "ch:1:sloid:91220::83"
+
+    def test_get_feature_accepts_a_sloid(self):
+        from swisstopo_mcp.rest_api import GetFeatureInput
+
+        m = GetFeatureInput(layer="ch.bav.haltestellen-oev", feature_id=self.SLOID)
+        assert m.feature_id == self.SLOID
+
+    def test_map_query_accepts_a_sloid(self):
+        from swisstopo_mcp.rest_api import MapQueryInput
+
+        m = MapQueryInput(
+            operation="feature_by_id",
+            layer="ch.bav.haltestellen-oev",
+            feature_id=self.SLOID,
+        )
+        assert m.feature_id == self.SLOID
+
+    def test_plain_numeric_ids_still_work(self):
+        """The other real shape — most layers use integers."""
+        from swisstopo_mcp.rest_api import GetFeatureInput
+
+        assert GetFeatureInput(layer="ch.are.bauzonen", feature_id="10003995")
+
+
+class TestSeparatorSpacingIsAccepted:
+    """A space after a comma is how anyone writes a list or a coordinate pair,
+    and the code behind each of these fields already coped with it — `float()`
+    strips, `bbox` strips each part explicitly. Only the patterns did not."""
+
+    def test_point_accepts_a_space_after_the_comma(self):
+        from swisstopo_mcp.geodata import QueryGeodataInput
+
+        assert QueryGeodataInput(layer="strassenverzeichnis", point="47.360966, 8.525343")
+
+    def test_point_still_rejects_a_non_pair(self):
+        from swisstopo_mcp.geodata import QueryGeodataInput
+
+        with pytest.raises(ValidationError):
+            QueryGeodataInput(layer="strassenverzeichnis", point="47.360966")
+
+    def test_origins_accepts_and_normalises_spacing(self):
+        m = GeocodeInput(search_text="Bern", origins="address, gazetteer")
+        # Normalised on the way in, so the value handed upstream is the one
+        # SearchServer expects rather than one with a stray space in it.
+        assert m.origins == "address,gazetteer"
+
+    def test_origins_still_rejects_an_unknown_member(self):
+        """Loosening the charset must not loosen the enum behind it."""
+        with pytest.raises(ValidationError, match="nonsense"):
+            GeocodeInput(search_text="Bern", origins="address, nonsense")

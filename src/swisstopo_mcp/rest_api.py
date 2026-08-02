@@ -14,6 +14,7 @@ from swisstopo_mcp.api_client import (
     CH_LAT_MIN,
     CH_LON_MAX,
     CH_LON_MIN,
+    FEATURE_ID_PATTERN,
     ID_PATTERN,
     LANG_PATTERN,
     TEXT_PATTERN,
@@ -102,7 +103,11 @@ class GetFeatureInput(BaseModel):
         ..., min_length=2, max_length=128, pattern=ID_PATTERN, description="Layer-ID"
     )
     feature_id: str = Field(
-        ..., min_length=1, max_length=128, pattern=ID_PATTERN, description="Feature-ID"
+        ...,
+        min_length=1,
+        max_length=128,
+        pattern=FEATURE_ID_PATTERN,
+        description="Feature-ID",
     )
     sr: int = Field(default=4326, description="Koordinatensystem der Ausgabegeometrie")
 
@@ -285,7 +290,7 @@ class MapQueryInput(BaseModel):
         default=None,
         min_length=1,
         max_length=128,
-        pattern=ID_PATTERN,
+        pattern=FEATURE_ID_PATTERN,
         description="Feature-ID innerhalb des Layers (nur feature_by_id).",
     )
     sr: int = Field(

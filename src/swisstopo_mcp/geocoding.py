@@ -39,7 +39,11 @@ class GeocodeInput(BaseModel):
     origins: str | None = Field(
         default=None,
         max_length=128,
-        pattern=r"^[a-z0-9,]+$",
+        # Space allowed: a comma-separated list is normally written with one,
+        # and the validator below now strips each member. Without it
+        # 'address, gazetteer' failed on the raw regex, which says nothing
+        # about what was wrong.
+        pattern=r"^[a-z0-9,\s]+$",
         description=(
             "Filter, kommagetrennt: 'address', 'zipcode', 'gg25', 'district', "
             "'kantone', 'gazetteer', 'parcel'"
@@ -66,14 +70,18 @@ class GeocodeInput(BaseModel):
         """
         if v is None:
             return v
-        members = [m for m in v.split(",") if m]
+        # Strip each member, and hand the normalised list on: the pattern now
+        # admits 'address, gazetteer', so without stripping the second member
+        # would arrive as ' gazetteer' and be reported as unknown — an error
+        # naming a value that is in fact allowed.
+        members = [m.strip() for m in v.split(",") if m.strip()]
         unknown = sorted({m for m in members if m not in ORIGINS})
         if unknown:
             raise ValueError(
                 f"Unbekannte origins: {', '.join(unknown)}. "
                 f"Erlaubt: {', '.join(sorted(ORIGINS))}."
             )
-        return v
+        return ",".join(members)
 
     limit: int = Field(default=10, ge=1, le=50, description="Maximale Trefferanzahl")
 

@@ -187,7 +187,12 @@ class QueryGeodataInput(BaseModel):
     point: str | None = Field(
         default=None,
         max_length=60,
-        pattern=r"^[\d.\-]+,[\d.\-]+$",
+        # The space after the comma is the way a coordinate pair is normally
+        # written, `float()` strips it anyway, and the two sibling fields here
+        # already accept it — `bbox` admits `\s` and strips each part, and so
+        # does `coordinates` on the elevation profile. `point` was the only one
+        # that turned '47.36, 8.52' into a regex error.
+        pattern=r"^[\d.\-]+,\s*[\d.\-]+$",
         description="WGS84-Punkt 'lat,lon' (z.B. '47.360966,8.525343').",
     )
     bbox: str | None = Field(

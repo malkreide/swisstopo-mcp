@@ -58,7 +58,19 @@ SUPPORTED_SRS = {4326, 2056, 21781, 3857}
 # constrains the charset, not the size. `tests/test_input_validation.py` fails
 # if a string field ships without a bound.
 TEXT_PATTERN = r"^[\w\sÀ-ÿ.,;:'’\-/()&+%°]+$"  # addresses, place names, search terms
-ID_PATTERN = r"^[\w.,\s\-]+$"  # layer / feature / collection identifiers
+ID_PATTERN = r"^[\w.,\s\-]+$"  # layer / collection identifiers
+
+# Feature IDs need the colon that layer and collection IDs do not.
+# `ch.bav.haltestellen-oev` answers `features_at_point` with SLOIDs like
+# `ch:1:sloid:91220::83` — 201 of the 761 real feature IDs sampled across six
+# layers carry one — and `feature_by_id` rejected exactly those, so the
+# documented follow-up call failed on an ID this server had just handed out.
+#
+# Kept separate from ID_PATTERN rather than widening it: 896 real layer IDs and
+# 100 STAC collection IDs were checked and none contains a colon, so there is
+# no evidence to widen those. If one ever turns up, this is the pattern to
+# merge back.
+FEATURE_ID_PATTERN = r"^[\w.,:\s\-]+$"
 COORDS_PATTERN = r"^[\d.,;\s\-]+$"  # 'lat1,lon1;lat2,lon2;...'
 LANG_PATTERN = r"^[a-z]{2}$"  # de | fr | it | en
 CANTON_PATTERN = r"^[A-Za-z]{2}$"  # ZH, BE, ...

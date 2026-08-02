@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Retry policy toward the geo upstreams** (ARCH-014): `Retry-After` is read
+  and beats the backoff table, the backoff is jittered, and a total budget
+  bounds the whole call.
+
+  `Retry-After` on 429/503 in both RFC 9110 §10.2.3 forms. A malformed header
+  falls back to the table rather than crashing on the error path.
+
+  Jitter matters here more than elsewhere: Overpass and geodienste.ch are
+  community/cantonal instances, and a synchronised retry storm lands on them
+  exactly when they recover. Table delays land in [0.5x, 1.5x]; on a
+  `Retry-After` the spread is one-sided ([1.0x, 1.25x]). Capped at 20s **after**
+  jitter, so the cap is a real bound rather than a midpoint.
+
+  The retry warning sent to the client (`_notify_retry`, SDK-003) now reports
+  the *actual* jittered wait — announcing the table value would have made it a
+  small lie.
+
+  Total budget of 25s, anchored on the Python MCP SDK's
+  `MCP_DEFAULT_TIMEOUT = 30.0`. Unlike the SPARQL servers in the portfolio there
+  is no long-query case to protect here: tile, feature and geocoding endpoints
+  answer in well under a second when healthy. The request is wrapped in an
+  `asyncio.timeout` deadline — httpx applies its timeout per operation and the
+  read timeout restarts with every chunk, so it alone cannot bound the call.
+
+
 ### Fixed
 
 - **Fehler konnten keinen nächsten Schritt tragen — strukturell nicht.**

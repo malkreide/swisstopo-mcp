@@ -2,7 +2,7 @@
 
 # swisstopo-mcp
 
-![Version](https://img.shields.io/badge/version-0.4.0-blue)
+![Version](https://img.shields.io/badge/version-0.4.1-blue)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![MCP](https://img.shields.io/badge/MCP-Model%20Context%20Protocol-purple)](https://modelcontextprotocol.io/)
@@ -349,7 +349,7 @@ assessment and a security review before any implementation starts.
 20 tools against a self-imposed budget of 25. The check's ideal is ≤12, so the
 count still needs an argument, not just a number. Per cluster:
 
-**The five api3 tools are merged** (0.4.0, breaking). `search_layers`,
+**The five api3 tools are merged** (0.4.1, breaking). `search_layers`,
 `layer_info`, `identify_features`, `find_features` and `get_feature` are now
 `operation` values on `swisstopo_map_query`. They were the textbook
 one-tool-per-REST-endpoint mapping the check names, and they are gone as such.

@@ -251,6 +251,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the shipped server is unaffected, and the current tree passes because
   `USER_AGENT` is derived from `__version__` rather than hand-maintained.
 
+## [0.4.1] - 2026-08-02
+
+### Fixed
+
+- **`structlog` carried no upper bound, and the index already serves a major past
+  the floor.** The declared range was `structlog>=24.1.0`; PyPI has been serving
+  `26.1.0`. The artefact does not change — the resolver's answer to the next
+  fresh install does, and that is exactly how `swiss-energy-mcp` 0.3.3 became
+  uninstallable when `mcp` 2.0.0 removed the module it imported.
+
+  Now `structlog>=24.1.0,<27`. The bound is measured rather than guessed: this package
+  installs and imports against `structlog 26.1.0` today, so the cap admits what
+  demonstrably works and stops only the next, unknown major.
+
+A dependency range only reaches users through a new release, hence the
+version bump. No code changed.
+
 ## [0.4.0] - 2026-07-30
 
 ### Changed

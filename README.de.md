@@ -2,7 +2,7 @@
 
 # swisstopo-mcp
 
-![Version](https://img.shields.io/badge/version-0.4.0-blue)
+![Version](https://img.shields.io/badge/version-0.4.1-blue)
 [![Lizenz: MIT](https://img.shields.io/badge/Lizenz-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![MCP](https://img.shields.io/badge/MCP-Model%20Context%20Protocol-purple)](https://modelcontextprotocol.io/)
@@ -349,7 +349,7 @@ Lethal-Trifecta-Bewertung und ein Security-Review vor Implementationsbeginn.
 ≤12, die Zahl braucht also weiterhin eine Begruendung, nicht nur eine Nennung.
 Pro Cluster:
 
-**Die fuenf api3-Tools sind zusammengelegt** (0.4.0, Breaking Change).
+**Die fuenf api3-Tools sind zusammengelegt** (0.4.1, Breaking Change).
 `search_layers`, `layer_info`, `identify_features`, `find_features` und
 `get_feature` sind jetzt `operation`-Werte von `swisstopo_map_query`. Sie waren
 das lehrbuchhafte Ein-Tool-pro-REST-Endpunkt-Mapping, das der Check benennt, und

@@ -4,7 +4,11 @@ from __future__ import annotations
 import asyncio
 import ipaddress
 import os
+import random
 import socket
+import time
+from datetime import UTC, datetime
+from email.utils import parsedate_to_datetime
 from functools import lru_cache
 from typing import Any
 from urllib.parse import urlparse
@@ -387,6 +391,83 @@ async def _get_client() -> httpx.AsyncClient | _NonClosingClient:
 RETRY_BACKOFFS: tuple[float, ...] = (2.0, 4.0, 8.0)
 RETRYABLE_STATUS: frozenset[int] = frozenset({429, 500, 502, 503, 504})
 
+# --- Retry policy, part two (ARCH-014) ---------------------------------------
+# The block above settles *what* is retried. These settle *how fast* and
+# *how long*.
+
+# Ceiling on a single wait — against a ladder that grows without bound and
+# against a `Retry-After` an upstream may send but that we need not sit through.
+MAX_DELAY_S = 20.0
+
+# Jitter. Without it every client that hit the same outage retries in lockstep,
+# and the load returns as a wave exactly when the upstream recovers. Overpass
+# and geodienste.ch are community/cantonal instances where that matters.
+JITTER_SPREAD = 0.5  # table delays land in [0.5x, 1.5x]
+
+# On a `Retry-After` the spread is one-sided: the upstream said when to come
+# back, so later is polite and earlier ignores the value we just read.
+RETRY_AFTER_JITTER = 0.25  # lands in [1.0x, 1.25x]
+
+# Statuses carrying a meaningful `Retry-After` (RFC 9110 §10.2.3).
+RETRY_AFTER_STATUSES = frozenset({429, 503})
+
+# Ceiling on the *whole* call — every attempt, every wait, together.
+#
+# An attempt count is not a bound: four attempts at a 30s timeout plus 2+4+8s of
+# backoff are over two minutes, and `RETRY_BACKOFFS` never says so. The limit
+# that matters is not ours either: the caller has its own timeout, and past it
+# nobody receives the answer — the work continues, the load lands on Overpass or
+# geo.admin.ch, and the result goes nowhere.
+#
+# Anchored on the Python MCP SDK's `MCP_DEFAULT_TIMEOUT = 30.0`. 25s leaves
+# headroom for MCP framing and the tool layer. Unlike the SPARQL servers in this
+# portfolio there is no long-query case to protect: tile, feature and geocoding
+# endpoints answer in well under a second when healthy.
+TOTAL_BUDGET_S = 25.0
+
+
+def parse_retry_after(resp: httpx.Response | None) -> float | None:
+    """Seconds to wait per the response's ``Retry-After``, or None.
+
+    RFC 9110 §10.2.3 allows delta-seconds and an HTTP-date; both occur, both are
+    read. Anything unparseable yields None and the caller falls back to its own
+    curve — a malformed header must not become a crash on the error path.
+    """
+    if resp is None or resp.status_code not in RETRY_AFTER_STATUSES:
+        return None
+    raw = (resp.headers.get("Retry-After") or "").strip()
+    if not raw:
+        return None
+    if raw.isdigit():
+        return float(raw)
+    try:
+        when = parsedate_to_datetime(raw)
+    except (TypeError, ValueError):
+        return None
+    if when is None:
+        return None
+    if when.tzinfo is None:  # RFC 9110 dates are GMT; a naive one means UTC
+        when = when.replace(tzinfo=UTC)
+    return max(0.0, (when - datetime.now(UTC)).total_seconds())
+
+
+def retry_delay(attempt: int, last_error: Exception | None) -> float:
+    """Seconds to wait before ``attempt`` (1-based, indexes RETRY_BACKOFFS).
+
+    The upstream's own answer beats our guess: a ``Retry-After`` on a 429 or 503
+    wins over the backoff table, which is guessing at the same question.
+    """
+    hinted = parse_retry_after(getattr(last_error, "response", None))
+    if hinted is not None:
+        jittered = hinted * (1.0 + random.random() * RETRY_AFTER_JITTER)
+    else:
+        jittered = RETRY_BACKOFFS[attempt - 1] * (
+            1.0 - JITTER_SPREAD + random.random() * 2 * JITTER_SPREAD
+        )
+    # Cap *after* jitter. The other order made MAX_DELAY_S not a bound at all:
+    # a value capped at 20s was then multiplied by up to 1.5 and landed at 30s.
+    return min(jittered, MAX_DELAY_S)
+
 
 async def _sleep(seconds: float) -> None:
     """Indirection so tests can patch out the real backoff delay."""
@@ -418,6 +499,7 @@ async def request_with_retry(
     timeout: float | None = None,
     check_host: bool = True,
     ctx: Any | None = None,
+    total_budget: float = TOTAL_BUDGET_S,
 ) -> httpx.Response:
     """Perform an HTTP request with exponential-backoff retry.
 
@@ -436,24 +518,45 @@ async def request_with_retry(
     if check_host:
         assert_host_allowed(url)
     host = urlparse(url).hostname or ""
+    # ARCH-014: the budget bounds the whole call, not just one wait. Monotonic,
+    # so an NTP step cannot hand out or revoke budget.
+    deadline = time.monotonic() + total_budget
     last_exc: Exception | None = None
     for attempt in range(len(RETRY_BACKOFFS) + 1):
         if attempt:
-            delay = RETRY_BACKOFFS[attempt - 1]
+            delay = retry_delay(attempt, last_exc)
+            # A wait that outlasts the budget is a wait for nobody: the caller
+            # has given up by the time it ends.
+            if delay >= deadline - time.monotonic():
+                break
+            # The client is told the *actual* wait, jitter included — announcing
+            # the table value would make the warning a small lie.
             if ctx is not None:
                 await _notify_retry(ctx, host, attempt, delay)
             await _sleep(delay)
             _log.debug("upstream_retry", host=host, attempt=attempt)
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            break
         try:
-            async with await _get_client() as client:
-                response = await client.request(
-                    method,
-                    url,
-                    params=params,
-                    content=content,
-                    headers=headers,
-                    timeout=timeout,
-                )
+            # httpx applies its timeout per operation (connect/read/write/pool)
+            # and the read timeout restarts with every chunk — that bounds each
+            # step, not the call, so a slowly trickling response could outlast
+            # the budget. `asyncio.timeout` is the wall-clock deadline the
+            # budget actually promises; the httpx timeout stays alongside it.
+            async with asyncio.timeout(remaining):
+                async with await _get_client() as client:
+                    response = await client.request(
+                        method,
+                        url,
+                        params=params,
+                        content=content,
+                        headers=headers,
+                        timeout=min(timeout if timeout is not None else REQUEST_TIMEOUT, remaining),
+                    )
+        except TimeoutError as exc:  # budget gone, not just this attempt
+            last_exc = exc
+            break
         except httpx.RequestError as exc:  # timeout / connect / read errors
             last_exc = exc
             continue

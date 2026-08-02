@@ -1161,3 +1161,216 @@ class TestOerebEndpointRegistryLive:
             "api_client.py, docs/network-egress.md sowie "
             "deploy/smokescreen-acl.yaml (via scripts/render_egress_acl.py)."
         )
+
+
+# ---------------------------------------------------------------------------
+# Other cantonal ÖREB implementations
+#
+# ZH and BE are the two cantons this server ships, and both are bespoke. The
+# other 24 run four further stacks — `pyramid_oereb` (GR, SG, AR, AI, GL),
+# `RdppfSVC.svc` (VD, GE, FR), `crdppf` (NE, JU) and further one-offs (AG, ZG,
+# …). The parser's tolerance across those was never established, only hoped for.
+#
+# It was probed against live responses, one canton per family. Four of the five
+# parse unmodified; the payloads below are their real answers, trimmed to the
+# part that carries the envelope shape. They are here so that adding one of
+# those cantons is a registry entry rather than a debugging session.
+#
+# The fifth is a documented gap — see TestRdppfSvcFamilyIsNotSupported.
+# ---------------------------------------------------------------------------
+
+# Trimmed from live `/extract/json/` responses, one canton per parsing family.
+_OTHER_CANTON_EXTRACTS = {
+    "GR (pyramid_oereb)": {'GetExtractByIdResponse': {'extract': {'RealEstate': {'RestrictionOnLandownership': [{'Theme': {'Code': 'ch.GR.NutzungsplanungZpGgp',
+                                                                                                     'Text': [{'Language': 'de',
+                                                                                                               'Text': 'Kommunale '
+                                                                                                                       'Nutzungsplanung '
+                                                                                                                       '- '
+                                                                                                                       'Zonenplan '
+                                                                                                                       'und '
+                                                                                                                       'Genereller '
+                                                                                                                       'Gestaltungsplan'}]},
+                                                                                           'LegendText': [{'Language': 'de',
+                                                                                                           'Text': 'Mühlbach '
+                                                                                                                   'überdeckt '
+                                                                                                                   'mit '
+                                                                                                                   'gestalterischem '
+                                                                                                                   'Aufwertungspotential'}],
+                                                                                           'Lawstatus': {'Code': 'inForce',
+                                                                                                         'Text': [{'Language': 'de',
+                                                                                                                   'Text': 'Rechtskräftig'}]},
+                                                                                           'ResponsibleOffice': {'Name': [{'Language': 'de',
+                                                                                                                           'Text': 'Stadt '
+                                                                                                                                   'Chur, '
+                                                                                                                                   'Abteilung '
+                                                                                                                                   'Stadtentwicklung'}],
+                                                                                                                 'OfficeAtWeb': [{'Language': 'de',
+                                                                                                                                  'Text': 'https://www.chur.ch'}]},
+                                                                                           'LegalProvisions': [{'Title': [{'Language': 'de',
+                                                                                                                           'Text': 'Gesamtrevision '
+                                                                                                                                   '(3901_B_OPTO_03072007_RB.PDF)'}]}]}]}}}},
+    "SG (pyramid_oereb)": {'GetExtractByIdResponse': {'extract': {'RealEstate': {'RestrictionOnLandownership': [{'Theme': {'Code': 'ch.Nutzungsplanung',
+                                                                                                     'Text': [{'Language': 'de',
+                                                                                                               'Text': 'Nutzungsplanung '
+                                                                                                                       'Zonenplan'}]},
+                                                                                           'LegendText': [{'Language': 'de',
+                                                                                                           'Text': 'BauG '
+                                                                                                                   'Bestimmte '
+                                                                                                                   'Nutzungsart '
+                                                                                                                   'Art '
+                                                                                                                   '28oct'}],
+                                                                                           'Lawstatus': {'Code': 'inForce',
+                                                                                                         'Text': [{'Language': 'de',
+                                                                                                                   'Text': 'Rechtskräftig'}]},
+                                                                                           'ResponsibleOffice': {'Name': [{'Language': 'de',
+                                                                                                                           'Text': 'Stadt '
+                                                                                                                                   'St.Gallen'}],
+                                                                                                                 'OfficeAtWeb': [{'Language': 'de',
+                                                                                                                                  'Text': 'https://www.stadt.sg.ch'}],
+                                                                                                                 'Street': 'Rathaus',
+                                                                                                                 'Number': 'nan',
+                                                                                                                 'PostalCode': '9001',
+                                                                                                                 'City': 'St.Gallen'},
+                                                                                           'AreaShare': 3850,
+                                                                                           'PartInPercent': 94.1,
+                                                                                           'LegalProvisions': [{'Title': [{'Language': 'de',
+                                                                                                                           'Text': 'Teilzonenplan '
+                                                                                                                                   'Nutzungsplan '
+                                                                                                                                   'Altstadt '
+                                                                                                                                   '- '
+                                                                                                                                   'Genehmigung'}]}]}]}}}},
+    "NE (crdppf)": {'GetExtractByIdResponse': {'extract': {'RealEstate': {'RestrictionOnLandownership': [{'Theme': {'Code': 'ch.Nutzungsplanung',
+                                                                                                     'Text': [{'Language': 'de',
+                                                                                                               'Text': 'Nutzungsplanung '
+                                                                                                                       '(kantonal/kommunal)'}]},
+                                                                                           'LegendText': [{'Language': 'fr',
+                                                                                                           'Text': 'Zone '
+                                                                                                                   "d'utilité "
+                                                                                                                   'publique'}],
+                                                                                           'Lawstatus': {'Code': 'inForce',
+                                                                                                         'Text': [{'Language': 'de',
+                                                                                                                   'Text': 'Rechtskräftig'}]},
+                                                                                           'ResponsibleOffice': {'Name': [{'Language': 'fr',
+                                                                                                                           'Text': 'Service '
+                                                                                                                                   'de '
+                                                                                                                                   "l'aménagement "
+                                                                                                                                   'du '
+                                                                                                                                   'territoire'}],
+                                                                                                                 'OfficeAtWeb': [{'Language': 'fr',
+                                                                                                                                  'Text': 'https://www.ne.ch/scat'}],
+                                                                                                                 'Street': 'Rue '
+                                                                                                                           'de '
+                                                                                                                           'Tivoli',
+                                                                                                                 'Number': '5',
+                                                                                                                 'PostalCode': '2002',
+                                                                                                                 'City': 'Neuchâtel'},
+                                                                                           'AreaShare': 3051,
+                                                                                           'PartInPercent': 100.0,
+                                                                                           'LegalProvisions': [{'Title': [{'Language': 'fr',
+                                                                                                                           'Text': 'Loi '
+                                                                                                                                   'cantonale '
+                                                                                                                                   'sur '
+                                                                                                                                   'la '
+                                                                                                                                   'sauvegarde '
+                                                                                                                                   'du '
+                                                                                                                                   'patrimoine '
+                                                                                                                                   'culturel'}]}]}]}}}},
+    "AG (Eigenbau)": {'GetExtractByIdResponse': {'extract': {'RealEstate': {'RestrictionOnLandownership': [{'Theme': {'Code': 'ch.Nutzungsplanung',
+                                                                                                     'Text': [{'Language': 'de',
+                                                                                                               'Text': 'Nutzungsplanung '
+                                                                                                                       '(kantonal/kommunal)'}]},
+                                                                                           'LegendText': [{'Language': 'de',
+                                                                                                           'Text': 'Totalrevision '
+                                                                                                                   'Erschliessungspläne '
+                                                                                                                   'Plan '
+                                                                                                                   'Nr. '
+                                                                                                                   '11'}],
+                                                                                           'Lawstatus': {'Code': 'inForce',
+                                                                                                         'Text': [{'Language': 'de',
+                                                                                                                   'Text': 'Rechtskräftig'}]},
+                                                                                           'ResponsibleOffice': {'Name': [{'Language': 'de',
+                                                                                                                           'Text': 'Aarau'}],
+                                                                                                                 'OfficeAtWeb': [{'Language': 'de',
+                                                                                                                                  'Text': 'http://www.aarau.ch'}]},
+                                                                                           'AreaShare': 112,
+                                                                                           'PartInPercent': 100.0,
+                                                                                           'LegalProvisions': [{'Title': [{'Language': 'de',
+                                                                                                                           'Text': 'Bundesgesetz '
+                                                                                                                                   'über '
+                                                                                                                                   'die '
+                                                                                                                                   'Raumplanung'}]}]}]}}}},
+}
+
+# Trimmed from a live `/getegrid/json/` response.
+_GR_EGRID_PAYLOAD = {"GetEGRIDResponse": [{'egrid': 'CH716823867719',
+     'number': '6914',
+     'identDN': 'GR0000003901',
+     'type': {'Code': 'RealEstate',
+              'Text': [{'Language': 'de', 'Text': 'Liegenschaft'},
+                       {'Language': 'it', 'Text': 'Bene immobile'},
+                       {'Language': 'rm', 'Text': 'Bain immobigliar'}]}}]}
+
+
+class TestOtherCantonalImplementationsParse:
+    """Four of the five further implementation families need no code change.
+
+    Recorded rather than invented: an invented payload is what let the original
+    envelope bug through, and finding out what these services actually send was
+    the entire point of the probe.
+    """
+
+    @pytest.mark.parametrize("family", sorted(_OTHER_CANTON_EXTRACTS))
+    def test_extract_envelope_is_understood(self, family):
+        from swisstopo_mcp.oereb import _parse_restrictions, _restriction_record
+
+        restrictions = _parse_restrictions(_OTHER_CANTON_EXTRACTS[family])
+        assert restrictions, f"{family}: envelope not recognised"
+
+        record = _restriction_record(restrictions[0])
+        assert record["theme_code"], f"{family}: no theme code — filtering impossible"
+        assert record["legend_text"] or record["theme"], f"{family}: nothing to show"
+
+    def test_pyramid_oereb_getegrid_is_understood(self):
+        from swisstopo_mcp.oereb import _parse_egrid_payload
+
+        records = _parse_egrid_payload(_GR_EGRID_PAYLOAD)
+        assert records and records[0]["egrid"].startswith("CH")
+
+
+class TestRdppfSvcFamilyIsNotSupported:
+    """VD, GE and FR run `RdppfSVC.svc`, and it diverges twice.
+
+    Pinned as a *known gap* rather than fixed. Half-support that looks complete
+    is worse than none: whoever adds a Romandy canton has to handle both of
+    these plus whatever the extract side does — the VD probe answered HTTP 500 —
+    and is better served discovering it here than from an empty result in
+    production. Adding a canton is a deliberate act anyway (OEREB_ENDPOINTS,
+    ALLOWED_HOSTS, the egress ACL, docs/network-egress.md).
+    """
+
+    # Trimmed from a live VD `/getegrid/json/` response.
+    ITEM_PAYLOAD = {"Item": [{'egrid': 'CH738308453444',
+         'number': 'DP 905',
+         'identDN': 'VD0132000000',
+         'type': {'Code': 0, 'Text': [{'Language': 1, 'Text': 'Bien-fonds'}]},
+         'limit': None}]}
+
+    def test_the_item_envelope_is_not_read(self):
+        from swisstopo_mcp.oereb import _parse_egrid_payload
+
+        assert _parse_egrid_payload(self.ITEM_PAYLOAD) == [], (
+            "the RdppfSVC family now parses — good, but then this test and the "
+            "comment above it are stale, and those cantons can be registered"
+        )
+
+    def test_the_language_tag_is_numeric_not_a_code(self):
+        """The second divergence, and the subtler one: this family tags language
+        as an integer, so `_localized_text` can never match a requested `de`/`fr`
+        and falls back to the first entry. On a bilingual canton that is a
+        mistranslation rather than a missing value."""
+        from swisstopo_mcp.oereb import _localized_text
+
+        entry = self.ITEM_PAYLOAD["Item"][0]["type"]
+        assert entry["Text"][0]["Language"] == 1
+        # Text still comes out — via the fallback, not via a language match.
+        assert _localized_text(entry, "de")

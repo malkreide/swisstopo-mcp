@@ -207,3 +207,74 @@ class TestTheToolsThatMostOftenReturnNothing:
         assert "swisstopo_query_geodata" in r.note, (
             "the legally binding cantonal plan is the actual next step"
         )
+
+
+# ---------------------------------------------------------------------------
+# Error paths against the real upstream (audit ARCH-003, second half)
+#
+# ARCH-003 stopped one step short. An *empty* result must carry a next step and
+# an AST sweep enforces it — but an error could not carry one at all, because
+# `ToolResponse.error` had no `note` parameter. So a mistyped layer ID produced
+# the bare string "Fehler bei Layer-Info: HTTP-Fehler 400.", while the same tool
+# answering *nothing* would have explained where to look. An error is the more
+# confusing of the two outcomes, not the less.
+#
+# These run live on purpose. What upstream does with a bad identifier is a
+# contract like any other — api3 answers an unknown layer with 400 and an
+# unknown feature with 404, and if that ever becomes a 200 carrying an error
+# body, every one of these tools would report success on a failed lookup. No
+# live test touched an error path before this.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.live
+class TestUpstreamErrorsCarryANextStep:
+    async def test_unknown_layer_is_an_error_that_points_at_discovery(self):
+        from swisstopo_mcp.rest_api import MapQueryInput, map_query
+
+        r = await map_query(
+            MapQueryInput(operation="layer_info", layer="ch.gibt.es.definitiv.nicht")
+        )
+        assert r.is_error is True, "an unknown layer must not read as success"
+        assert r.note, "an error without a next step is where a caller gives up"
+        assert "search_layers" in r.note
+
+    async def test_unknown_feature_id_is_an_error_that_points_at_discovery(self):
+        from swisstopo_mcp.rest_api import MapQueryInput, map_query
+
+        r = await map_query(
+            MapQueryInput(
+                operation="feature_by_id",
+                layer="ch.are.bauzonen",
+                feature_id="99999999999",
+            )
+        )
+        assert r.is_error is True
+        assert r.note and "features_at_point" in r.note
+
+    async def test_unknown_collection_is_an_error_that_points_at_discovery(self):
+        from swisstopo_mcp.stac import GetCollectionInput, get_collection
+
+        r = await get_collection(GetCollectionInput(collection_id="ch.gibt.es.nicht"))
+        assert r.is_error is True
+        assert r.note and "swisstopo_search_geodata" in r.note
+
+    async def test_an_error_still_carries_source_and_licence(self):
+        """The envelope guarantee that CH-004 established must survive the note
+        being added — an error attributes the same source as a success."""
+        from swisstopo_mcp.rest_api import MapQueryInput, map_query
+
+        r = await map_query(MapQueryInput(operation="layer_info", layer="ch.nope.nope"))
+        assert r.is_error is True
+        assert r.source and r.license
+
+    async def test_a_real_empty_result_is_not_reported_as_an_error(self):
+        """The counterpart: a query that legitimately finds nothing must stay a
+        soft miss. Confusing the two is what makes a caller retry a lookup that
+        was answered correctly."""
+        from swisstopo_mcp.stac import SearchGeodataInput, search_geodata
+
+        r = await search_geodata(SearchGeodataInput(query="zzzqqqxyzzz"))
+        assert r.is_error is False
+        assert r.match_type == "none"
+        assert r.note

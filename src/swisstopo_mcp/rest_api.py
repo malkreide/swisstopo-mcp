@@ -595,7 +595,9 @@ async def identify_features(params: IdentifyInput) -> ToolResponse:
             ),
         )
     except Exception as e:
-        return ToolResponse.error(handle_api_error(e, "Feature-Identifikation"))
+        return ToolResponse.error(
+            handle_api_error(e, "Feature-Identifikation"), note="Prüfe die Layer-ID: `swisstopo_map_query` mit operation='search_layers' listet die gültigen IDs. Ein Tippfehler in der ID sieht upstream wie ein unbekannter Layer aus und wird als HTTP 400 abgewiesen."
+        )
 
 
 @log_tool_call("swisstopo_map_query:features_by_attribute")
@@ -625,7 +627,9 @@ async def find_features(params: FindFeaturesInput) -> ToolResponse:
             ),
         )
     except Exception as e:
-        return ToolResponse.error(handle_api_error(e, "Feature-Suche"))
+        return ToolResponse.error(
+            handle_api_error(e, "Feature-Suche"), note="Prüfe die Layer-ID: `swisstopo_map_query` mit operation='search_layers' listet die gültigen IDs. Ein Tippfehler in der ID sieht upstream wie ein unbekannter Layer aus und wird als HTTP 400 abgewiesen."
+        )
 
 
 @log_tool_call("swisstopo_map_query:feature_by_id")
@@ -652,7 +656,9 @@ async def get_feature(params: GetFeatureInput) -> ToolResponse:
             ),
         )
     except Exception as e:
-        return ToolResponse.error(handle_api_error(e, "Feature-Abruf"))
+        return ToolResponse.error(
+            handle_api_error(e, "Feature-Abruf"), note="Prüfe Layer und Feature-ID: operation='features_at_point' oder 'features_by_attribute' liefern gültige IDs für genau diesen Layer. Eine ID aus einem anderen Layer ist hier unbekannt."
+        )
 
 
 async def _identify_lv95(layer: str, easting: float, northing: float, limit: int) -> list[dict]:
@@ -818,7 +824,9 @@ async def layer_info(params: LayerInfoInput, ctx: Context | None = None) -> Tool
 
         return ToolResponse.ok(format_layer_info(meta), [meta], match_type="exact")
     except Exception as e:
-        return ToolResponse.error(handle_api_error(e, "Layer-Info"))
+        return ToolResponse.error(
+            handle_api_error(e, "Layer-Info"), note="Prüfe die Layer-ID: `swisstopo_map_query` mit operation='search_layers' listet die gültigen IDs. Ein Tippfehler in der ID sieht upstream wie ein unbekannter Layer aus und wird als HTTP 400 abgewiesen."
+        )
 
 
 # ---------------------------------------------------------------------------

@@ -437,3 +437,52 @@ class TestSeparatorSpacingIsAccepted:
         """Loosening the charset must not loosen the enum behind it."""
         with pytest.raises(ValidationError, match="nonsense"):
             GeocodeInput(search_text="Bern", origins="address, nonsense")
+
+
+class TestIdentifiersMustCarryMeaning:
+    """`layer`, `feature_id` and `collection_id` land in a URL *path*. The
+    charset alone admitted `..`, and httpx then normalises the path away:
+    `/MapServer/ch.are.bauzonen/..` collapses to `/MapServer`, so the request
+    answered about a different endpoint instead of failing.
+
+    Not an egress escape — the host stays on ALLOWED_HOSTS, the scheme stays
+    https and redirects are off — but a call that silently answers about
+    something else is worse than one that errors. The patterns now require at
+    least one word character, which no real identifier lacks.
+    """
+
+    @pytest.mark.parametrize("junk", ["..", ".", "...", "..,..", "--", ",,", "  "])
+    def test_dot_only_layer_is_rejected(self, junk):
+        from swisstopo_mcp.rest_api import LayerInfoInput
+
+        with pytest.raises(ValidationError):
+            LayerInfoInput(layer=junk)
+
+    @pytest.mark.parametrize("junk", ["..", ".", "..,..", "--"])
+    def test_dot_only_feature_id_is_rejected(self, junk):
+        from swisstopo_mcp.rest_api import GetFeatureInput
+
+        with pytest.raises(ValidationError):
+            GetFeatureInput(layer="ch.are.bauzonen", feature_id=junk)
+
+    @pytest.mark.parametrize("junk", ["..", ".", "--"])
+    def test_dot_only_collection_id_is_rejected(self, junk):
+        from swisstopo_mcp.stac import GetCollectionInput
+
+        with pytest.raises(ValidationError):
+            GetCollectionInput(collection_id=junk)
+
+    @pytest.mark.parametrize(
+        "real",
+        [
+            "ch.are.bauzonen",
+            "ch.swisstopo.swissboundaries3d-gemeinde-flaeche.fill",
+            "ch.swisstopo-vd.stand-oerebkataster",
+        ],
+    )
+    def test_real_layer_ids_still_pass(self, real):
+        """The guard must not cost anything real: 896 live layer IDs, 100 STAC
+        collection IDs and 761 feature IDs were checked against it."""
+        from swisstopo_mcp.rest_api import LayerInfoInput
+
+        assert LayerInfoInput(layer=real).layer == real

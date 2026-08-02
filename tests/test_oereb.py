@@ -908,9 +908,85 @@ class TestOerebAt:
 # enabled by default.
 ZH_LAT, ZH_LON = 47.360966, 8.525343
 
+# Bern, Bundeshaus. Canton BE runs a different ÖREB implementation on a
+# different host, and every format difference this server has had to absorb was
+# a ZH/BE difference: the extract envelope is `Extract` on one and `extract` on
+# the other, `SubCode` is unset on one and carries three values on the other,
+# and `TOPICS` is honoured by one and ignored by the other. All three were found
+# by hand, because the live tests ran on ZH alone — BE existed only in fixtures,
+# which is to say only in assumptions about BE.
+BE_LAT, BE_LON = 46.9480, 7.4474
+
+# (canton, lat, lon) for the probes below. BE is not enabled by default, so the
+# tests that use it widen `oereb_cantons` for their duration.
+LIVE_CANTONS = [("ZH", ZH_LAT, ZH_LON), ("BE", BE_LAT, BE_LON)]
+
+
+@pytest.fixture
+def both_cantons(monkeypatch):
+    """Enable BE alongside ZH. The default is ZH only, so a BE probe would
+    otherwise fail on 'Kanton nicht unterstützt' rather than reach upstream."""
+    monkeypatch.setattr(settings, "oereb_cantons", "ZH,BE")
+
 
 @pytest.mark.live
 class TestOerebLive:
+    @pytest.mark.parametrize("canton,lat,lon", LIVE_CANTONS)
+    async def test_each_canton_resolves_a_point_to_an_egrid(
+        self, canton, lat, lon, both_cantons
+    ):
+        """Same contract, both implementations. `getegrid` is where the 2.0
+        envelope first shows up, and BE served it correctly the whole time the
+        parser was reading GeoJSON — a BE probe here would have caught that."""
+        result = await get_egrid(GetEgridInput(lat=lat, lon=lon, canton=canton))
+        assert result.is_error is False, result.summary
+        assert result.source == OEREB_SOURCE
+        assert result.match_type in {"exact", "none"}
+        if result.results:
+            egrid = result.results[0].get("egrid")
+            assert isinstance(egrid, str) and egrid, "EGRID field shape changed"
+
+    @pytest.mark.parametrize("canton,lat,lon", LIVE_CANTONS)
+    async def test_each_canton_parses_its_extract_envelope(
+        self, canton, lat, lon, both_cantons
+    ):
+        """The envelope key differs per canton (`Extract` vs `extract`), and
+        descending into the wrong node reported every parcel as unencumbered.
+        Asserting on `match_type` alone would not catch it — an empty extract is
+        a legitimate answer — so this also requires the restriction records to
+        carry the fields the formatter and the topics filter read."""
+        located = await get_egrid(GetEgridInput(lat=lat, lon=lon, canton=canton))
+        if not located.results:
+            pytest.skip(f"no parcel at the {canton} probe point today")
+        egrid = located.results[0]["egrid"]
+
+        result = await get_oereb_extract(
+            GetOerebExtractInput(egrid=egrid, canton=canton)
+        )
+        assert result.is_error is False, result.summary
+        assert result.source == OEREB_SOURCE
+        if result.match_type == "exact":
+            assert result.results, "match_type 'exact' with no records is drift"
+            first = result.results[0]
+            for key in ("theme", "theme_code", "legend_text", "lawstatus"):
+                assert key in first, f"restriction record lost '{key}'"
+            assert first["theme_code"], (
+                "no theme code — the topics filter matches on this, so an empty "
+                "one makes filtering silently impossible"
+            )
+
+    @pytest.mark.parametrize("canton,lat,lon", LIVE_CANTONS)
+    async def test_each_canton_answers_the_one_call_aggregate(
+        self, canton, lat, lon, both_cantons
+    ):
+        result = await oereb_at(OerebAtInput(lat=lat, lon=lon, canton=canton))
+        assert result.is_error is False, result.summary
+        assert result.source == OEREB_SOURCE
+        assert result.license == OEREB_LICENSE
+        assert result.match_type in {"exact", "none"}
+        if result.match_type == "none":
+            assert result.note, "an empty ÖREB answer must carry a next step"
+
     async def test_get_egrid_resolves_a_zurich_point(self):
         result = await get_egrid(GetEgridInput(lat=ZH_LAT, lon=ZH_LON, canton="ZH"))
         assert result.is_error is False, result.summary

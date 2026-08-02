@@ -58,7 +58,23 @@ SUPPORTED_SRS = {4326, 2056, 21781, 3857}
 # constrains the charset, not the size. `tests/test_input_validation.py` fails
 # if a string field ships without a bound.
 TEXT_PATTERN = r"^[\w\sÀ-ÿ.,;:'’\-/()&+%°]+$"  # addresses, place names, search terms
-ID_PATTERN = r"^[\w.,\s\-]+$"  # layer / collection identifiers
+
+# Identifiers must contain at least one word character — the `\w` in the middle
+# of the pattern, which is why these are not a plain character class.
+#
+# `layer`, `feature_id` and `collection_id` are interpolated into a URL *path*
+# (`/MapServer/{layer}/{feature_id}`, `/collections/{id}`), and the charset
+# alone admitted `..`. httpx then normalises the path and collapses
+# `/MapServer/ch.are.bauzonen/..` to `/MapServer`, so the request quietly hit a
+# different endpoint instead of failing. Not an egress escape — the host stays
+# on ALLOWED_HOSTS, the scheme stays https and redirects are off — but a call
+# that silently answers about something else is worse than one that errors.
+#
+# A dots-and-commas-only string is never a real identifier: all 896 layer IDs,
+# 100 STAC collection IDs, 109 attribute names and 761 feature IDs sampled from
+# the live APIs carry word characters. Written without a lookahead on purpose —
+# Pydantic compiles these with the Rust regex engine, which has none.
+ID_PATTERN = r"^[\w.,\s\-]*\w[\w.,\s\-]*$"  # layer / collection identifiers
 
 # Feature IDs need the colon that layer and collection IDs do not.
 # `ch.bav.haltestellen-oev` answers `features_at_point` with SLOIDs like
@@ -70,7 +86,7 @@ ID_PATTERN = r"^[\w.,\s\-]+$"  # layer / collection identifiers
 # 100 STAC collection IDs were checked and none contains a colon, so there is
 # no evidence to widen those. If one ever turns up, this is the pattern to
 # merge back.
-FEATURE_ID_PATTERN = r"^[\w.,:\s\-]+$"
+FEATURE_ID_PATTERN = r"^[\w.,:\s\-]*\w[\w.,:\s\-]*$"
 COORDS_PATTERN = r"^[\d.,;\s\-]+$"  # 'lat1,lon1;lat2,lon2;...'
 LANG_PATTERN = r"^[a-z]{2}$"  # de | fr | it | en
 CANTON_PATTERN = r"^[A-Za-z]{2}$"  # ZH, BE, ...

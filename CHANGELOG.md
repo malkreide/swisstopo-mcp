@@ -9,6 +9,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`..` als Kennung traf still ein anderes Endpoint, statt zu scheitern.**
+  Betrifft `swisstopo_map_query`, `swisstopo_get_collection`,
+  `swisstopo_list_available_layers` und `swisstopo_map_url`; deren
+  Tool-Definitionen ändern sich, Clients müssen sie neu bestätigen.
+
+  `layer`, `feature_id` und `collection_id` werden in einen URL-*Pfad*
+  interpoliert (`/MapServer/{layer}/{feature_id}`, `/collections/{id}`), und der
+  Zeichensatz liess `..` zu. httpx normalisiert den Pfad daraufhin:
+  `/MapServer/ch.are.bauzonen/..` kollabiert zu `/MapServer`, die Abfrage
+  antwortete also über ein anderes Endpoint.
+
+  Kein Egress-Ausbruch — der Host bleibt auf `ALLOWED_HOSTS`, das Schema bleibt
+  https, `follow_redirects` ist aus, und das getroffene Endpoint ist ohnehin
+  über `search_layers` erreichbar. Aber ein Aufruf, der still über etwas
+  anderes Auskunft gibt, ist schlechter als einer, der abbricht.
+
+  Die Muster verlangen jetzt mindestens ein Wortzeichen. Ohne Lookahead
+  geschrieben, weil Pydantic sie mit der Rust-Regex-Engine kompiliert, die
+  keinen kennt. Gegengeprüft: 896 Layer-IDs, 100 STAC-Collections, 109
+  Attributnamen und 761 Feature-IDs aus den Live-APIs gehen weiter durch.
+
+### Added
+
+- **Live-Abdeckung für Kanton BE.** Die ÖREB-Live-Tests liefen ausschliesslich
+  auf ZH — BE existierte nur in Fixtures, also nur in Annahmen über BE. Dabei
+  war *jeder* Formatunterschied, den dieser Server absorbieren musste, ein
+  ZH/BE-Unterschied: der Extract-Umschlag heisst `Extract` beim einen und
+  `extract` beim anderen, `SubCode` ist beim einen leer und trägt beim anderen
+  drei Werte, `TOPICS` wird vom einen respektiert und vom anderen ignoriert.
+  Alle drei wurden von Hand gefunden, nicht von den Tests.
+
+  `TestOerebLive` ist jetzt über beide Kantone parametrisiert (Bern,
+  Bundeshaus als BE-Sonde; BE wird per Fixture zugeschaltet, da nur ZH
+  standardmässig aktiv ist). Die Extract-Prüfung geht dabei über `match_type`
+  hinaus — ein leerer Auszug ist eine legitime Antwort, deshalb wird zusätzlich
+  verlangt, dass die Beschränkungs-Records die Felder tragen, die Formatter und
+  Themenfilter lesen. Ein fehlender `theme_code` etwa macht Filtern still
+  unmöglich.
+
+  **Mitgeprüft und für unbedenklich befunden:** dieselbe Frage für
+  geodienste-Layer. Deren Attribute sind über ZH/BE/AG/TG identisch — das ist
+  der Zweck von geodienste.ch, ein harmonisiertes Modell. Die
+  ÖREB-Problematik existiert dort nicht, eine Mehrkantons-Parametrisierung
+  brächte also nichts.
+
+### Fixed
+
 - **Der Server gab Feature-IDs aus, die er selbst nicht mehr annahm.** Betrifft
   `swisstopo_map_query`, `swisstopo_query_geodata` und `swisstopo_geocode`;
   deren Tool-Definitionen ändern sich, Clients müssen sie neu bestätigen.

@@ -1181,134 +1181,242 @@ class TestOerebEndpointRegistryLive:
 
 # Trimmed from live `/extract/json/` responses, one canton per parsing family.
 _OTHER_CANTON_EXTRACTS = {
-    "GR (pyramid_oereb)": {'GetExtractByIdResponse': {'extract': {'RealEstate': {'RestrictionOnLandownership': [{'Theme': {'Code': 'ch.GR.NutzungsplanungZpGgp',
-                                                                                                     'Text': [{'Language': 'de',
-                                                                                                               'Text': 'Kommunale '
-                                                                                                                       'Nutzungsplanung '
-                                                                                                                       '- '
-                                                                                                                       'Zonenplan '
-                                                                                                                       'und '
-                                                                                                                       'Genereller '
-                                                                                                                       'Gestaltungsplan'}]},
-                                                                                           'LegendText': [{'Language': 'de',
-                                                                                                           'Text': 'Mühlbach '
-                                                                                                                   'überdeckt '
-                                                                                                                   'mit '
-                                                                                                                   'gestalterischem '
-                                                                                                                   'Aufwertungspotential'}],
-                                                                                           'Lawstatus': {'Code': 'inForce',
-                                                                                                         'Text': [{'Language': 'de',
-                                                                                                                   'Text': 'Rechtskräftig'}]},
-                                                                                           'ResponsibleOffice': {'Name': [{'Language': 'de',
-                                                                                                                           'Text': 'Stadt '
-                                                                                                                                   'Chur, '
-                                                                                                                                   'Abteilung '
-                                                                                                                                   'Stadtentwicklung'}],
-                                                                                                                 'OfficeAtWeb': [{'Language': 'de',
-                                                                                                                                  'Text': 'https://www.chur.ch'}]},
-                                                                                           'LegalProvisions': [{'Title': [{'Language': 'de',
-                                                                                                                           'Text': 'Gesamtrevision '
-                                                                                                                                   '(3901_B_OPTO_03072007_RB.PDF)'}]}]}]}}}},
-    "SG (pyramid_oereb)": {'GetExtractByIdResponse': {'extract': {'RealEstate': {'RestrictionOnLandownership': [{'Theme': {'Code': 'ch.Nutzungsplanung',
-                                                                                                     'Text': [{'Language': 'de',
-                                                                                                               'Text': 'Nutzungsplanung '
-                                                                                                                       'Zonenplan'}]},
-                                                                                           'LegendText': [{'Language': 'de',
-                                                                                                           'Text': 'BauG '
-                                                                                                                   'Bestimmte '
-                                                                                                                   'Nutzungsart '
-                                                                                                                   'Art '
-                                                                                                                   '28oct'}],
-                                                                                           'Lawstatus': {'Code': 'inForce',
-                                                                                                         'Text': [{'Language': 'de',
-                                                                                                                   'Text': 'Rechtskräftig'}]},
-                                                                                           'ResponsibleOffice': {'Name': [{'Language': 'de',
-                                                                                                                           'Text': 'Stadt '
-                                                                                                                                   'St.Gallen'}],
-                                                                                                                 'OfficeAtWeb': [{'Language': 'de',
-                                                                                                                                  'Text': 'https://www.stadt.sg.ch'}],
-                                                                                                                 'Street': 'Rathaus',
-                                                                                                                 'Number': 'nan',
-                                                                                                                 'PostalCode': '9001',
-                                                                                                                 'City': 'St.Gallen'},
-                                                                                           'AreaShare': 3850,
-                                                                                           'PartInPercent': 94.1,
-                                                                                           'LegalProvisions': [{'Title': [{'Language': 'de',
-                                                                                                                           'Text': 'Teilzonenplan '
-                                                                                                                                   'Nutzungsplan '
-                                                                                                                                   'Altstadt '
-                                                                                                                                   '- '
-                                                                                                                                   'Genehmigung'}]}]}]}}}},
-    "NE (crdppf)": {'GetExtractByIdResponse': {'extract': {'RealEstate': {'RestrictionOnLandownership': [{'Theme': {'Code': 'ch.Nutzungsplanung',
-                                                                                                     'Text': [{'Language': 'de',
-                                                                                                               'Text': 'Nutzungsplanung '
-                                                                                                                       '(kantonal/kommunal)'}]},
-                                                                                           'LegendText': [{'Language': 'fr',
-                                                                                                           'Text': 'Zone '
-                                                                                                                   "d'utilité "
-                                                                                                                   'publique'}],
-                                                                                           'Lawstatus': {'Code': 'inForce',
-                                                                                                         'Text': [{'Language': 'de',
-                                                                                                                   'Text': 'Rechtskräftig'}]},
-                                                                                           'ResponsibleOffice': {'Name': [{'Language': 'fr',
-                                                                                                                           'Text': 'Service '
-                                                                                                                                   'de '
-                                                                                                                                   "l'aménagement "
-                                                                                                                                   'du '
-                                                                                                                                   'territoire'}],
-                                                                                                                 'OfficeAtWeb': [{'Language': 'fr',
-                                                                                                                                  'Text': 'https://www.ne.ch/scat'}],
-                                                                                                                 'Street': 'Rue '
-                                                                                                                           'de '
-                                                                                                                           'Tivoli',
-                                                                                                                 'Number': '5',
-                                                                                                                 'PostalCode': '2002',
-                                                                                                                 'City': 'Neuchâtel'},
-                                                                                           'AreaShare': 3051,
-                                                                                           'PartInPercent': 100.0,
-                                                                                           'LegalProvisions': [{'Title': [{'Language': 'fr',
-                                                                                                                           'Text': 'Loi '
-                                                                                                                                   'cantonale '
-                                                                                                                                   'sur '
-                                                                                                                                   'la '
-                                                                                                                                   'sauvegarde '
-                                                                                                                                   'du '
-                                                                                                                                   'patrimoine '
-                                                                                                                                   'culturel'}]}]}]}}}},
-    "AG (Eigenbau)": {'GetExtractByIdResponse': {'extract': {'RealEstate': {'RestrictionOnLandownership': [{'Theme': {'Code': 'ch.Nutzungsplanung',
-                                                                                                     'Text': [{'Language': 'de',
-                                                                                                               'Text': 'Nutzungsplanung '
-                                                                                                                       '(kantonal/kommunal)'}]},
-                                                                                           'LegendText': [{'Language': 'de',
-                                                                                                           'Text': 'Totalrevision '
-                                                                                                                   'Erschliessungspläne '
-                                                                                                                   'Plan '
-                                                                                                                   'Nr. '
-                                                                                                                   '11'}],
-                                                                                           'Lawstatus': {'Code': 'inForce',
-                                                                                                         'Text': [{'Language': 'de',
-                                                                                                                   'Text': 'Rechtskräftig'}]},
-                                                                                           'ResponsibleOffice': {'Name': [{'Language': 'de',
-                                                                                                                           'Text': 'Aarau'}],
-                                                                                                                 'OfficeAtWeb': [{'Language': 'de',
-                                                                                                                                  'Text': 'http://www.aarau.ch'}]},
-                                                                                           'AreaShare': 112,
-                                                                                           'PartInPercent': 100.0,
-                                                                                           'LegalProvisions': [{'Title': [{'Language': 'de',
-                                                                                                                           'Text': 'Bundesgesetz '
-                                                                                                                                   'über '
-                                                                                                                                   'die '
-                                                                                                                                   'Raumplanung'}]}]}]}}}},
+    "GR (pyramid_oereb)": {
+        "GetExtractByIdResponse": {
+            "extract": {
+                "RealEstate": {
+                    "RestrictionOnLandownership": [
+                        {
+                            "Theme": {
+                                "Code": "ch.GR.NutzungsplanungZpGgp",
+                                "Text": [
+                                    {
+                                        "Language": "de",
+                                        "Text": "Kommunale "
+                                        "Nutzungsplanung "
+                                        "- "
+                                        "Zonenplan "
+                                        "und "
+                                        "Genereller "
+                                        "Gestaltungsplan",
+                                    }
+                                ],
+                            },
+                            "LegendText": [
+                                {
+                                    "Language": "de",
+                                    "Text": "Mühlbach "
+                                    "überdeckt "
+                                    "mit "
+                                    "gestalterischem "
+                                    "Aufwertungspotential",
+                                }
+                            ],
+                            "Lawstatus": {
+                                "Code": "inForce",
+                                "Text": [{"Language": "de", "Text": "Rechtskräftig"}],
+                            },
+                            "ResponsibleOffice": {
+                                "Name": [
+                                    {
+                                        "Language": "de",
+                                        "Text": "Stadt Chur, Abteilung Stadtentwicklung",
+                                    }
+                                ],
+                                "OfficeAtWeb": [{"Language": "de", "Text": "https://www.chur.ch"}],
+                            },
+                            "LegalProvisions": [
+                                {
+                                    "Title": [
+                                        {
+                                            "Language": "de",
+                                            "Text": "Gesamtrevision (3901_B_OPTO_03072007_RB.PDF)",
+                                        }
+                                    ]
+                                }
+                            ],
+                        }
+                    ]
+                }
+            }
+        }
+    },
+    "SG (pyramid_oereb)": {
+        "GetExtractByIdResponse": {
+            "extract": {
+                "RealEstate": {
+                    "RestrictionOnLandownership": [
+                        {
+                            "Theme": {
+                                "Code": "ch.Nutzungsplanung",
+                                "Text": [{"Language": "de", "Text": "Nutzungsplanung Zonenplan"}],
+                            },
+                            "LegendText": [
+                                {"Language": "de", "Text": "BauG Bestimmte Nutzungsart Art 28oct"}
+                            ],
+                            "Lawstatus": {
+                                "Code": "inForce",
+                                "Text": [{"Language": "de", "Text": "Rechtskräftig"}],
+                            },
+                            "ResponsibleOffice": {
+                                "Name": [{"Language": "de", "Text": "Stadt St.Gallen"}],
+                                "OfficeAtWeb": [
+                                    {"Language": "de", "Text": "https://www.stadt.sg.ch"}
+                                ],
+                                "Street": "Rathaus",
+                                "Number": "nan",
+                                "PostalCode": "9001",
+                                "City": "St.Gallen",
+                            },
+                            "AreaShare": 3850,
+                            "PartInPercent": 94.1,
+                            "LegalProvisions": [
+                                {
+                                    "Title": [
+                                        {
+                                            "Language": "de",
+                                            "Text": "Teilzonenplan "
+                                            "Nutzungsplan "
+                                            "Altstadt "
+                                            "- "
+                                            "Genehmigung",
+                                        }
+                                    ]
+                                }
+                            ],
+                        }
+                    ]
+                }
+            }
+        }
+    },
+    "NE (crdppf)": {
+        "GetExtractByIdResponse": {
+            "extract": {
+                "RealEstate": {
+                    "RestrictionOnLandownership": [
+                        {
+                            "Theme": {
+                                "Code": "ch.Nutzungsplanung",
+                                "Text": [
+                                    {
+                                        "Language": "de",
+                                        "Text": "Nutzungsplanung (kantonal/kommunal)",
+                                    }
+                                ],
+                            },
+                            "LegendText": [{"Language": "fr", "Text": "Zone d'utilité publique"}],
+                            "Lawstatus": {
+                                "Code": "inForce",
+                                "Text": [{"Language": "de", "Text": "Rechtskräftig"}],
+                            },
+                            "ResponsibleOffice": {
+                                "Name": [
+                                    {
+                                        "Language": "fr",
+                                        "Text": "Service de l'aménagement du territoire",
+                                    }
+                                ],
+                                "OfficeAtWeb": [
+                                    {"Language": "fr", "Text": "https://www.ne.ch/scat"}
+                                ],
+                                "Street": "Rue de Tivoli",
+                                "Number": "5",
+                                "PostalCode": "2002",
+                                "City": "Neuchâtel",
+                            },
+                            "AreaShare": 3051,
+                            "PartInPercent": 100.0,
+                            "LegalProvisions": [
+                                {
+                                    "Title": [
+                                        {
+                                            "Language": "fr",
+                                            "Text": "Loi "
+                                            "cantonale "
+                                            "sur "
+                                            "la "
+                                            "sauvegarde "
+                                            "du "
+                                            "patrimoine "
+                                            "culturel",
+                                        }
+                                    ]
+                                }
+                            ],
+                        }
+                    ]
+                }
+            }
+        }
+    },
+    "AG (Eigenbau)": {
+        "GetExtractByIdResponse": {
+            "extract": {
+                "RealEstate": {
+                    "RestrictionOnLandownership": [
+                        {
+                            "Theme": {
+                                "Code": "ch.Nutzungsplanung",
+                                "Text": [
+                                    {
+                                        "Language": "de",
+                                        "Text": "Nutzungsplanung (kantonal/kommunal)",
+                                    }
+                                ],
+                            },
+                            "LegendText": [
+                                {
+                                    "Language": "de",
+                                    "Text": "Totalrevision Erschliessungspläne Plan Nr. 11",
+                                }
+                            ],
+                            "Lawstatus": {
+                                "Code": "inForce",
+                                "Text": [{"Language": "de", "Text": "Rechtskräftig"}],
+                            },
+                            "ResponsibleOffice": {
+                                "Name": [{"Language": "de", "Text": "Aarau"}],
+                                "OfficeAtWeb": [{"Language": "de", "Text": "http://www.aarau.ch"}],
+                            },
+                            "AreaShare": 112,
+                            "PartInPercent": 100.0,
+                            "LegalProvisions": [
+                                {
+                                    "Title": [
+                                        {
+                                            "Language": "de",
+                                            "Text": "Bundesgesetz über die Raumplanung",
+                                        }
+                                    ]
+                                }
+                            ],
+                        }
+                    ]
+                }
+            }
+        }
+    },
 }
 
 # Trimmed from a live `/getegrid/json/` response.
-_GR_EGRID_PAYLOAD = {"GetEGRIDResponse": [{'egrid': 'CH716823867719',
-     'number': '6914',
-     'identDN': 'GR0000003901',
-     'type': {'Code': 'RealEstate',
-              'Text': [{'Language': 'de', 'Text': 'Liegenschaft'},
-                       {'Language': 'it', 'Text': 'Bene immobile'},
-                       {'Language': 'rm', 'Text': 'Bain immobigliar'}]}}]}
+_GR_EGRID_PAYLOAD = {
+    "GetEGRIDResponse": [
+        {
+            "egrid": "CH716823867719",
+            "number": "6914",
+            "identDN": "GR0000003901",
+            "type": {
+                "Code": "RealEstate",
+                "Text": [
+                    {"Language": "de", "Text": "Liegenschaft"},
+                    {"Language": "it", "Text": "Bene immobile"},
+                    {"Language": "rm", "Text": "Bain immobigliar"},
+                ],
+            },
+        }
+    ]
+}
 
 
 class TestOtherCantonalImplementationsParse:
@@ -1349,11 +1457,17 @@ class TestRdppfSvcFamilyIsNotSupported:
     """
 
     # Trimmed from a live VD `/getegrid/json/` response.
-    ITEM_PAYLOAD = {"Item": [{'egrid': 'CH738308453444',
-         'number': 'DP 905',
-         'identDN': 'VD0132000000',
-         'type': {'Code': 0, 'Text': [{'Language': 1, 'Text': 'Bien-fonds'}]},
-         'limit': None}]}
+    ITEM_PAYLOAD = {
+        "Item": [
+            {
+                "egrid": "CH738308453444",
+                "number": "DP 905",
+                "identDN": "VD0132000000",
+                "type": {"Code": 0, "Text": [{"Language": 1, "Text": "Bien-fonds"}]},
+                "limit": None,
+            }
+        ]
+    }
 
     def test_the_item_envelope_is_not_read(self):
         from swisstopo_mcp.oereb import _parse_egrid_payload

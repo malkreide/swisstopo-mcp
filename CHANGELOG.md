@@ -7,7 +7,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Test, der Aggregat und Delegat auf gleiche Validierung prüft.** Zwei Tools
+  kollabieren eine mehrstufige Kette und validieren die Werte des Aufrufers ein
+  zweites Mal, indem sie das Input-Modell des darunterliegenden Tools bauen:
+  `swisstopo_oereb_at` baut ein `GetOerebExtractInput`, `swisstopo_map_query`
+  eines von fünf REST-Modellen. Jedes weitergereichte Feld wird also gegen zwei
+  getrennt geschriebene `Field()`-Definitionen geprüft.
+
+  Weichen die ab, ist der Fehler in eine Richtung still und in die andere
+  hässlich. Strengeres Aggregat: Eingabe, die das darunterliegende Tool
+  akzeptiert, wird an der Tür abgewiesen — genau der `topics`-Fall. Lockereres
+  Aggregat: der Wert passiert das äussere Modell und fliegt im Handler als
+  unerwarteter `ValidationError` auseinander, sichtbar als interner Fehler.
+
+  `TestAggregatesValidateLikeTheirDelegates` vergleicht alle sieben
+  Weiterreich-Paare feldweise. Beschreibungen bleiben absichtlich
+  unverglichen — ein Aggregat vermerkt, zu welcher Operation ein Feld gehört
+  («nur features_at_point»), und diese Abweichung ist gewollt.
+
+  **Befund der Prüfung: keine weitere Divergenz.** `lang`, `canton` und jedes
+  andere weitergereichte Feld stimmen in beiden Aggregaten überein; `topics`
+  war der Einzelfall. Gegengeprüft, dass der Test den ursprünglichen Bug fängt:
+  mit dem Vor-Fix-Muster auf `OerebAtInput` schlägt er fehl.
+
 ### Changed
+
+- **Zwei ÖREB-Feldbeschreibungen an den Rest des Servers angeglichen.** Betrifft
+  `swisstopo_get_oereb_extract` und `swisstopo_oereb_at`; beide
+  Tool-Definitionen ändern sich, Clients müssen sie neu bestätigen.
+
+  `lang` war in genau diesen zwei Tools als «Sprache» dokumentiert, in allen
+  fünf übrigen als «Sprache: de, fr, it, en». Da `LANG_PATTERN` nur
+  Zweibuchstaben-Codes zulässt, lädt die knappe Fassung zu `lang="deutsch"`
+  ein — was mit einem Validierungsfehler endet, ohne dass die Beschreibung je
+  gesagt hätte, was erlaubt ist. `canton` in `GetOerebExtractInput` war das
+  einzige Vorkommen ohne Beispiel («Kantonskürzel» statt «Kantonskürzel (z.B.
+  'ZH', 'BE')»).
+
+  Aufgefallen beim Divergenz-Scan oben: die Constraints stimmten, die
+  Beschreibungen nicht — und die Beschreibung ist das, was das Modell liest.
 
 - **Der Themenfilter wird clientseitig angewendet — und funktioniert erstmals
   überhaupt.** Betrifft `swisstopo_get_oereb_extract` und `swisstopo_oereb_at`;

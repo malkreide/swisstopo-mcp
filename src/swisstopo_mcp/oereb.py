@@ -93,12 +93,18 @@ class GetOerebExtractInput(BaseModel):
         description="EGRID (z.B. 'CH767982496078')",
     )
     canton: str = Field(
-        ..., min_length=2, max_length=2, pattern=CANTON_PATTERN, description="Kantonskürzel"
+        ...,
+        min_length=2,
+        max_length=2,
+        pattern=CANTON_PATTERN,
+        description="Kantonskürzel (z.B. 'ZH', 'BE')",
     )
     topics: str | None = Field(
         default=None, max_length=200, pattern=TOPICS_PATTERN, description=TOPICS_DESCRIPTION
     )
-    lang: str = Field(default="de", pattern=LANG_PATTERN, description="Sprache")
+    lang: str = Field(
+        default="de", pattern=LANG_PATTERN, description="Sprache: de, fr, it, en"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -527,7 +533,9 @@ class OerebAtInput(SwissPointInput):
     topics: str | None = Field(
         default=None, max_length=200, pattern=TOPICS_PATTERN, description=TOPICS_DESCRIPTION
     )
-    lang: str = Field(default="de", pattern=LANG_PATTERN, description="Sprache")
+    lang: str = Field(
+        default="de", pattern=LANG_PATTERN, description="Sprache: de, fr, it, en"
+    )
 
 
 @log_tool_call("swisstopo_oereb_at")

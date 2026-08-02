@@ -7,6 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Der Server gab Feature-IDs aus, die er selbst nicht mehr annahm.** Betrifft
+  `swisstopo_map_query`, `swisstopo_query_geodata` und `swisstopo_geocode`;
+  deren Tool-Definitionen ändern sich, Clients müssen sie neu bestätigen.
+
+  Nach dem `topics`-Fall alle 46 gemusterten Felder gegen echte Werte aus den
+  Live-APIs gehalten, nicht gegen ausgedachte. Drei Muster fielen durch:
+
+  1. **`feature_id` wies 201 von 761 echten Feature-IDs ab.**
+     `ch.bav.haltestellen-oev` antwortet mit SLOIDs (`ch:1:sloid:91220::83`),
+     der Identifier-Zeichensatz kannte aber keinen Doppelpunkt. Damit brach der
+     dokumentierte Folgeschritt: `features_at_point` liefert eine ID,
+     `feature_by_id` weist sie an der Eingangsprüfung ab, bevor je ein Request
+     rausgeht. `feature_id` hat jetzt ein eigenes Muster — `ID_PATTERN` bleibt
+     unverändert, weil 896 echte Layer-IDs und 100 STAC-Collection-IDs geprüft
+     wurden und keine einen Doppelpunkt trägt.
+
+     Ein Live-Round-Trip-Test existierte bereits, lief aber nur auf dem
+     Gemeindelayer mit reinen Zahlen-IDs — deshalb blieb er grün. Er läuft jetzt
+     zusätzlich auf einem Layer mit Doppelpunkt-IDs.
+
+  2. **`point` wies ein Leerzeichen nach dem Komma ab**, während die zwei
+     Nachbarfelder es annehmen: `bbox` erlaubt `\s` und strippt jeden Teil,
+     `coordinates` im Höhenprofil ebenso. `float()` strippt ohnehin selbst — nur
+     das Muster tat es nicht.
+
+  3. **`origins` wies ein Leerzeichen nach dem Komma ab**, und der Validator
+     dahinter strippte nicht. Beides behoben; `'address, gazetteer'` wird jetzt
+     zu `'address,gazetteer'` normalisiert, bevor es upstream geht. Die
+     Enum-Prüfung bleibt unverändert scharf.
+
+  **Was durchging:** TEXT_PATTERN gegen 2115 Gemeindenamen, 1325 Strassennamen,
+  993 Ortschaften und 134 Bezirksnamen — keine Abweisung. ID_PATTERN gegen 896
+  Layer-IDs, 100 STAC-Collections und 109 Attributnamen — keine Abweisung. Die
+  numerischen Muster gegen 970 BFS-Keys und 176 PLZ — keine Abweisung.
+
 ### Added
 
 - **Test, der Aggregat und Delegat auf gleiche Validierung prüft.** Zwei Tools

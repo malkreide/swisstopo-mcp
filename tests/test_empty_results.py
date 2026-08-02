@@ -191,7 +191,7 @@ class TestTheToolsThatMostOftenReturnNothing:
         async def none_found(*a, **k):
             return []
 
-        monkeypatch.setattr(oereb, "_fetch_egrid_features", none_found)
+        monkeypatch.setattr(oereb, "_fetch_egrid_records", none_found)
         r = await get_egrid(GetEgridInput(lat=47.37, lon=8.54, canton="ZH"))
         assert r.match_type == "none"
         assert r.note != FALLBACK_NOTE

@@ -49,6 +49,14 @@ jobs:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           set -euo pipefail
+          # The label has to exist before it can be used, on the repository as
+          # well as on the issue: `gh issue create --label` on an unknown label
+          # fails the whole call ("could not add label: not found"), which cost
+          # a night's report even though the label was the only thing missing.
+          # `--force` makes this idempotent, so it is safe to run every time.
+          gh label create live-test-failure --force \
+            --color B60205 \
+            --description "Nightly live API suite failed against real upstreams"
           # Deduplicate: one open issue at a time, not one per night.
           if [ -n "$(gh issue list --label live-test-failure --state open --json number --jq '.[].number')" ]; then
             echo "An open live-test-failure issue already exists; not filing another."

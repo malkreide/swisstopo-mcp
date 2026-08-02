@@ -9,6 +9,69 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Both ÖREB tools had been returning nothing at all, for every parcel in the
+  country.** The nightly live suite caught it the first night it covered them
+  (audit OPS-001), and it was three separate breaks stacked on top of each
+  other:
+
+  1. **The canton ZH host stopped existing.** `oereb.geo.zh.ch` no longer
+     resolves — NXDOMAIN, not a timeout — so every ZH request failed as
+     "Verbindungsfehler". The service moved to `https://maps.zh.ch/oereb/v2`.
+     That URL is not guesswork: it is what the Confederation publishes as
+     `oereb_webservice` in `ch.swisstopo-vd.stand-oerebkataster`, which is the
+     registry to re-check the next time a canton moves.
+  2. **`getegrid` was parsed as GeoJSON.** The code read `data["features"]`;
+     both live services answer with the ÖREB data-extract 2.0 envelope,
+     `{"GetEGRIDResponse": [{"egrid": …}]}`. So canton BE — which was
+     reachable the whole time — reported "kein EGRID gefunden" for every
+     coordinate. The legacy `features` shape is still read, for a canton that
+     has not migrated yet.
+  3. **The extract envelope was descended into wrongly.** Restrictions live at
+     `GetExtractByIdResponse.Extract.RealEstate.RestrictionOnLandownership`;
+     the old `extract.get("RealEstate", extract)` fallback silently landed on
+     the wrong node and produced an empty list, which the tool then reported as
+     "keine Eigentumsbeschränkungen gefunden" — a wrong answer dressed as a
+     legitimate one. ZH spells that middle key `Extract` and BE spells it
+     `extract`; both are matched now.
+
+  Two more things the real payloads forced. A point with no parcel under it,
+  and an unknown EGRID, answer `204 No Content` with an empty body rather than
+  `404` — parsing that as JSON turned a legitimate miss into "Unerwarteter
+  interner Fehler". And the per-restriction fields are `Theme` / `LegendText` /
+  `Lawstatus`, not the `Topic` / `Information` the formatter looked for, with
+  every human-readable value wrapped as a list of `{Language, Text}` pairs, so
+  `lang` now actually selects the translation instead of being passed upstream
+  and ignored on the way back.
+
+  `results` now carries a compact record per restriction (theme, legend text,
+  legal status, responsible office, legal provisions, area share) instead of
+  the raw object: a single ZH restriction embeds a fully URL-encoded WMS
+  GetMap request plus its theme's entire legend, and a Zürich parcel returns
+  eighteen of them.
+
+  The mocked fixtures in `tests/test_oereb.py` are the reason all of this
+  survived a suite that was green: they modelled shapes the services do not
+  serve. They are now trimmed copies of real ZH and BE responses, and cover
+  both cantons' spelling of the extract wrapper, the 204 path, and the
+  language selection.
+
+- **The nightly live-test failure report failed on the report, not the tests.**
+  `gh issue create --label live-test-failure` aborts the whole call when the
+  label does not exist on the repository ("could not add label: not found"),
+  so the one night the suite went red produced no issue — only a second red
+  step. The workflow now creates the label with `gh label create --force`
+  before filing.
+
+- **A live TLS test pinned the wrong failure mode.**
+  `test_handshake_fails_without_hostname_sni` asserted
+  `ssl.SSLCertVerificationError`, but passing an IP literal as
+  `server_hostname` makes Python omit the SNI extension entirely, and what
+  happens next depends on the edge node the runner resolves to: one that
+  serves a default certificate fails verification, one that needs SNI to pick a
+  certificate aborts with a handshake-failure alert. It now asserts
+  `ssl.SSLError`, which is the fact the test is actually about — no SNI, no
+  usable connection.
+
 - **The ruff cap was a downgrade in disguise (`<0.16` → `<0.17`).** The bound
   was picked from the floor rather than from the version actually in use. The
   rest of the portfolio runs ruff 0.16.x; `<0.16` pinned this repo back to

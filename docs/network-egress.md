@@ -14,7 +14,7 @@ allow-list (audit check **SEC-021**) and complements the SSRF hardening from
 | `data.geo.admin.ch` | STAC catalog | swisstopo_search_geodata, swisstopo_get_collection |
 | `wmts.geo.admin.ch` | WMTS tiles | (map references) |
 | `map.geo.admin.ch` | Shareable map viewer URLs | swisstopo_map_url |
-| `oereb.geo.zh.ch` | OEREB cadastre — canton ZH | swisstopo_get_egrid, swisstopo_get_oereb_extract |
+| `maps.zh.ch` | OEREB cadastre — canton ZH (`/oereb/v2`, replaced `oereb.geo.zh.ch` after that name stopped resolving) | swisstopo_get_egrid, swisstopo_get_oereb_extract |
 | `www.oereb2.apps.be.ch` | OEREB cadastre — canton BE | swisstopo_get_egrid, swisstopo_get_oereb_extract |
 | `geodienste.ch` | Interkantonale Basisgeodaten (services catalogue + WMS/WFS/OGC API Features) | swisstopo_list_available_layers, swisstopo_query_geodata |
 | `overpass.osm.ch` | OpenStreetMap Overpass API (Swiss instance) — POI queries (ODbL) | swisstopo_query_osm_features |

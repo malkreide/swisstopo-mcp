@@ -76,7 +76,7 @@ ALLOWED_HOSTS: frozenset[str] = frozenset(
         "data.geo.admin.ch",  # STAC catalog
         "wmts.geo.admin.ch",  # WMTS tiles
         "map.geo.admin.ch",  # shareable map viewer URLs
-        "oereb.geo.zh.ch",  # OEREB cadastre — canton ZH
+        "maps.zh.ch",  # OEREB cadastre — canton ZH
         "www.oereb2.apps.be.ch",  # OEREB cadastre — canton BE
         "geodienste.ch",  # interkantonale Basisgeodaten (Katalog + WMS/WFS/OGC API)
         "overpass.osm.ch",  # OpenStreetMap Overpass API (Schweizer Instanz)

@@ -269,131 +269,150 @@ class TestUnsupportedCanton:
 
 # ---------------------------------------------------------------------------
 # Mocked HTTP Responses
+#
+# The payloads below are trimmed copies of what `maps.zh.ch/oereb/v2` and
+# `www.oereb2.apps.be.ch` actually return, not invented shapes. The previous
+# fixtures modelled a GeoJSON `features` list and a flat `Topic`/`Information`
+# restriction, neither of which exists in the ÖREB data-extract 2.0 schema the
+# services speak — so the suite stayed green through a parser that returned
+# "kein EGRID gefunden" and "keine Eigentumsbeschränkungen" for every parcel in
+# the country. Keep these anchored to real responses.
 # ---------------------------------------------------------------------------
+
+
+def _mock_client(monkeypatch, payload, status_code=200, capture=None):
+    """Point the ÖREB handlers at a canned JSON response.
+
+    `capture` is an optional dict that receives the requested URL under "url".
+    """
+    import json as _json
+
+    body = b"" if status_code == 204 else _json.dumps(payload).encode()
+
+    async def mock_get_client():
+        class MockResponse:
+            content = body
+
+            def __init__(self):
+                self.status_code = status_code
+
+            def raise_for_status(self):
+                pass
+
+            def json(self):
+                return payload
+
+        class MockClient:
+            async def get(self, url):
+                if capture is not None:
+                    capture["url"] = url
+                return MockResponse()
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *args):
+                pass
+
+        return MockClient()
+
+    monkeypatch.setattr("swisstopo_mcp.oereb._get_client", mock_get_client)
+
+
+def _mock_raising_client(monkeypatch, exc_factory):
+    """Point the handlers at a client whose GET raises."""
+
+    async def mock_get_client():
+        class MockClient:
+            async def get(self, url):
+                raise exc_factory(url)
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *args):
+                pass
+
+        return MockClient()
+
+    monkeypatch.setattr("swisstopo_mcp.oereb._get_client", mock_get_client)
+
+
+def _egrid_payload(*entries):
+    """A `getegrid` answer in the 2.0 shape both live cantons serve."""
+    return {"GetEGRIDResponse": list(entries)}
 
 
 class TestGetEgridHandler:
     async def test_returns_egrid_string(self, monkeypatch):
         monkeypatch.setattr(settings, "oereb_cantons", "ZH,BE")
-
-        async def mock_get_client():
-            class MockResponse:
-                status_code = 200
-
-                def raise_for_status(self):
-                    pass
-
-                def json(self):
-                    return {
-                        "features": [
-                            {
-                                "properties": {
-                                    "egrid": "CH767982496078",
-                                    "gemeindename": "Zürich",
-                                }
-                            }
-                        ]
-                    }
-
-            class MockClient:
-                async def get(self, url):
-                    return MockResponse()
-
-                async def __aenter__(self):
-                    return self
-
-                async def __aexit__(self, *args):
-                    pass
-
-            return MockClient()
-
-        monkeypatch.setattr("swisstopo_mcp.oereb._get_client", mock_get_client)
+        _mock_client(
+            monkeypatch,
+            _egrid_payload(
+                {
+                    "egrid": "CH767982496078",
+                    "number": "WO6408",
+                    "identDN": "ZH0200000261",
+                }
+            ),
+        )
         result = await get_egrid(GetEgridInput(lat=47.376, lon=8.541, canton="ZH"))
         assert "CH767982496078" in result.summary
+        # The parcel number is what the 2.0 answer actually carries; the old
+        # formatter printed "Gemeinde: ?" because it looked for a name that is
+        # not in this response at all.
+        assert "WO6408" in result.summary
+        assert result.results[0]["egrid"] == "CH767982496078"
+
+    async def test_reads_the_legacy_geojson_shape(self, monkeypatch):
+        """ZH served this until it moved to /oereb/v2; a canton that has not
+        migrated yet must not read as an empty parcel."""
+        monkeypatch.setattr(settings, "oereb_cantons", "ZH,BE")
+        _mock_client(
+            monkeypatch,
+            {"features": [{"properties": {"egrid": "CH111", "gemeindename": "Zürich"}}]},
+        )
+        result = await get_egrid(GetEgridInput(lat=47.376, lon=8.541, canton="ZH"))
+        assert "CH111" in result.summary
         assert "Zürich" in result.summary
 
     async def test_no_features_returns_not_found(self, monkeypatch):
         monkeypatch.setattr(settings, "oereb_cantons", "ZH,BE")
-
-        async def mock_get_client():
-            class MockResponse:
-                status_code = 200
-
-                def raise_for_status(self):
-                    pass
-
-                def json(self):
-                    return {"features": []}
-
-            class MockClient:
-                async def get(self, url):
-                    return MockResponse()
-
-                async def __aenter__(self):
-                    return self
-
-                async def __aexit__(self, *args):
-                    pass
-
-            return MockClient()
-
-        monkeypatch.setattr("swisstopo_mcp.oereb._get_client", mock_get_client)
+        _mock_client(monkeypatch, _egrid_payload())
         result = await get_egrid(GetEgridInput(lat=47.376, lon=8.541, canton="ZH"))
         assert "gefunden" in result.summary.lower() or "kein" in result.summary.lower()
 
+    async def test_204_is_a_miss_not_an_error(self, monkeypatch):
+        """A point with no parcel under it answers 204 with an empty body.
+        Parsing that as JSON turns a legitimate miss into 'Unerwarteter
+        interner Fehler'."""
+        monkeypatch.setattr(settings, "oereb_cantons", "ZH,BE")
+        _mock_client(monkeypatch, None, status_code=204)
+        result = await get_egrid(GetEgridInput(lat=47.376, lon=8.541, canton="ZH"))
+        assert result.is_error is False
+        assert result.match_type == "none"
+
     async def test_uses_lv95_coordinates_in_url(self, monkeypatch):
         monkeypatch.setattr(settings, "oereb_cantons", "ZH,BE")
-        captured_url = {}
-
-        async def mock_get_client():
-            class MockResponse:
-                status_code = 200
-
-                def raise_for_status(self):
-                    pass
-
-                def json(self):
-                    return {"features": []}
-
-            class MockClient:
-                async def get(self, url):
-                    captured_url["url"] = url
-                    return MockResponse()
-
-                async def __aenter__(self):
-                    return self
-
-                async def __aexit__(self, *args):
-                    pass
-
-            return MockClient()
-
-        monkeypatch.setattr("swisstopo_mcp.oereb._get_client", mock_get_client)
+        captured = {}
+        _mock_client(monkeypatch, _egrid_payload(), capture=captured)
         await get_egrid(GetEgridInput(lat=47.376, lon=8.541, canton="ZH"))
         # URL should contain EN= with LV95 coordinates (easting first)
-        assert "EN=" in captured_url["url"]
-        assert "/getegrid/json/" in captured_url["url"]
+        assert "EN=" in captured["url"]
+        assert "/getegrid/json/" in captured["url"]
 
     async def test_http_error_returns_error_message(self, monkeypatch):
         import httpx
 
         monkeypatch.setattr(settings, "oereb_cantons", "ZH,BE")
-
-        async def mock_get_client():
-            class MockClient:
-                async def get(self, url):
-                    resp = httpx.Response(500, request=httpx.Request("GET", url))
-                    raise httpx.HTTPStatusError("Server error", request=resp.request, response=resp)
-
-                async def __aenter__(self):
-                    return self
-
-                async def __aexit__(self, *args):
-                    pass
-
-            return MockClient()
-
-        monkeypatch.setattr("swisstopo_mcp.oereb._get_client", mock_get_client)
+        _mock_raising_client(
+            monkeypatch,
+            lambda url: httpx.HTTPStatusError(
+                "Server error",
+                request=httpx.Request("GET", url),
+                response=httpx.Response(500, request=httpx.Request("GET", url)),
+            ),
+        )
         result = await get_egrid(GetEgridInput(lat=47.376, lon=8.541, canton="ZH"))
         assert "Fehler" in result.summary
 
@@ -401,110 +420,51 @@ class TestGetEgridHandler:
         import httpx
 
         monkeypatch.setattr(settings, "oereb_cantons", "ZH,BE")
-
-        async def mock_get_client():
-            class MockClient:
-                async def get(self, url):
-                    raise httpx.TimeoutException("timeout")
-
-                async def __aenter__(self):
-                    return self
-
-                async def __aexit__(self, *args):
-                    pass
-
-            return MockClient()
-
-        monkeypatch.setattr("swisstopo_mcp.oereb._get_client", mock_get_client)
+        _mock_raising_client(monkeypatch, lambda url: httpx.TimeoutException("timeout"))
         result = await get_egrid(GetEgridInput(lat=47.376, lon=8.541, canton="ZH"))
         assert "Fehler" in result.summary or "Zeitüberschreitung" in result.summary
 
     async def test_multiple_features_returned(self, monkeypatch):
         monkeypatch.setattr(settings, "oereb_cantons", "ZH,BE")
-
-        async def mock_get_client():
-            class MockResponse:
-                status_code = 200
-
-                def raise_for_status(self):
-                    pass
-
-                def json(self):
-                    return {
-                        "features": [
-                            {"properties": {"egrid": "CH111", "gemeindename": "Zürich"}},
-                            {"properties": {"egrid": "CH222", "gemeindename": "Zürich"}},
-                        ]
-                    }
-
-            class MockClient:
-                async def get(self, url):
-                    return MockResponse()
-
-                async def __aenter__(self):
-                    return self
-
-                async def __aexit__(self, *args):
-                    pass
-
-            return MockClient()
-
-        monkeypatch.setattr("swisstopo_mcp.oereb._get_client", mock_get_client)
+        _mock_client(
+            monkeypatch,
+            _egrid_payload({"egrid": "CH111"}, {"egrid": "CH222"}),
+        )
         result = await get_egrid(GetEgridInput(lat=47.376, lon=8.541, canton="ZH"))
         assert "CH111" in result.summary
         assert "CH222" in result.summary
 
 
 class TestGetOerebExtractHandler:
-    def _make_extract_response(self, topics=None):
-        """Build a minimal ÖREB extract JSON response."""
+    def _make_extract_response(self, topics=None, wrapper="Extract"):
+        """Build a minimal ÖREB extract JSON response.
+
+        `wrapper` exists because the two live services disagree on it: ZH nests
+        under `Extract`, BE under `extract`. Both are exercised below.
+        """
         if topics is None:
             topics = []
         return {
             "GetExtractByIdResponse": {
-                "RealEstate": {
-                    "RestrictionOnLandownership": topics
-                }
+                wrapper: {"RealEstate": {"RestrictionOnLandownership": topics}}
             }
         }
 
     def _make_restriction(self, topic="Nutzungsplanung", description="Wohnzone W2",
                           authority="Gemeinde Zürich", legal="Bau- und Zonenordnung"):
         return {
-            "Topic": topic,
-            "Information": [{"Text": description}],
-            "ResponsibleOffice": {"Name": [{"Text": authority}]},
-            "LegalProvisions": [{"Title": [{"Text": legal}]}],
+            "Theme": {"Code": "ch.Nutzungsplanung", "Text": [{"Language": "de", "Text": topic}]},
+            "LegendText": [{"Language": "de", "Text": description}],
+            "Lawstatus": {"Code": "inForce", "Text": [{"Language": "de", "Text": "Rechtskräftig"}]},
+            "ResponsibleOffice": {"Name": [{"Language": "de", "Text": authority}]},
+            "LegalProvisions": [{"Title": [{"Language": "de", "Text": legal}]}],
+            "AreaShare": 2556,
+            "PartInPercent": 12.5,
         }
 
     async def test_returns_markdown_extract(self, monkeypatch):
         monkeypatch.setattr(settings, "oereb_cantons", "ZH,BE")
-        restriction = self._make_restriction()
-        response_data = self._make_extract_response([restriction])
-
-        async def mock_get_client():
-            class MockResponse:
-                status_code = 200
-
-                def raise_for_status(self):
-                    pass
-
-                def json(self):
-                    return response_data
-
-            class MockClient:
-                async def get(self, url):
-                    return MockResponse()
-
-                async def __aenter__(self):
-                    return self
-
-                async def __aexit__(self, *args):
-                    pass
-
-            return MockClient()
-
-        monkeypatch.setattr("swisstopo_mcp.oereb._get_client", mock_get_client)
+        _mock_client(monkeypatch, self._make_extract_response([self._make_restriction()]))
         result = await get_oereb_extract(
             GetOerebExtractInput(egrid="CH767982496078", canton="ZH")
         )
@@ -512,190 +472,129 @@ class TestGetOerebExtractHandler:
         assert "Nutzungsplanung" in result.summary
         assert "Wohnzone W2" in result.summary
         assert "Gemeinde Zürich" in result.summary
+        assert "Rechtskräftig" in result.summary
+
+    async def test_reads_the_lowercase_extract_wrapper(self, monkeypatch):
+        """BE spells the same node `extract`. Descending into the wrong one used
+        to report every parcel as unencumbered."""
+        monkeypatch.setattr(settings, "oereb_cantons", "ZH,BE")
+        _mock_client(
+            monkeypatch,
+            self._make_extract_response([self._make_restriction()], wrapper="extract"),
+        )
+        result = await get_oereb_extract(
+            GetOerebExtractInput(egrid="CH507635214670", canton="BE")
+        )
+        assert result.match_type == "exact"
+        assert "Wohnzone W2" in result.summary
+
+    async def test_results_are_compact_records(self, monkeypatch):
+        """A raw ZH restriction carries an encoded WMS GetMap request and the
+        full theme legend; eighteen of those would bury the answer."""
+        monkeypatch.setattr(settings, "oereb_cantons", "ZH,BE")
+        restriction = self._make_restriction()
+        restriction["Map"] = {"ReferenceWMS": [{"Language": "de", "Text": "https://" + "x" * 5000}]}
+        _mock_client(monkeypatch, self._make_extract_response([restriction]))
+        result = await get_oereb_extract(
+            GetOerebExtractInput(egrid="CH767982496078", canton="ZH")
+        )
+        record = result.results[0]
+        assert record == {
+            "theme": "Nutzungsplanung",
+            "theme_code": "ch.Nutzungsplanung",
+            "legend_text": "Wohnzone W2",
+            "lawstatus": "Rechtskräftig",
+            "responsible_office": "Gemeinde Zürich",
+            "legal_provisions": ["Bau- und Zonenordnung"],
+            "area_share_m2": 2556,
+            "part_in_percent": 12.5,
+        }
 
     async def test_no_restrictions_returns_empty_message(self, monkeypatch):
         monkeypatch.setattr(settings, "oereb_cantons", "ZH,BE")
-        response_data = self._make_extract_response([])
-
-        async def mock_get_client():
-            class MockResponse:
-                status_code = 200
-
-                def raise_for_status(self):
-                    pass
-
-                def json(self):
-                    return response_data
-
-            class MockClient:
-                async def get(self, url):
-                    return MockResponse()
-
-                async def __aenter__(self):
-                    return self
-
-                async def __aexit__(self, *args):
-                    pass
-
-            return MockClient()
-
-        monkeypatch.setattr("swisstopo_mcp.oereb._get_client", mock_get_client)
+        _mock_client(monkeypatch, self._make_extract_response([]))
         result = await get_oereb_extract(
             GetOerebExtractInput(egrid="CH767982496078", canton="ZH")
         )
         assert "Keine" in result.summary
 
     async def test_404_egrid_not_found(self, monkeypatch):
-        import httpx
-
         monkeypatch.setattr(settings, "oereb_cantons", "ZH,BE")
-
-        async def mock_get_client():
-            class MockClient:
-                async def get(self, url):
-                    resp = httpx.Response(404, request=httpx.Request("GET", url))
-                    # Don't raise — we handle 404 specially
-                    return resp
-
-                async def __aenter__(self):
-                    return self
-
-                async def __aexit__(self, *args):
-                    pass
-
-            return MockClient()
-
-        monkeypatch.setattr("swisstopo_mcp.oereb._get_client", mock_get_client)
+        _mock_client(monkeypatch, None, status_code=404)
         # Valid EGRID format (alphanumeric) but non-existent -> upstream 404.
         result = await get_oereb_extract(
             GetOerebExtractInput(egrid="CH000000000000", canton="ZH")
         )
         assert "nicht gefunden" in result.summary or "CH000000000000" in result.summary
 
+    async def test_204_egrid_not_found(self, monkeypatch):
+        """ZH answers an unknown EGRID with 204 and an empty body rather than
+        404 — same meaning, and equally not JSON."""
+        monkeypatch.setattr(settings, "oereb_cantons", "ZH,BE")
+        result_payload = None
+        _mock_client(monkeypatch, result_payload, status_code=204)
+        result = await get_oereb_extract(
+            GetOerebExtractInput(egrid="CH000000000000", canton="ZH")
+        )
+        assert result.is_error is False
+        assert result.match_type == "none"
+        assert "CH000000000000" in result.summary
+
     async def test_topics_filter_added_to_url(self, monkeypatch):
         monkeypatch.setattr(settings, "oereb_cantons", "ZH,BE")
-        captured_url = {}
-        response_data = self._make_extract_response([])
-
-        async def mock_get_client():
-            class MockResponse:
-                status_code = 200
-
-                def raise_for_status(self):
-                    pass
-
-                def json(self):
-                    return response_data
-
-            class MockClient:
-                async def get(self, url):
-                    captured_url["url"] = url
-                    return MockResponse()
-
-                async def __aenter__(self):
-                    return self
-
-                async def __aexit__(self, *args):
-                    pass
-
-            return MockClient()
-
-        monkeypatch.setattr("swisstopo_mcp.oereb._get_client", mock_get_client)
+        captured = {}
+        _mock_client(monkeypatch, self._make_extract_response([]), capture=captured)
         await get_oereb_extract(
             GetOerebExtractInput(
                 egrid="CH767982496078", canton="ZH", topics="Nutzungsplanung"
             )
         )
-        assert "TOPICS=Nutzungsplanung" in captured_url["url"]
+        assert "TOPICS=Nutzungsplanung" in captured["url"]
 
     async def test_no_topics_filter_absent_from_url(self, monkeypatch):
         monkeypatch.setattr(settings, "oereb_cantons", "ZH,BE")
-        captured_url = {}
-        response_data = self._make_extract_response([])
-
-        async def mock_get_client():
-            class MockResponse:
-                status_code = 200
-
-                def raise_for_status(self):
-                    pass
-
-                def json(self):
-                    return response_data
-
-            class MockClient:
-                async def get(self, url):
-                    captured_url["url"] = url
-                    return MockResponse()
-
-                async def __aenter__(self):
-                    return self
-
-                async def __aexit__(self, *args):
-                    pass
-
-            return MockClient()
-
-        monkeypatch.setattr("swisstopo_mcp.oereb._get_client", mock_get_client)
-        await get_oereb_extract(
-            GetOerebExtractInput(egrid="CH767982496078", canton="ZH")
-        )
-        assert "TOPICS" not in captured_url["url"]
+        captured = {}
+        _mock_client(monkeypatch, self._make_extract_response([]), capture=captured)
+        await get_oereb_extract(GetOerebExtractInput(egrid="CH767982496078", canton="ZH"))
+        assert "TOPICS" not in captured["url"]
 
     async def test_lang_passed_in_url(self, monkeypatch):
         monkeypatch.setattr(settings, "oereb_cantons", "ZH,BE")
-        captured_url = {}
-        response_data = self._make_extract_response([])
-
-        async def mock_get_client():
-            class MockResponse:
-                status_code = 200
-
-                def raise_for_status(self):
-                    pass
-
-                def json(self):
-                    return response_data
-
-            class MockClient:
-                async def get(self, url):
-                    captured_url["url"] = url
-                    return MockResponse()
-
-                async def __aenter__(self):
-                    return self
-
-                async def __aexit__(self, *args):
-                    pass
-
-            return MockClient()
-
-        monkeypatch.setattr("swisstopo_mcp.oereb._get_client", mock_get_client)
+        captured = {}
+        _mock_client(monkeypatch, self._make_extract_response([]), capture=captured)
         await get_oereb_extract(
             GetOerebExtractInput(egrid="CH767982496078", canton="ZH", lang="fr")
         )
-        assert "LANG=fr" in captured_url["url"]
+        assert "LANG=fr" in captured["url"]
+
+    async def test_lang_selects_the_translation(self, monkeypatch):
+        """The multilingual fields carry every language at once; asking for `fr`
+        and rendering the German text would be a silent mistranslation."""
+        monkeypatch.setattr(settings, "oereb_cantons", "ZH,BE")
+        restriction = self._make_restriction()
+        restriction["LegendText"] = [
+            {"Language": "de", "Text": "Wohnzone W2"},
+            {"Language": "fr", "Text": "Zone d'habitation W2"},
+        ]
+        _mock_client(monkeypatch, self._make_extract_response([restriction]))
+        result = await get_oereb_extract(
+            GetOerebExtractInput(egrid="CH767982496078", canton="ZH", lang="fr")
+        )
+        assert "Zone d'habitation W2" in result.summary
+        assert "Wohnzone W2" not in result.summary
 
     async def test_http_error_returns_error_message(self, monkeypatch):
         import httpx
 
         monkeypatch.setattr(settings, "oereb_cantons", "ZH,BE")
-
-        async def mock_get_client():
-            class MockClient:
-                async def get(self, url):
-                    resp = httpx.Response(500, request=httpx.Request("GET", url))
-                    raise httpx.HTTPStatusError("Server error", request=resp.request, response=resp)
-
-                async def __aenter__(self):
-                    return self
-
-                async def __aexit__(self, *args):
-                    pass
-
-            return MockClient()
-
-        monkeypatch.setattr("swisstopo_mcp.oereb._get_client", mock_get_client)
+        _mock_raising_client(
+            monkeypatch,
+            lambda url: httpx.HTTPStatusError(
+                "Server error",
+                request=httpx.Request("GET", url),
+                response=httpx.Response(500, request=httpx.Request("GET", url)),
+            ),
+        )
         result = await get_oereb_extract(
             GetOerebExtractInput(egrid="CH767982496078", canton="ZH")
         )
@@ -703,35 +602,15 @@ class TestGetOerebExtractHandler:
 
     async def test_grouped_by_topic(self, monkeypatch):
         monkeypatch.setattr(settings, "oereb_cantons", "ZH,BE")
-        restrictions = [
-            self._make_restriction(topic="Nutzungsplanung", description="Wohnzone"),
-            self._make_restriction(topic="Waldabstand", description="Waldabstandslinie"),
-        ]
-        response_data = self._make_extract_response(restrictions)
-
-        async def mock_get_client():
-            class MockResponse:
-                status_code = 200
-
-                def raise_for_status(self):
-                    pass
-
-                def json(self):
-                    return response_data
-
-            class MockClient:
-                async def get(self, url):
-                    return MockResponse()
-
-                async def __aenter__(self):
-                    return self
-
-                async def __aexit__(self, *args):
-                    pass
-
-            return MockClient()
-
-        monkeypatch.setattr("swisstopo_mcp.oereb._get_client", mock_get_client)
+        _mock_client(
+            monkeypatch,
+            self._make_extract_response(
+                [
+                    self._make_restriction(topic="Nutzungsplanung", description="Wohnzone"),
+                    self._make_restriction(topic="Waldabstand", description="Waldabstandslinie"),
+                ]
+            ),
+        )
         result = await get_oereb_extract(
             GetOerebExtractInput(egrid="CH767982496078", canton="ZH")
         )
@@ -742,31 +621,7 @@ class TestGetOerebExtractHandler:
 
     async def test_egrid_in_heading(self, monkeypatch):
         monkeypatch.setattr(settings, "oereb_cantons", "ZH,BE")
-        response_data = self._make_extract_response([self._make_restriction()])
-
-        async def mock_get_client():
-            class MockResponse:
-                status_code = 200
-
-                def raise_for_status(self):
-                    pass
-
-                def json(self):
-                    return response_data
-
-            class MockClient:
-                async def get(self, url):
-                    return MockResponse()
-
-                async def __aenter__(self):
-                    return self
-
-                async def __aexit__(self, *args):
-                    pass
-
-            return MockClient()
-
-        monkeypatch.setattr("swisstopo_mcp.oereb._get_client", mock_get_client)
+        _mock_client(monkeypatch, self._make_extract_response([self._make_restriction()]))
         result = await get_oereb_extract(
             GetOerebExtractInput(egrid="CH767982496078", canton="ZH")
         )
@@ -780,22 +635,48 @@ class TestGetOerebExtractHandler:
 import httpx  # noqa: E402
 import respx  # noqa: E402
 
-from swisstopo_mcp.oereb import OerebAtInput, _first_egrid, oereb_at  # noqa: E402
+from swisstopo_mcp.oereb import (  # noqa: E402
+    OerebAtInput,
+    _first_egrid,
+    _parse_egrid_payload,
+    oereb_at,
+)
 
-_ZH = "https://oereb.geo.zh.ch"
-_EGRID_PAYLOAD = {"features": [{"properties": {"egrid": "CH807306036483"}}]}
+_ZH = "https://maps.zh.ch/oereb/v2"
+_EGRID_PAYLOAD = _egrid_payload({"egrid": "CH807306036483", "number": "WO6408"})
 
 
-class TestFirstEgrid:
-    def test_lowercase_key(self):
-        assert _first_egrid([{"properties": {"egrid": "CH1"}}]) == "CH1"
+class TestParseEgridPayload:
+    def test_reads_the_2_0_shape(self):
+        assert _parse_egrid_payload(_EGRID_PAYLOAD) == [
+            {"egrid": "CH807306036483", "number": "WO6408"}
+        ]
 
     def test_uppercase_key(self):
         """Cantonal endpoints disagree on the casing."""
-        assert _first_egrid([{"properties": {"EGRID": "CH2"}}]) == "CH2"
+        assert _parse_egrid_payload({"GetEGRIDResponse": [{"EGRID": "CH2"}]}) == [
+            {"egrid": "CH2"}
+        ]
 
-    def test_skips_features_without_an_egrid(self):
-        assert _first_egrid([{"properties": {}}, {"properties": {"egrid": "CH3"}}]) == "CH3"
+    def test_skips_entries_without_an_egrid(self):
+        payload = {"GetEGRIDResponse": [{"number": "1"}, {"egrid": "CH3"}]}
+        assert _parse_egrid_payload(payload) == [{"egrid": "CH3"}]
+
+    def test_reads_the_legacy_geojson_shape(self):
+        payload = {"features": [{"properties": {"egrid": "CH4", "gemeindename": "Uster"}}]}
+        assert _parse_egrid_payload(payload) == [{"egrid": "CH4", "municipality": "Uster"}]
+
+    def test_unknown_shape_gives_nothing(self):
+        assert _parse_egrid_payload({"something": "else"}) == []
+        assert _parse_egrid_payload("not json at all") == []
+
+
+class TestFirstEgrid:
+    def test_takes_the_first_record(self):
+        assert _first_egrid([{"egrid": "CH1"}, {"egrid": "CH2"}]) == "CH1"
+
+    def test_skips_records_without_an_egrid(self):
+        assert _first_egrid([{"number": "1"}, {"egrid": "CH3"}]) == "CH3"
 
     def test_empty_gives_none(self):
         assert _first_egrid([]) is None
@@ -823,7 +704,7 @@ class TestOerebAt:
     async def test_no_parcel_is_a_soft_miss_with_a_hint(self, monkeypatch):
         monkeypatch.setattr(settings, "oereb_cantons", "ZH")
         respx.get(url__startswith=f"{_ZH}/getegrid/json/").mock(
-            return_value=httpx.Response(200, json={"features": []})
+            return_value=httpx.Response(204)
         )
         out = await oereb_at(OerebAtInput(lat=47.3769, lon=8.5417, canton="ZH"))
         assert out.is_error is False

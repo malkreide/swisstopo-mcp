@@ -21,8 +21,13 @@ from swisstopo_mcp.models import OEREB_LICENSE, OEREB_SOURCE, ToolResponse
 # Canton Registry
 # ---------------------------------------------------------------------------
 
+# Base URLs of the cantonal ÖREB web services, as published by the Confederation
+# in `ch.swisstopo-vd.stand-oerebkataster` (attribute `oereb_webservice`). That
+# layer is the registry to re-check when a canton moves: ZH's previous host,
+# `oereb.geo.zh.ch`, stopped resolving altogether and took both ÖREB tools down
+# with it.
 OEREB_ENDPOINTS: dict[str, str] = {
-    "ZH": "https://oereb.geo.zh.ch",
+    "ZH": "https://maps.zh.ch/oereb/v2",
     "BE": "https://www.oereb2.apps.be.ch",
 }
 
@@ -81,8 +86,78 @@ class GetOerebExtractInput(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-async def _fetch_egrid_features(base: str, easting: float, northing: float) -> list[dict]:
-    """Resolve an LV95 point to its parcel feature(s) at a cantonal ÖREB endpoint.
+def _localized_text(value: object, lang: str = "de") -> str:
+    """Pull a plain string out of an ÖREB multilingual value.
+
+    The data-extract schema wraps almost every human-readable field as a list of
+    `{"Language": ..., "Text": ...}` pairs, but cantons emit the same field as a
+    bare dict or a bare string often enough that only reading the list shape
+    loses text. Prefer the requested language; fall back to whatever is there.
+    """
+    if isinstance(value, str):
+        return value
+    if isinstance(value, dict):
+        return _localized_text(value.get("Text"), lang) if "Text" in value else ""
+    if isinstance(value, list):
+        for item in value:
+            if isinstance(item, dict) and item.get("Language") == lang and item.get("Text"):
+                return str(item["Text"])
+        for item in value:
+            if isinstance(item, str):
+                return item
+            if isinstance(item, dict) and item.get("Text"):
+                return str(item["Text"])
+    return ""
+
+
+def _egrid_record(entry: dict) -> dict | None:
+    """Normalise one parcel entry to `{egrid, number, identDN, municipality}`."""
+    egrid = entry.get("egrid") or entry.get("EGRID")
+    if not egrid:
+        return None
+    record: dict = {"egrid": str(egrid)}
+    number = entry.get("number") or entry.get("Number")
+    if number:
+        record["number"] = str(number)
+    ident = entry.get("identDN") or entry.get("IdentDN")
+    if ident:
+        record["identDN"] = str(ident)
+    municipality = (
+        entry.get("gemeindename")
+        or entry.get("municipality")
+        or entry.get("MunicipalityName")
+    )
+    if municipality:
+        record["municipality"] = str(municipality)
+    return record
+
+
+def _parse_egrid_payload(data: object) -> list[dict]:
+    """Flatten a getegrid answer into parcel records.
+
+    Two shapes reach this. `GetEGRIDResponse` is what both live cantonal
+    services return today — it is the shape the ÖREB data-extract 2.0 spec
+    defines. The GeoJSON `features` list is what ZH served before it moved to
+    `/oereb/v2`; reading it costs three lines and is the difference between a
+    canton that lags the migration working and returning nothing at all.
+    """
+    if not isinstance(data, dict):
+        return []
+    entries = data.get("GetEGRIDResponse")
+    if isinstance(entries, list):
+        candidates = [e for e in entries if isinstance(e, dict)]
+    else:
+        features = data.get("features")
+        candidates = [
+            f.get("properties", {})
+            for f in (features if isinstance(features, list) else [])
+            if isinstance(f, dict) and isinstance(f.get("properties"), dict)
+        ]
+    return [r for r in (_egrid_record(c) for c in candidates) if r]
+
+
+async def _fetch_egrid_records(base: str, easting: float, northing: float) -> list[dict]:
+    """Resolve an LV95 point to its parcel record(s) at a cantonal ÖREB endpoint.
 
     Shared by `swisstopo_get_egrid` and `swisstopo_oereb_at` so the one-call
     aggregate does not re-enter the tool layer to reach it (ARCH-007).
@@ -92,16 +167,19 @@ async def _fetch_egrid_features(base: str, easting: float, northing: float) -> l
     async with await _get_client() as client:
         response = await client.get(url)
         response.raise_for_status()
+        # A point with no parcel under it answers `204 No Content` with an empty
+        # body rather than a 200 carrying an empty list — and an empty body is
+        # not JSON, so parsing it would turn a legitimate miss into an error.
+        if response.status_code == 204 or not response.content.strip():
+            return []
         data = response.json()
-    features = data.get("features", [])
-    return features if isinstance(features, list) else []
+    return _parse_egrid_payload(data)
 
 
-def _first_egrid(features: list[dict]) -> str | None:
-    """Pull the EGRID out of the first feature, tolerating key-case variation."""
-    for feature in features:
-        props = feature.get("properties", {})
-        egrid = props.get("egrid") or props.get("EGRID")
+def _first_egrid(records: list[dict]) -> str | None:
+    """Pull the EGRID out of the first record that carries one."""
+    for record in records:
+        egrid = record.get("egrid")
         if egrid:
             return str(egrid)
     return None
@@ -123,8 +201,8 @@ async def get_egrid(params: GetEgridInput) -> ToolResponse:
 
     try:
         lat, lon = params.as_wgs84
-        features = await _fetch_egrid_features(base, *params.as_lv95)
-        if not features:
+        records = await _fetch_egrid_records(base, *params.as_lv95)
+        if not records:
             return ToolResponse.ok(
                 f"Kein EGRID gefunden für Koordinaten "
                 f"({lat}, {lon}) in Kanton {canton}.",
@@ -140,15 +218,20 @@ async def get_egrid(params: GetEgridInput) -> ToolResponse:
             )
 
         lines = []
-        records = []
-        for feature in features:
-            props = feature.get("properties", {})
-            egrid = props.get("egrid", props.get("EGRID", "?"))
-            municipality = props.get(
-                "gemeindename", props.get("municipality", props.get("Gemeinde", "?"))
+        for record in records:
+            # getegrid identifies the parcel, not its municipality: the 2.0
+            # answer carries the parcel number and the land-registry district
+            # and no municipality name at all. Report what is actually there
+            # instead of the "Gemeinde: ?" the old formatter printed.
+            detail = ", ".join(
+                part
+                for part in (
+                    f"Parzelle {record['number']}" if record.get("number") else "",
+                    f"Gemeinde: {record['municipality']}" if record.get("municipality") else "",
+                )
+                if part
             )
-            lines.append(f"EGRID: {egrid} (Gemeinde: {municipality})")
-            records.append({"egrid": egrid, "municipality": municipality})
+            lines.append(f"EGRID: {record['egrid']}" + (f" ({detail})" if detail else ""))
 
         return ToolResponse.ok(
             "\n".join(lines),
@@ -160,6 +243,74 @@ async def get_egrid(params: GetEgridInput) -> ToolResponse:
 
     except Exception as e:
         return ToolResponse.error(handle_api_error(e, f"EGRID-Abfrage Kanton {canton}"), source=OEREB_SOURCE)
+
+
+def _parse_restrictions(data: object) -> list[dict]:
+    """Reach `RestrictionOnLandownership` inside a data-extract answer.
+
+    The envelope is nested three deep and the middle key is not spelled the same
+    everywhere: ZH answers `GetExtractByIdResponse.Extract`, BE answers
+    `GetExtractByIdResponse.extract`. A `.get("RealEstate", extract)` fallback
+    silently descended into the wrong node and reported every parcel in
+    Switzerland as unencumbered, so each level is matched explicitly here.
+    """
+    if not isinstance(data, dict):
+        return []
+    node = data.get("GetExtractByIdResponse", data)
+    if not isinstance(node, dict):
+        return []
+    for key in ("Extract", "extract"):
+        inner = node.get(key)
+        if isinstance(inner, dict):
+            node = inner
+            break
+    real_estate = node.get("RealEstate")
+    if not isinstance(real_estate, dict):
+        return []
+    restrictions = real_estate.get("RestrictionOnLandownership")
+    return restrictions if isinstance(restrictions, list) else []
+
+
+def _restriction_record(restriction: dict, lang: str = "de") -> dict:
+    """Reduce one restriction to the fields a caller can act on.
+
+    Deliberately not the raw object: a single ZH restriction carries a
+    fully URL-encoded WMS GetMap request plus the complete legend of its theme,
+    and eighteen of those would fill the answer with markup nobody reads.
+    """
+    theme = restriction.get("Theme")
+    theme_text = _localized_text(theme, lang)
+    theme_code = ""
+    if isinstance(theme, dict):
+        # `Code` in the spec, `code` as ZH serves it.
+        theme_code = str(theme.get("Code") or theme.get("code") or "")
+
+    office = restriction.get("ResponsibleOffice")
+    office_name = (
+        _localized_text(office.get("Name"), lang) if isinstance(office, dict) else ""
+    )
+
+    provisions = restriction.get("LegalProvisions")
+    titles = [
+        title
+        for p in (provisions if isinstance(provisions, list) else [])
+        if isinstance(p, dict)
+        for title in [_localized_text(p.get("Title"), lang)]
+        if title
+    ]
+
+    return {
+        "theme": theme_text or theme_code or "Unbekannt",
+        "theme_code": theme_code,
+        "legend_text": _localized_text(
+            restriction.get("LegendText") or restriction.get("Information"), lang
+        ),
+        "lawstatus": _localized_text(restriction.get("Lawstatus"), lang),
+        "responsible_office": office_name,
+        "legal_provisions": titles,
+        "area_share_m2": restriction.get("AreaShare"),
+        "part_in_percent": restriction.get("PartInPercent"),
+    }
 
 
 @log_tool_call("swisstopo_get_oereb_extract")
@@ -188,7 +339,9 @@ async def get_oereb_extract(
         assert_host_allowed(url)
         async with await _get_client() as client:
             response = await client.get(url)
-            if response.status_code == 404:
+            # An unknown EGRID is a 204 with an empty body on ZH and a 404
+            # elsewhere. Both mean "no such parcel here", and neither is JSON.
+            if response.status_code in (204, 404):
                 return ToolResponse.ok(
                     f"EGRID '{params.egrid}' nicht gefunden in Kanton {canton}.",
                     [],
@@ -204,13 +357,7 @@ async def get_oereb_extract(
             response.raise_for_status()
             data = response.json()
 
-        # Parse restriction topics from response
-        extract = data.get("GetExtractByIdResponse", data.get("extract", data))
-        if isinstance(extract, dict):
-            real_state = extract.get("RealEstate", extract)
-            restriction_measures = real_state.get("RestrictionOnLandownership", [])
-        else:
-            restriction_measures = []
+        restriction_measures = _parse_restrictions(data)
 
         if not restriction_measures:
             return ToolResponse.ok(
@@ -226,66 +373,52 @@ async def get_oereb_extract(
                 license=OEREB_LICENSE,
             )
 
-        # Group by topic
+        records = [
+            _restriction_record(r, params.lang)
+            for r in restriction_measures
+            if isinstance(r, dict)
+        ]
+
         topics_grouped: dict[str, list[dict]] = {}
-        for restriction in restriction_measures:
-            topic = restriction.get("Topic", restriction.get("theme", "Unbekannt"))
-            if isinstance(topic, dict):
-                topic = topic.get("Text", topic.get("text", "Unbekannt"))
-            topics_grouped.setdefault(topic, []).append(restriction)
+        for record in records:
+            topics_grouped.setdefault(record["theme"], []).append(record)
 
         lines = [f"## ÖREB-Auszug für {params.egrid}", ""]
-        for topic_name, restrictions in topics_grouped.items():
+        for topic_name, grouped in topics_grouped.items():
             lines.append(f"### {topic_name}")
-            for r in restrictions:
-                information = r.get("Information", r.get("information", []))
-                description = ""
-                if isinstance(information, list) and information:
-                    first_info = information[0]
-                    if isinstance(first_info, dict):
-                        description = str(first_info.get("Text") or first_info.get("text") or "")
-                elif isinstance(information, str):
-                    description = information
-
-                authority_obj = r.get("ResponsibleOffice", r.get("authority", {}))
-                authority = ""
-                if isinstance(authority_obj, dict):
-                    authority_names = authority_obj.get("Name", authority_obj.get("name", []))
-                    if isinstance(authority_names, list) and authority_names:
-                        first_name = authority_names[0]
-                        if isinstance(first_name, dict):
-                            authority = str(first_name.get("Text") or first_name.get("text") or "")
-                        else:
-                            authority = str(first_name)
-                    elif isinstance(authority_names, str):
-                        authority = authority_names
-
-                legal_provisions = r.get("LegalProvisions", r.get("legalProvisions", []))
-                legal_text = ""
-                if isinstance(legal_provisions, list) and legal_provisions:
-                    first_lp = legal_provisions[0]
-                    if isinstance(first_lp, dict):
-                        lp_titles = first_lp.get("Title", first_lp.get("title", []))
-                        if isinstance(lp_titles, list) and lp_titles:
-                            first_title = lp_titles[0]
-                            if isinstance(first_title, dict):
-                                legal_text = str(first_title.get("Text") or first_title.get("text") or "")
-                            else:
-                                legal_text = str(first_title)
-                        elif isinstance(lp_titles, str):
-                            legal_text = lp_titles
-
-                if description:
-                    lines.append(f"- **Beschreibung:** {description}")
-                if authority:
-                    lines.append(f"- **Zuständige Stelle:** {authority}")
-                if legal_text:
-                    lines.append(f"- **Rechtliche Grundlage:** {legal_text}")
+            for r in grouped:
+                # One bullet per restriction, its own attributes nested under
+                # it. A theme routinely carries five or more restrictions, and
+                # a flat list of `Beschreibung/Rechtsstatus/…` lines leaves no
+                # way to tell which authority goes with which zone.
+                head = r["legend_text"] or topic_name
+                if r["lawstatus"]:
+                    head += f" — {r['lawstatus']}"
+                lines.append(f"- **{head}**")
+                if r["area_share_m2"] is not None:
+                    share = f"  - Fläche: {r['area_share_m2']} m²"
+                    # Only when it carries information: cantons that do not
+                    # compute the share still send the field, as a zero.
+                    if r["part_in_percent"]:
+                        share += f" ({r['part_in_percent']} % der Parzelle)"
+                    lines.append(share)
+                if r["responsible_office"]:
+                    lines.append(f"  - Zuständige Stelle: {r['responsible_office']}")
+                provisions = r["legal_provisions"]
+                for provision in provisions[:3]:
+                    lines.append(f"  - Rechtliche Grundlage: {provision}")
+                # The summary shows the first three; `results` carries them all.
+                # Say so rather than let the shortened list read as complete.
+                if len(provisions) > 3:
+                    lines.append(
+                        f"  - … {len(provisions) - 3} weitere Rechtsgrundlagen "
+                        "(vollständig in `results`)"
+                    )
             lines.append("")
 
         return ToolResponse.ok(
             "\n".join(lines).rstrip(),
-            list(restriction_measures),
+            records,
             match_type="exact",
             source=OEREB_SOURCE,
             license=OEREB_LICENSE,
@@ -337,8 +470,8 @@ async def oereb_at(params: OerebAtInput, ctx: Context | None = None) -> ToolResp
 
     try:
         lat, lon = params.as_wgs84
-        features = await _fetch_egrid_features(base, *params.as_lv95)
-        egrid = _first_egrid(features)
+        records = await _fetch_egrid_records(base, *params.as_lv95)
+        egrid = _first_egrid(records)
     except Exception as e:
         return ToolResponse.error(
             handle_api_error(e, f"ÖREB-Abfrage Kanton {canton}"), source=OEREB_SOURCE

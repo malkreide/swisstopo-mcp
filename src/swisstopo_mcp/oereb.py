@@ -52,6 +52,26 @@ def get_oereb_endpoint(canton: str) -> str | None:
 # Input Models
 # ---------------------------------------------------------------------------
 
+# `swisstopo_get_oereb_extract` and `swisstopo_oereb_at` take the same themes
+# filter. It was spelled out twice, which is exactly how the charset below got
+# fixed on one of them and left broken on the other — one definition, two uses.
+#
+# The dot is not decoration: every ÖREB theme code carries one
+# (`ch.Nutzungsplanung`, `ch.BE.Gewaesserschutzbereiche`). Without it the field
+# rejected every valid code and accepted only `Nutzungsplanung`, which matches
+# no theme — the filter could not work for any canton, and the rejection
+# happened before a request was ever made. The space is here for the same
+# reason: `_parse_topics` strips it from each entry, so 'a, b' parses fine, and
+# a validator stricter than the code behind it buys nothing. The value no
+# longer reaches any URL (see `get_oereb_extract`), so it is a pure lookup key;
+# `max_length` still bounds it.
+TOPICS_PATTERN = r"^[\w.,\- ]+$"
+TOPICS_DESCRIPTION = (
+    "Themenfilter: ÖREB-Themencode oder -Subcode, kommagetrennt "
+    "(z.B. 'ch.Nutzungsplanung'). Wird clientseitig angewendet; ohne Treffer "
+    "nennt die Antwort die tatsächlich vorhandenen Themen."
+)
+
 
 class GetEgridInput(SwissPointInput):
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid", strict=True)
@@ -76,7 +96,7 @@ class GetOerebExtractInput(BaseModel):
         ..., min_length=2, max_length=2, pattern=CANTON_PATTERN, description="Kantonskürzel"
     )
     topics: str | None = Field(
-        default=None, max_length=200, pattern=r"^[\w,\-]+$", description="Themenfilter (kommagetrennt)"
+        default=None, max_length=200, pattern=TOPICS_PATTERN, description=TOPICS_DESCRIPTION
     )
     lang: str = Field(default="de", pattern=LANG_PATTERN, description="Sprache")
 
@@ -271,6 +291,30 @@ def _parse_restrictions(data: object) -> list[dict]:
     return restrictions if isinstance(restrictions, list) else []
 
 
+def _parse_topics(raw: str | None) -> set[str]:
+    """Split the comma-separated topics filter into normalised theme codes."""
+    if not raw:
+        return set()
+    return {part.strip().lower() for part in raw.split(",") if part.strip()}
+
+
+def _matches_topics(record: dict, wanted: set[str]) -> bool:
+    """True when a restriction belongs to one of the requested themes.
+
+    Matched against both the theme code and its sub-code, because cantons
+    disagree on which level carries the distinction: ZH leaves `SubCode` unset
+    entirely, while BE files three different sub-codes under the single code
+    `ch.Nutzungsplanung`. Filtering on the code alone would make the sub-codes
+    unreachable; filtering on the sub-code alone would break ZH outright.
+    """
+    candidates = {
+        value.lower()
+        for value in (record.get("theme_code"), record.get("theme_subcode"))
+        if value
+    }
+    return bool(candidates & wanted)
+
+
 def _restriction_record(restriction: dict, lang: str = "de") -> dict:
     """Reduce one restriction to the fields a caller can act on.
 
@@ -281,9 +325,11 @@ def _restriction_record(restriction: dict, lang: str = "de") -> dict:
     theme = restriction.get("Theme")
     theme_text = _localized_text(theme, lang)
     theme_code = ""
+    theme_subcode = ""
     if isinstance(theme, dict):
         # `Code` in the spec, `code` as ZH serves it.
         theme_code = str(theme.get("Code") or theme.get("code") or "")
+        theme_subcode = str(theme.get("SubCode") or theme.get("subCode") or "")
 
     office = restriction.get("ResponsibleOffice")
     office_name = (
@@ -302,6 +348,7 @@ def _restriction_record(restriction: dict, lang: str = "de") -> dict:
     return {
         "theme": theme_text or theme_code or "Unbekannt",
         "theme_code": theme_code,
+        "theme_subcode": theme_subcode,
         "legend_text": _localized_text(
             restriction.get("LegendText") or restriction.get("Information"), lang
         ),
@@ -332,9 +379,17 @@ async def get_oereb_extract(
         )
 
     try:
+        # No TOPICS on the wire, on purpose. The parameter is honoured by some
+        # cantons and ignored by others — BE filters on it, ZH returns the same
+        # eighteen restrictions whatever is passed, including a nonsense value.
+        # Sending it would make the filter's behaviour depend on which canton
+        # the caller happens to ask about, and would leave the "your filter
+        # matched nothing" case indistinguishable from "this parcel carries no
+        # restrictions" wherever it *did* work. Fetching everything and
+        # filtering below is uniform and keeps the full theme list in hand to
+        # report back. The extra payload is ~90-210 KB, already the size of an
+        # unfiltered extract.
         url = f"{base}/extract/json/?EGRID={params.egrid}&GEOMETRY=false&LANG={params.lang}"
-        if params.topics:
-            url += f"&TOPICS={params.topics}"
 
         assert_host_allowed(url)
         async with await _get_client() as client:
@@ -365,9 +420,9 @@ async def get_oereb_extract(
                 [],
                 match_type="none",
                 note=(
-                    "Kein Treffer heisst hier: für dieses Grundstück sind in den "
-                    "abgefragten Themen keine Beschränkungen eingetragen. Ohne "
-                    "topics-Filter erneut abfragen, um alle Themen abzudecken."
+                    "Kein Treffer heisst hier: für dieses Grundstück sind gar "
+                    "keine Beschränkungen eingetragen — der Auszug ist leer, "
+                    "unabhängig von einem Themenfilter."
                 ),
                 source=OEREB_SOURCE,
                 license=OEREB_LICENSE,
@@ -378,6 +433,35 @@ async def get_oereb_extract(
             for r in restriction_measures
             if isinstance(r, dict)
         ]
+
+        wanted = _parse_topics(params.topics)
+        if wanted:
+            matched = [r for r in records if _matches_topics(r, wanted)]
+            if not matched:
+                # An empty filter result must not read like an unencumbered
+                # parcel — that is the same silent-wrong-answer the envelope
+                # parsing produced. Name the codes that are actually on this
+                # extract so the next call can be right.
+                offered = sorted(
+                    {code for r in records for code in (r["theme_code"],) if code}
+                )
+                return ToolResponse.ok(
+                    f"## ÖREB-Auszug für {params.egrid}\n\n"
+                    f"Keine Beschränkung im Thema '{params.topics}'. "
+                    f"Das Grundstück trägt {len(records)} Beschränkung(en) in "
+                    "anderen Themen.",
+                    [],
+                    match_type="none",
+                    note=(
+                        f"Verfügbare Themen für diesen EGRID: {offered}. "
+                        "Der Filter vergleicht Themencode und Subcode exakt "
+                        "(Gross-/Kleinschreibung egal) — ohne `topics` erneut "
+                        "abfragen, um alles zu sehen."
+                    ),
+                    source=OEREB_SOURCE,
+                    license=OEREB_LICENSE,
+                )
+            records = matched
 
         topics_grouped: dict[str, list[dict]] = {}
         for record in records:
@@ -441,10 +525,7 @@ class OerebAtInput(SwissPointInput):
         description="Kantonskürzel (z.B. 'ZH', 'BE')",
     )
     topics: str | None = Field(
-        default=None,
-        max_length=200,
-        pattern=r"^[\w,\-]+$",
-        description="Themenfilter (kommagetrennt)",
+        default=None, max_length=200, pattern=TOPICS_PATTERN, description=TOPICS_DESCRIPTION
     )
     lang: str = Field(default="de", pattern=LANG_PATTERN, description="Sprache")
 

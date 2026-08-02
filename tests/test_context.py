@@ -1,5 +1,6 @@
 # tests/test_context.py
 """Tests for Context progress/logging in long-running tools (audit finding SDK-003)."""
+
 from __future__ import annotations
 
 from unittest.mock import AsyncMock
@@ -115,12 +116,21 @@ class TestTheSlowToolsTakeAContext:
         from swisstopo_mcp.openplz import FindCommuneInput, find_commune
 
         pages = [
-            httpx.Response(200, json=[{"name": f"G{i}", "key": str(i)} for i in range(50)],
-                           headers={"x-total-count": "120"}),
-            httpx.Response(200, json=[{"name": f"H{i}", "key": str(i)} for i in range(50)],
-                           headers={"x-total-count": "120"}),
-            httpx.Response(200, json=[{"name": f"I{i}", "key": str(i)} for i in range(20)],
-                           headers={"x-total-count": "120"}),
+            httpx.Response(
+                200,
+                json=[{"name": f"G{i}", "key": str(i)} for i in range(50)],
+                headers={"x-total-count": "120"},
+            ),
+            httpx.Response(
+                200,
+                json=[{"name": f"H{i}", "key": str(i)} for i in range(50)],
+                headers={"x-total-count": "120"},
+            ),
+            httpx.Response(
+                200,
+                json=[{"name": f"I{i}", "key": str(i)} for i in range(20)],
+                headers={"x-total-count": "120"},
+            ),
         ]
         timeline: list[str] = []
 
@@ -381,18 +391,14 @@ class TestFindCommuneByNameReportsRetries:
                 attempts["n"] += 1
                 if attempts["n"] == 1:
                     raise httpx.ConnectError("down")
-                return httpx.Response(
-                    200, json=[], request=httpx.Request(method, url)
-                )
+                return httpx.Response(200, json=[], request=httpx.Request(method, url))
 
         monkeypatch.setattr(api_client, "_get_client", lambda: _async(_Client()))
         monkeypatch.setattr(api_client, "_sleep", lambda s: _async(None))
         monkeypatch.setattr(api_client, "assert_host_allowed", lambda url: None)
 
         timeline: list[str] = []
-        result = await find_commune(
-            FindCommuneInput(name="Uster"), ctx=_Recorder(timeline)
-        )
+        result = await find_commune(FindCommuneInput(name="Uster"), ctx=_Recorder(timeline))
 
         assert result.is_error is False, result.summary
         assert any(e.startswith("warning:") for e in timeline), (

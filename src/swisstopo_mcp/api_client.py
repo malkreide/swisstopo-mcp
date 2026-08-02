@@ -192,8 +192,7 @@ def assert_host_allowed(url: str) -> None:
     host = parsed.hostname or ""
     if host not in ALLOWED_HOSTS:
         raise PermissionError(
-            f"Host nicht auf der Egress-Allow-List: {host!r}. "
-            f"Erlaubt: {sorted(ALLOWED_HOSTS)}"
+            f"Host nicht auf der Egress-Allow-List: {host!r}. Erlaubt: {sorted(ALLOWED_HOSTS)}"
         )
     assert_resolved_ip_public(host)
 
@@ -448,8 +447,12 @@ async def request_with_retry(
         try:
             async with await _get_client() as client:
                 response = await client.request(
-                    method, url, params=params, content=content,
-                    headers=headers, timeout=timeout,
+                    method,
+                    url,
+                    params=params,
+                    content=content,
+                    headers=headers,
+                    timeout=timeout,
                 )
         except httpx.RequestError as exc:  # timeout / connect / read errors
             last_exc = exc
@@ -534,6 +537,7 @@ async def openplz_request(
 
 # --- Error Handling ---
 
+
 def handle_api_error(e: Exception, context: str = "") -> str:
     """Translate exceptions into German user-friendly error messages."""
     prefix = f"Fehler bei {context}: " if context else "Fehler: "
@@ -580,6 +584,7 @@ def handle_api_error(e: Exception, context: str = "") -> str:
 
 
 # --- Coordinate Helpers ---
+
 
 def wgs84_to_lv95(lat: float, lon: float) -> tuple[float, float]:
     """Convert WGS84 (lat, lon) to LV95 (E, N).
@@ -645,8 +650,7 @@ def validate_sr(sr: int) -> int:
     """Validate spatial reference code. Returns sr if valid, raises ValueError otherwise."""
     if sr not in SUPPORTED_SRS:
         raise ValueError(
-            f"Nicht unterstütztes Koordinatensystem: {sr}. "
-            f"Unterstützt: {sorted(SUPPORTED_SRS)}"
+            f"Nicht unterstütztes Koordinatensystem: {sr}. Unterstützt: {sorted(SUPPORTED_SRS)}"
         )
     return sr
 

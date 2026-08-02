@@ -8,6 +8,7 @@ Usage:
     python scripts/render_egress_acl.py           # write the ACL
     python scripts/render_egress_acl.py --check   # exit 1 if it is stale
 """
+
 from __future__ import annotations
 
 import argparse

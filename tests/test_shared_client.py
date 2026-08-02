@@ -1,5 +1,6 @@
 # tests/test_shared_client.py
 """Regression tests for SDK-001: shared httpx.AsyncClient reuse via lifespan."""
+
 from __future__ import annotations
 
 import httpx

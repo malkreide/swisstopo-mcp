@@ -12,6 +12,7 @@ These tests drive a real client session over in-memory streams — the same code
 path a stdio or HTTP client takes — so the assertions are about what actually
 goes over the wire.
 """
+
 from __future__ import annotations
 
 import json
@@ -94,13 +95,12 @@ class TestSuccessIsUnaffected:
         """`match_type: "none"` is a valid answer, not a failure — the
         distinction the flag exists to preserve (ARCH-003)."""
         async with session() as s:
+
             async def empty(path, params=None, **_):
                 return {"results": []}
 
             monkeypatch.setattr("swisstopo_mcp.geocoding.geo_admin_request", empty)
-            result = await s.call_tool(
-                "swisstopo_geocode", {"params": {"search_text": "zzzznope"}}
-            )
+            result = await s.call_tool("swisstopo_geocode", {"params": {"search_text": "zzzznope"}})
             assert result.is_error is False
             assert result.structured_content["match_type"] == "none"
 
@@ -119,9 +119,7 @@ class TestProtocolErrorsAreDistinct:
 
     async def test_invalid_arguments_are_an_error_result(self):
         async with session() as s:
-            result = await s.call_tool(
-                "swisstopo_geocode", {"params": {"search_text": "x"}}
-            )
+            result = await s.call_tool("swisstopo_geocode", {"params": {"search_text": "x"}})
             assert result.is_error is True
 
     async def test_a_handled_error_is_not_a_protocol_error(self):

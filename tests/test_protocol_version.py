@@ -23,6 +23,7 @@ Both eras are asserted separately now, so neither can move unnoticed, and the
 handshake ceiling is measured against a live server rather than read off a
 constant name.
 """
+
 from __future__ import annotations
 
 import json
@@ -79,9 +80,7 @@ async def _initialize(requested: str) -> str | None:
     app = build_http_app()
     async with app.router.lifespan_context(app):
         transport = httpx.ASGITransport(app=app)
-        async with httpx.AsyncClient(
-            transport=transport, base_url="http://127.0.0.1"
-        ) as client:
+        async with httpx.AsyncClient(transport=transport, base_url="http://127.0.0.1") as client:
             response = await client.post(
                 "/mcp",
                 headers=_HEADERS,
@@ -103,9 +102,7 @@ async def _initialize(requested: str) -> str | None:
     return json.loads(body).get("result", {}).get("protocolVersion")
 
 
-@pytest.mark.parametrize(
-    "requested", ["2024-11-05", "2025-03-26", "2025-06-18", "2025-11-25"]
-)
+@pytest.mark.parametrize("requested", ["2024-11-05", "2025-03-26", "2025-06-18", "2025-11-25"])
 async def test_older_clients_keep_their_revision(requested):
     """The migration must not push existing clients onto a new revision."""
     assert await _initialize(requested) == requested

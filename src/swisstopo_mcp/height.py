@@ -1,5 +1,6 @@
 # src/swisstopo_mcp/height.py
 """Height and elevation profile tools for api3.geo.admin.ch."""
+
 from __future__ import annotations
 
 import json
@@ -215,7 +216,8 @@ async def elevation_profile(
         if isinstance(data, list):
             if ctx is not None:
                 await ctx.report_progress(
-                    progress=len(data), total=params.nb_points,
+                    progress=len(data),
+                    total=params.nb_points,
                     message=f"{len(data)} Punkte",
                 )
             return ToolResponse.ok(
@@ -230,7 +232,9 @@ async def elevation_profile(
                     "mit swisstopo_get_height prüfen."
                 ),
             )
-        return ToolResponse.error(f"Fehler bei Höhenprofil: Unerwartetes Antwortformat: {type(data).__name__}")
+        return ToolResponse.error(
+            f"Fehler bei Höhenprofil: Unerwartetes Antwortformat: {type(data).__name__}"
+        )
     except ValueError as e:
         return ToolResponse.error(f"Fehler bei Eingabe: {e}")
     except Exception as e:

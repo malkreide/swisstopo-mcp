@@ -4,6 +4,7 @@ Server/transport/logging settings come from a single Settings object instead of
 ad-hoc `sys.argv` / `os.environ` reads. All variables use the `SWISSTOPO_`
 prefix and may also be supplied via a local `.env` file (see `.env.example`).
 """
+
 from __future__ import annotations
 
 from typing import Literal
@@ -69,7 +70,12 @@ class Settings(BaseSettings):
     # The `:*` suffix is the SDK's wildcard-port syntax — without it the entries
     # would only match the configured `http_port`, and `--port` overrides it at
     # runtime, which would lock the developer out of their own server.
-    _LOCAL_ORIGINS = ("http://localhost", "http://localhost:*", "http://127.0.0.1", "http://127.0.0.1:*")
+    _LOCAL_ORIGINS = (
+        "http://localhost",
+        "http://localhost:*",
+        "http://127.0.0.1",
+        "http://127.0.0.1:*",
+    )
     _LOCAL_HOSTS = ("localhost", "localhost:*", "127.0.0.1", "127.0.0.1:*")
 
     @property

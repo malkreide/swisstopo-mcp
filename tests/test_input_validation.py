@@ -1,5 +1,6 @@
 # tests/test_input_validation.py
 """Regression tests for SEC-018: strict input validation + whitelist patterns."""
+
 from __future__ import annotations
 
 import pytest
@@ -14,10 +15,10 @@ class TestWhitelistPatterns:
     @pytest.mark.parametrize(
         "bad",
         [
-            "test\x00null",   # control char
+            "test\x00null",  # control char
             "<script>alert</script>",  # angle brackets
-            'a"b',            # double quote
-            "a`b",            # backtick
+            'a"b',  # double quote
+            "a`b",  # backtick
         ],
     )
     def test_search_text_rejects_dangerous(self, bad):
@@ -154,8 +155,16 @@ def _input_models():
 
     seen: dict[str, type[BaseModel]] = {}
     for module in (
-        coords, geocoding, geodata, height, oereb, openplz, overpass,
-        rest_api, stac, wmts,
+        coords,
+        geocoding,
+        geodata,
+        height,
+        oereb,
+        openplz,
+        overpass,
+        rest_api,
+        stac,
+        wmts,
     ):
         for name, obj in inspect.getmembers(module, inspect.isclass):
             if (
@@ -184,11 +193,11 @@ class TestEveryStringFieldIsBounded:
     # max_length. Each entry names the pattern, so the exemption is a stated
     # reason rather than a way to silence the check.
     EXEMPT = {
-        "lang",          # ^[a-z]{2}$
-        "canton",        # ^[A-Za-z]{2}$ / ^([A-Za-z]{2}|\d{1,2})$
-        "source",        # ^(swisstopo|geodienste|oereb)$
-        "postal_code",   # ^\d{4}$
-        "district",      # ^\d{1,4}$
+        "lang",  # ^[a-z]{2}$
+        "canton",  # ^[A-Za-z]{2}$ / ^([A-Za-z]{2}|\d{1,2})$
+        "source",  # ^(swisstopo|geodienste|oereb)$
+        "postal_code",  # ^\d{4}$
+        "district",  # ^\d{1,4}$
     }
 
     def test_the_sweep_finds_the_models(self):
@@ -202,9 +211,7 @@ class TestEveryStringFieldIsBounded:
         for qualname, field_name, field in _string_fields():
             if field_name in self.EXEMPT:
                 continue
-            has_max = any(
-                getattr(meta, "max_length", None) is not None for meta in field.metadata
-            )
+            has_max = any(getattr(meta, "max_length", None) is not None for meta in field.metadata)
             if not has_max:
                 unbounded.append(f"{qualname}.{field_name}")
 
@@ -231,8 +238,7 @@ class TestEveryStringFieldIsBounded:
             assert patterns, f"{qualname}.{field_name} is exempt but has no pattern"
             pattern = patterns[0]
             assert pattern.startswith("^") and pattern.endswith("$"), (
-                f"{qualname}.{field_name} pattern is not anchored, so it does "
-                "not bound the length"
+                f"{qualname}.{field_name} pattern is not anchored, so it does not bound the length"
             )
             # An unbounded quantifier defeats the whole exemption.
             assert not re.search(r"[+*]", pattern), (

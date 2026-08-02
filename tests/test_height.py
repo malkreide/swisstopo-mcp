@@ -193,10 +193,7 @@ class TestFormatElevationProfile:
         assert "450.0" in result
 
     def test_many_points(self):
-        points = [
-            {"dist": float(i * 10), "alts": {"COMB": 500.0 + i}}
-            for i in range(5)
-        ]
+        points = [{"dist": float(i * 10), "alts": {"COMB": 500.0 + i}} for i in range(5)]
         result = format_elevation_profile(points)
         lines = result.strip().split("\n")
         # header + separator + 5 data rows = 7 lines
@@ -284,9 +281,7 @@ class TestElevationProfileHandler:
             return []
 
         monkeypatch.setattr("swisstopo_mcp.height.geo_admin_request", mock_request)
-        await elevation_profile(
-            ElevationProfileInput(coordinates="46.9,7.4;47.0,7.5")
-        )
+        await elevation_profile(ElevationProfileInput(coordinates="46.9,7.4;47.0,7.5"))
         assert captured["path"] == "/rest/services/profile.json"
         geom = _json.loads(captured["params"]["geom"])
         assert geom["type"] == "LineString"
@@ -302,9 +297,7 @@ class TestElevationProfileHandler:
         monkeypatch.setattr("swisstopo_mcp.height.geo_admin_request", mock_request)
         # Only one coordinate pair — passes the input pattern but fails the
         # >=2-pairs parse check, exercising the handler error path.
-        result = await elevation_profile(
-            ElevationProfileInput(coordinates="46.9,7.4")
-        )
+        result = await elevation_profile(ElevationProfileInput(coordinates="46.9,7.4"))
         assert "Fehler" in result.summary
 
     async def test_nb_points_passed_correctly(self, monkeypatch):
@@ -328,9 +321,7 @@ class TestElevationProfileHandler:
             raise httpx.HTTPStatusError("Not found", request=resp.request, response=resp)
 
         monkeypatch.setattr("swisstopo_mcp.height.geo_admin_request", mock_request)
-        result = await elevation_profile(
-            ElevationProfileInput(coordinates="46.9,7.4;47.0,7.5")
-        )
+        result = await elevation_profile(ElevationProfileInput(coordinates="46.9,7.4;47.0,7.5"))
         assert "Fehler" in result.summary
 
     async def test_single_coordinate_pair_rejected(self, monkeypatch):
@@ -339,9 +330,7 @@ class TestElevationProfileHandler:
             return []
 
         monkeypatch.setattr("swisstopo_mcp.height.geo_admin_request", mock_request)
-        result = await elevation_profile(
-            ElevationProfileInput(coordinates="46.9,7.4;46.9,7.4")
-        )
+        result = await elevation_profile(ElevationProfileInput(coordinates="46.9,7.4;46.9,7.4"))
         # Two identical pairs are valid — request should go through
         assert isinstance(result, ToolResponse)
 

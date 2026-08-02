@@ -13,6 +13,7 @@ sources — see ``docs/geodaten-erweiterung-phase1.md``:
   server. ``overpass-api.de`` returns 406 through some egress proxies.
 * Licence is ODbL (© OpenStreetMap contributors), not swisstopo OGD.
 """
+
 from __future__ import annotations
 
 import json
@@ -68,10 +69,27 @@ FEATURE_TAGS: dict[str, str] = {
 }
 
 FeatureType = Literal[
-    "school", "kindergarten", "university", "playground", "park", "hospital",
-    "pharmacy", "doctor", "restaurant", "cafe", "supermarket", "bank", "atm",
-    "parking", "bus_stop", "train_station", "library", "sports_centre",
-    "swimming_pool", "toilets", "fuel",
+    "school",
+    "kindergarten",
+    "university",
+    "playground",
+    "park",
+    "hospital",
+    "pharmacy",
+    "doctor",
+    "restaurant",
+    "cafe",
+    "supermarket",
+    "bank",
+    "atm",
+    "parking",
+    "bus_stop",
+    "train_station",
+    "library",
+    "sports_centre",
+    "swimming_pool",
+    "toilets",
+    "fuel",
 ]
 
 
@@ -285,15 +303,19 @@ async def query_osm_features(
 
         summary = _format(params, lat, lon, records, remark)
         return ToolResponse.ok(
-            summary, records, match_type="exact" if records else "none",
+            summary,
+            records,
+            match_type="exact" if records else "none",
             note=(
-                None if records else
-                f"Keine '{params.feature_type}' im Umkreis von "
+                None
+                if records
+                else f"Keine '{params.feature_type}' im Umkreis von "
                 f"{params.radius_m} m. radius_m erhöhen (max. 5000), oder eine "
                 "andere feature_type-Kategorie wählen. OSM-Daten sind "
                 "community-gepflegt und je nach Region unvollständig."
             ),
-            source=OSM_SOURCE, license=OSM_LICENSE,
+            source=OSM_SOURCE,
+            license=OSM_LICENSE,
         )
     except Exception as e:  # noqa: BLE001
         return ToolResponse.error(

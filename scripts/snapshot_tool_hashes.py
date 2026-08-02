@@ -11,6 +11,7 @@ Usage:
     python scripts/snapshot_tool_hashes.py           # write tool-hashes.json
     python scripts/snapshot_tool_hashes.py --check   # exit 1 if it differs
 """
+
 from __future__ import annotations
 
 import argparse

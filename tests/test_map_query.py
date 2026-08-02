@@ -25,6 +25,7 @@ not retested here. `MapQueryInput` delegates the point rules to
 constraints are still the ones `test_rest_api.py` and `test_lv95_input.py`
 cover — the delegation itself is what is asserted below.
 """
+
 from __future__ import annotations
 
 import pytest
@@ -128,9 +129,7 @@ class TestAnArgumentFromAnotherOperationIsRefused:
         required, optional = _OPERATION_FIELDS[operation]
         own = required | optional
         foreign = {
-            name
-            for spec in _OPERATION_FIELDS.values()
-            for name in (spec[0] | spec[1])
+            name for spec in _OPERATION_FIELDS.values() for name in (spec[0] | spec[1])
         } - own
         for name in sorted(foreign):
             with pytest.raises(ValidationError, match=name):
@@ -185,9 +184,7 @@ class TestThePointRulesAreDelegatedNotRestated:
 
     def test_half_a_pair_is_named_as_such(self):
         with pytest.raises(ValidationError, match="Unvollständig"):
-            MapQueryInput(
-                operation="features_at_point", layers="ch.are.bauzonen", lat=47.36
-            )
+            MapQueryInput(operation="features_at_point", layers="ch.are.bauzonen", lat=47.36)
 
     def test_degrees_in_the_lv95_fields_are_diagnosed(self):
         """The specific mistake SwissPointInput exists to name."""
@@ -348,15 +345,11 @@ _COLON_ID_LAYER = "ch.bav.haltestellen-oev"
 @pytest.mark.live
 class TestSwisstopoMapQueryLive:
     async def test_search_layers(self):
-        result = await map_query(
-            MapQueryInput(operation="search_layers", query="gebaeude")
-        )
+        result = await map_query(MapQueryInput(operation="search_layers", query="gebaeude"))
         assert result.is_error is False, result.summary
 
     async def test_layer_info(self):
-        result = await map_query(
-            MapQueryInput(operation="layer_info", layer=_COMMUNE_LAYER)
-        )
+        result = await map_query(MapQueryInput(operation="layer_info", layer=_COMMUNE_LAYER))
         assert result.is_error is False, result.summary
         assert result.results[0]["fields"], "a layer with no queryable fields is drift"
 

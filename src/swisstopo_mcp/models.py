@@ -5,6 +5,7 @@ Every tool returns a `ToolResponse`: machine-readable structured fields
 human-readable Markdown `summary`. MCPServer emits this as structured content
 *and* a JSON text block, so clients get both.
 """
+
 from __future__ import annotations
 
 from datetime import UTC, datetime
@@ -49,8 +50,7 @@ OSM_LICENSE = "ODbL — © OpenStreetMap contributors"
 # code is AGPL-3.0, but that is irrelevant here — we only consume the public
 # HTTP API, we do not redistribute the code.
 OPENPLZ_SOURCE = (
-    "OpenPLZ API (openplzapi.org) — Daten: BFS-Gemeindeverzeichnis "
-    "& swisstopo-Strassenverzeichnis"
+    "OpenPLZ API (openplzapi.org) — Daten: BFS-Gemeindeverzeichnis & swisstopo-Strassenverzeichnis"
 )
 OPENPLZ_LICENSE = "Freie Nutzung — Quellenangabe Pflicht (Swiss OGD / opendata.swiss)"
 

@@ -1,5 +1,6 @@
 # tests/test_http_app.py
 """Regression tests for SDK-004: CORS config on the Streamable-HTTP app."""
+
 from __future__ import annotations
 
 import httpx
@@ -90,12 +91,8 @@ async def _post_mcp(extra_headers: dict[str, str]) -> int:
     app = _probe_app()
     async with app.router.lifespan_context(app):
         transport = httpx.ASGITransport(app=app)
-        async with httpx.AsyncClient(
-            transport=transport, base_url="http://127.0.0.1"
-        ) as client:
-            response = await client.post(
-                "/mcp", json=_INIT, headers={**_HEADERS, **extra_headers}
-            )
+        async with httpx.AsyncClient(transport=transport, base_url="http://127.0.0.1") as client:
+            response = await client.post("/mcp", json=_INIT, headers={**_HEADERS, **extra_headers})
             return response.status_code
 
 
@@ -171,9 +168,7 @@ class TestTransportSecurityRequests:
         in Kubernetes; assert the asymmetry is deliberate and still true."""
         app = build_http_app()
         transport = httpx.ASGITransport(app=app)
-        async with httpx.AsyncClient(
-            transport=transport, base_url="http://127.0.0.1"
-        ) as c:
+        async with httpx.AsyncClient(transport=transport, base_url="http://127.0.0.1") as c:
             response = await c.get("/healthz", headers={"Host": "evil.example.com"})
         assert response.status_code == 200
 

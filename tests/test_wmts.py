@@ -103,6 +103,7 @@ class TestBuildMapUrl:
         result = await build_map_url(MapUrlInput(lat=46.9480, lon=7.4474))
         # Extract E and N values from the result
         import re
+
         e_match = re.search(r"E=(\d+)", result.summary)
         n_match = re.search(r"N=(\d+)", result.summary)
         assert e_match is not None
@@ -122,10 +123,9 @@ class TestBuildMapUrl:
         assert "layers=ch.are.bauzonen" in result.summary
 
     async def test_multiple_layers_in_url(self):
-        result = await build_map_url(MapUrlInput(
-            lat=47.38, lon=8.54,
-            layers="ch.swisstopo.swissimage,ch.are.bauzonen"
-        ))
+        result = await build_map_url(
+            MapUrlInput(lat=47.38, lon=8.54, layers="ch.swisstopo.swissimage,ch.are.bauzonen")
+        )
         assert "ch.swisstopo.swissimage" in result.summary
         assert "ch.are.bauzonen" in result.summary
 

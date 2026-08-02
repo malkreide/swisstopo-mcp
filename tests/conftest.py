@@ -40,6 +40,7 @@ close that:
 A test needing the shipped default can request it the same way: monkeypatch
 `settings.pin_dns` back to `True` after this fixture has run.
 """
+
 from __future__ import annotations
 
 import pytest

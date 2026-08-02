@@ -5,6 +5,7 @@ Covers the shared `SwissPointInput` contract and each tool that inherits it.
 The reference point is Seilergraben 76, Zürich: WGS84 (47.3769, 8.5417) ==
 LV95 (2683304, 1247926).
 """
+
 from __future__ import annotations
 
 import httpx

@@ -2,6 +2,7 @@
 """Tests for query_osm_features (Overpass). Focus on the fragile-source
 behaviours found in the Phase-1 live probe: XML errors for [out:json],
 timeout remarks in HTTP-200 bodies, graceful degradation."""
+
 from __future__ import annotations
 
 import httpx
@@ -178,7 +179,7 @@ REALISTIC_ERROR_PAGE = (
     "open64: 2 No such file or directory /opt/osm/db/overpass_db/nodes.bin . "
     "Dispatcher_Client::request_read_and_idx::rate_limited</p>\n"
     "<p>The output of your query:</p><pre>"
-    "[out:json][timeout:25];(node[\"amenity\"=\"school\"](around:500,47.36,8.52););"
+    '[out:json][timeout:25];(node["amenity"="school"](around:500,47.36,8.52););'
     "out center tags 50;</pre></body></html>"
 )
 

@@ -17,6 +17,7 @@ The passing check still named two gaps, and both were real:
 These tests hold what was added, and — more usefully — the properties that make
 it worth having rather than being primitives for their own sake.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -111,9 +112,7 @@ class TestThePrompts:
     async def _render(name: str, args: dict[str, str]) -> str:
         result = await mcp.get_prompt(name, args)
         return "\n".join(
-            message.content.text
-            for message in result.messages
-            if hasattr(message.content, "text")
+            message.content.text for message in result.messages if hasattr(message.content, "text")
         )
 
     async def test_the_arguments_reach_the_text(self):
@@ -149,9 +148,7 @@ class TestThePrompts:
     async def test_it_tells_the_model_to_follow_empty_result_hints(self):
         """Ties the prompt to the ARCH-003 work: a bare negative should send the
         model to the `note`, not end the conversation."""
-        text = await self._render(
-            "swisstopo_feature_lookup", {"ort": "Zürich", "was": "irgendwas"}
-        )
+        text = await self._render("swisstopo_feature_lookup", {"ort": "Zürich", "was": "irgendwas"})
         assert "note" in text and "none" in text
 
     async def test_the_download_prompt_warns_against_guessing_ids(self):

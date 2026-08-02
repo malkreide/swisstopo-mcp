@@ -1,5 +1,6 @@
 # src/swisstopo_mcp/wmts.py
 """WMTS map URL builder for map.geo.admin.ch."""
+
 from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -63,8 +64,7 @@ async def build_map_url(params: MapUrlInput) -> ToolResponse:
         "",
         f"`{url}`",
         "",
-        f"**Koordinaten:** {params.lat:.6f}°N, {params.lon:.6f}°E "
-        f"(LV95: E {e:.0f} / N {n:.0f})",
+        f"**Koordinaten:** {params.lat:.6f}°N, {params.lon:.6f}°E (LV95: E {e:.0f} / N {n:.0f})",
         f"**Zoomstufe:** {params.zoom}",
     ]
 

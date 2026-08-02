@@ -5,6 +5,7 @@ These were ported from swiss-geodata-mcp (see
 docs/merge-plan-swiss-geodata-mcp.md). Fixtures mirror the live payloads
 verified for Seilergraben 76, Zürich (LV95 2683531 / 1247914).
 """
+
 from __future__ import annotations
 
 import httpx
@@ -48,10 +49,24 @@ ZONING_PAYLOAD = {
 
 MUNICIPALITY_PAYLOAD = {
     "results": [
-        {"attributes": {"gemname": "Zürich", "gde_nr": 261, "kanton": "ZH", "jahr": 1950,
-                        "is_current_jahr": False}},
-        {"attributes": {"gemname": "Zürich", "gde_nr": 261, "kanton": "ZH", "jahr": 2025,
-                        "is_current_jahr": True}},
+        {
+            "attributes": {
+                "gemname": "Zürich",
+                "gde_nr": 261,
+                "kanton": "ZH",
+                "jahr": 1950,
+                "is_current_jahr": False,
+            }
+        },
+        {
+            "attributes": {
+                "gemname": "Zürich",
+                "gde_nr": 261,
+                "kanton": "ZH",
+                "jahr": 2025,
+                "is_current_jahr": True,
+            }
+        },
     ]
 }
 
@@ -116,9 +131,7 @@ class TestZoningAt:
 
     @respx.mock
     async def test_sends_lv95_upstream(self):
-        route = respx.get(IDENTIFY_URL).mock(
-            return_value=httpx.Response(200, json=ZONING_PAYLOAD)
-        )
+        route = respx.get(IDENTIFY_URL).mock(return_value=httpx.Response(200, json=ZONING_PAYLOAD))
         await zoning_at(ZoningAtInput(easting=EAST, northing=NORTH))
         params = route.calls[0].request.url.params
         assert params["sr"] == "2056"
@@ -160,9 +173,7 @@ class TestMunicipalityAt:
     @respx.mock
     async def test_picks_current_year_record(self):
         """The layer carries one polygon per historical year."""
-        respx.get(IDENTIFY_URL).mock(
-            return_value=httpx.Response(200, json=MUNICIPALITY_PAYLOAD)
-        )
+        respx.get(IDENTIFY_URL).mock(return_value=httpx.Response(200, json=MUNICIPALITY_PAYLOAD))
         out = await municipality_at(MunicipalityAtInput(easting=EAST, northing=NORTH))
         assert out.count == 1
         assert out.results[0]["municipality"] == "Zürich"
@@ -173,8 +184,14 @@ class TestMunicipalityAt:
     async def test_no_current_record_is_soft_miss(self):
         historical_only = {
             "results": [
-                {"attributes": {"gemname": "X", "gde_nr": 1, "kanton": "ZH",
-                                "is_current_jahr": False}}
+                {
+                    "attributes": {
+                        "gemname": "X",
+                        "gde_nr": 1,
+                        "kanton": "ZH",
+                        "is_current_jahr": False,
+                    }
+                }
             ]
         }
         respx.get(IDENTIFY_URL).mock(return_value=httpx.Response(200, json=historical_only))
@@ -210,9 +227,9 @@ class TestLayerInfo:
                 },
             )
         )
-        respx.get(
-            f"{GEO_ADMIN_BASE}/rest/services/all/MapServer/ch.are.bauzonen/legend"
-        ).mock(return_value=httpx.Response(200, text="<div>Wohnzonen</div>"))
+        respx.get(f"{GEO_ADMIN_BASE}/rest/services/all/MapServer/ch.are.bauzonen/legend").mock(
+            return_value=httpx.Response(200, text="<div>Wohnzonen</div>")
+        )
 
         out = await layer_info(LayerInfoInput(layer="ch.are.bauzonen"))
         assert out.is_error is False
@@ -229,9 +246,9 @@ class TestLayerInfo:
                 200, json={"id": "ch.are.bauzonen", "name": "Bauzonen", "fields": []}
             )
         )
-        respx.get(
-            f"{GEO_ADMIN_BASE}/rest/services/all/MapServer/ch.are.bauzonen/legend"
-        ).mock(return_value=httpx.Response(404, text="not found"))
+        respx.get(f"{GEO_ADMIN_BASE}/rest/services/all/MapServer/ch.are.bauzonen/legend").mock(
+            return_value=httpx.Response(404, text="not found")
+        )
 
         out = await layer_info(LayerInfoInput(layer="ch.are.bauzonen"))
         assert out.is_error is False
@@ -256,8 +273,9 @@ class TestFormatters:
         assert "Keine Bauzone" in format_zoning([])
 
     def test_zoning_includes_caveat(self):
-        out = format_zoning([{"zone_type_de": "Wohnzonen", "code": "1",
-                              "municipality": "Zürich", "canton": "ZH"}])
+        out = format_zoning(
+            [{"zone_type_de": "Wohnzonen", "code": "1", "municipality": "Zürich", "canton": "ZH"}]
+        )
         assert "Wohnzonen" in out and "Nutzungsplanung" in out
 
     def test_municipality_none(self):
@@ -328,8 +346,6 @@ class TestLicenceAttribution:
     async def test_municipality_carries_licence(self):
         from swisstopo_mcp.models import SWISSBOUNDARIES_LICENSE
 
-        respx.get(IDENTIFY_URL).mock(
-            return_value=httpx.Response(200, json=MUNICIPALITY_PAYLOAD)
-        )
+        respx.get(IDENTIFY_URL).mock(return_value=httpx.Response(200, json=MUNICIPALITY_PAYLOAD))
         out = await municipality_at(MunicipalityAtInput(easting=EAST, northing=NORTH))
         assert out.license == SWISSBOUNDARIES_LICENSE

@@ -191,4 +191,11 @@ async def get_collection(params: GetCollectionInput) -> ToolResponse:
             ),
         )
     except Exception as e:
-        return ToolResponse.error(handle_api_error(e, f"Collection '{params.collection_id}'"))
+        return ToolResponse.error(
+            handle_api_error(e, f"Collection '{params.collection_id}'"),
+            note=(
+                "Prüfe die Collection-ID: `swisstopo_search_geodata` liefert die "
+                "gültigen IDs. Eine unbekannte ID wird upstream als HTTP 404 "
+                "abgewiesen und ist von einem Ausfall nicht zu unterscheiden."
+            ),
+        )

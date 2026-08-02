@@ -9,6 +9,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Fehler konnten keinen nächsten Schritt tragen — strukturell nicht.**
+  ARCH-003 hat durchgesetzt, dass ein *leeres* Ergebnis einen Hinweis führt, und
+  ein AST-Sweep bewacht das. Aber `ToolResponse.error` hatte gar keinen
+  `note`-Parameter. Eine vertippte Layer-ID beantwortete
+  `swisstopo_map_query` deshalb mit der nackten Zeile «Fehler bei Layer-Info:
+  HTTP-Fehler 400.», während dasselbe Tool bei *keinem* Treffer erklärt hätte,
+  wo zu suchen ist. Ein Fehler ist die verwirrendere der beiden Antworten, nicht
+  die harmlosere.
+
+  `error()` nimmt jetzt einen `note`. Gesetzt ist er an den fünf Stellen der
+  Klasse «du hast eine Kennung benannt, die es nicht gibt» — Layer-Info,
+  Feature-Identifikation, Feature-Suche, Feature-Abruf, STAC-Collection —, und
+  er nennt jeweils das Discovery-Tool, das die gültige Kennung liefert. Die
+  übrigen 39 Fehlerstellen bleiben unverändert: dort ist der nächste Schritt
+  nicht offensichtlich, und ein erfundener Hinweis wäre schlechter als keiner.
+
+### Added
+
+- **Live-Tests für echte Upstream-Fehlerpfade.** Kein Live-Test fasste bisher
+  einen an — was bei einer unbekannten Kennung passiert, stand ausschliesslich
+  in Mocks. Dabei ist auch das ein Vertrag: api3 beantwortet einen unbekannten
+  Layer mit 400 und ein unbekanntes Feature mit 404, und würde daraus je ein
+  200 mit Fehler-Body, meldeten diese Tools Erfolg auf eine gescheiterte
+  Abfrage. Fünf Tests nageln das fest, inklusive der Gegenprobe, dass ein
+  legitim leeres Ergebnis weiterhin *kein* Fehler ist.
+
+- **Die anderen kantonalen ÖREB-Implementierungen geprüft.** ZH und BE sind
+  beides Eigenbauten; die übrigen 24 Kantone fahren vier weitere Stacks. Die
+  Toleranz des Parsers darüber war nie belegt, nur erhofft.
+
+  Gegen Live-Antworten geprüft, ein Kanton pro Familie: **vier von fünf parsen
+  ohne Codeänderung** — `pyramid_oereb` (GR, SG), `crdppf` (NE) und der
+  AG-Eigenbau. Ihre echten, gekürzten Antworten liegen jetzt als Fixtures bei,
+  damit das Hinzufügen eines dieser Kantone ein Registry-Eintrag ist und keine
+  Debugging-Sitzung.
+
+  Die fünfte ist als **bekannte Lücke** festgehalten statt behoben:
+  `RdppfSVC.svc` (VD, GE, FR) antwortet auf `getegrid` mit `{"Item": [...]}`
+  statt `GetEGRIDResponse` und markiert Sprachen numerisch (`"Language": 1`)
+  statt als Code, womit `_localized_text` nie auf die angeforderte Sprache
+  trifft und still auf den ersten Eintrag zurückfällt — in einem zweisprachigen
+  Kanton eine Fehlübersetzung, kein fehlender Wert. Halbe Unterstützung, die
+  vollständig aussieht, wäre schlechter als keine; wer einen Westschweizer
+  Kanton aufnimmt, findet beide Abweichungen dokumentiert vor.
+
+### Fixed
+
 - **`..` als Kennung traf still ein anderes Endpoint, statt zu scheitern.**
   Betrifft `swisstopo_map_query`, `swisstopo_get_collection`,
   `swisstopo_list_available_layers` und `swisstopo_map_url`; deren

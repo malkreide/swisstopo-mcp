@@ -184,10 +184,19 @@ class ToolResponse(BaseModel):
         *,
         source: str = SWISSTOPO_SOURCE,
         license: str | None = None,
+        note: str | None = None,
     ) -> ToolResponse:
         # Same derivation as `ok()`, so an error envelope attributes the same
         # source *and* the same licence it would have on success (CH-004). The
         # error path is where the previous split-parameter design failed.
+        #
+        # `note` is here because ARCH-003 stopped one step short: an empty
+        # result must carry a next step, but an *error* could not carry one at
+        # all — the parameter did not exist. So `swisstopo_map_query` answered a
+        # mistyped layer ID with the bare string "Fehler bei Layer-Info:
+        # HTTP-Fehler 400.", while the same tool answering *nothing* would have
+        # explained where to look. An error is the more confusing of the two
+        # outcomes, not the less.
         return cls(
             summary=summary,
             results=[],
@@ -195,4 +204,5 @@ class ToolResponse(BaseModel):
             is_error=True,
             source=source,
             license=license if license is not None else license_for(source),
+            note=note,
         )

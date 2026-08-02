@@ -792,3 +792,131 @@ class TestOerebLive:
         result = await get_egrid(GetEgridInput(lat=46.95, lon=7.45, canton="XX"))
         assert result.is_error is True
         assert "ZH" in result.summary
+
+
+# ---------------------------------------------------------------------------
+# Endpoint registry cross-check (live)
+#
+# The canton ZH outage was visible in federal data before it was visible here:
+# `oereb.geo.zh.ch` had already stopped being what the Confederation published
+# as the ZH service, and the tools only found out when the name stopped
+# resolving. The layer `ch.swisstopo-vd.stand-oerebkataster` carries the
+# current cantonal ÖREB web service per municipality in `oereb_webservice`.
+#
+# Comparing `OEREB_ENDPOINTS` against it turns "a canton moved" into a failure
+# that names the new URL, instead of a connection error whose cause has to be
+# dug out. It is a *different* signal from the other live tests here: those go
+# red once the old endpoint dies, this one goes red the day the registry
+# starts pointing somewhere else — which is earlier, and actionable.
+# ---------------------------------------------------------------------------
+
+_REGISTRY_LAYER = "ch.swisstopo-vd.stand-oerebkataster"
+
+# The registry names each canton in its own official language ('Ticino', not
+# 'Tessin'; 'Genève', not 'Genf') and carries no canton-code field to search on
+# instead, so the mapping has to be spelled out. All 26 were checked against
+# the live layer when this table was written — every one of them resolves to
+# exactly one `oereb_webservice`.
+CANTON_REGISTRY_NAMES: dict[str, str] = {
+    "AG": "Aargau",
+    "AI": "Appenzell Innerrhoden",
+    "AR": "Appenzell Ausserrhoden",
+    "BE": "Bern",
+    "BL": "Basel-Landschaft",
+    "BS": "Basel-Stadt",
+    "FR": "Fribourg",
+    "GE": "Genève",
+    "GL": "Glarus",
+    "GR": "Graubünden",
+    "JU": "Jura",
+    "LU": "Luzern",
+    "NE": "Neuchâtel",
+    "NW": "Nidwalden",
+    "OW": "Obwalden",
+    "SG": "St. Gallen",
+    "SH": "Schaffhausen",
+    "SO": "Solothurn",
+    "SZ": "Schwyz",
+    "TG": "Thurgau",
+    "TI": "Ticino",
+    "UR": "Uri",
+    "VD": "Vaud",
+    "VS": "Valais",
+    "ZG": "Zug",
+    "ZH": "Zürich",
+}
+
+
+async def _published_oereb_services(canton_name: str) -> set[str]:
+    """The distinct `oereb_webservice` URLs the registry lists for a canton."""
+    from swisstopo_mcp.api_client import geo_admin_request
+
+    payload = await geo_admin_request(
+        "/rest/services/api/MapServer/find",
+        {
+            "layer": _REGISTRY_LAYER,
+            "searchField": "kanton",
+            "searchText": canton_name,
+            # Without this, 'Basel-Stadt' also matches 'Basel-Landschaft'.
+            "contains": "false",
+            "returnGeometry": "false",
+        },
+    )
+    return {
+        url
+        for result in payload.get("results", [])
+        if isinstance(result, dict)
+        for url in [result.get("attributes", {}).get("oereb_webservice")]
+        if url
+    }
+
+
+def _covers(configured: str, published: str) -> bool:
+    """True when `published` is our base URL, or a call sitting below it.
+
+    Not a bare `startswith`: some cantons publish a complete example request
+    (`…/oereb/extract/xml?EGRID=…`) rather than the base, which is still the
+    same service — but `…/oereb/v20` must not count as a match for
+    `…/oereb/v2`, so the next character has to be a separator.
+    """
+    if published == configured:
+        return True
+    return published.startswith(configured) and published[len(configured)] in "/?"
+
+
+class TestCantonRegistryNames:
+    """Not a network test — it makes the live one below impossible to skip by
+    accident. A canton added to OEREB_ENDPOINTS without a registry name would
+    otherwise silently drop out of the cross-check."""
+
+    def test_every_configured_canton_has_a_registry_name(self):
+        missing = set(OEREB_ENDPOINTS) - set(CANTON_REGISTRY_NAMES)
+        assert not missing, (
+            f"Kein Registry-Name für {sorted(missing)}. Der Name ist der der "
+            "Kanton im Feld `kanton` von ch.swisstopo-vd.stand-oerebkataster "
+            "trägt — in seiner eigenen Amtssprache."
+        )
+
+    def test_table_covers_all_twenty_six_cantons(self):
+        assert len(CANTON_REGISTRY_NAMES) == 26
+
+
+@pytest.mark.live
+class TestOerebEndpointRegistryLive:
+    @pytest.mark.parametrize("canton", sorted(OEREB_ENDPOINTS))
+    async def test_endpoint_matches_what_the_confederation_publishes(self, canton):
+        published = await _published_oereb_services(CANTON_REGISTRY_NAMES[canton])
+        assert published, (
+            f"Die Registry liefert für {canton} kein `oereb_webservice`. "
+            f"Entweder heisst das Feld in {_REGISTRY_LAYER} nicht mehr so, "
+            "oder der Kanton ist dort nicht mehr geführt."
+        )
+
+        configured = OEREB_ENDPOINTS[canton].rstrip("/")
+        assert any(_covers(configured, url.rstrip("/")) for url in published), (
+            f"Kanton {canton} ist umgezogen. Konfiguriert: {configured}. "
+            f"Publiziert: {sorted(published)}. OEREB_ENDPOINTS in oereb.py "
+            "nachführen — und, falls sich der Host ändert, ALLOWED_HOSTS in "
+            "api_client.py, docs/network-egress.md sowie "
+            "deploy/smokescreen-acl.yaml (via scripts/render_egress_acl.py)."
+        )

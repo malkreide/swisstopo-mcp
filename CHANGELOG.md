@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Live-Test, der einen Kantonsumzug meldet, bevor der Endpoint stirbt.** Der
+  Bund führt in `ch.swisstopo-vd.stand-oerebkataster` pro Gemeinde die aktuelle
+  kantonale ÖREB-Service-URL im Attribut `oereb_webservice`. Beim ZH-Ausfall
+  stand die neue Adresse dort längst — nur hat sie niemand gelesen, und die
+  Tools erfuhren davon erst, als der alte Name nicht mehr auflöste.
+
+  `TestOerebEndpointRegistryLive` vergleicht `OEREB_ENDPOINTS` gegen diese
+  Registry und nennt im Fehlerfall die publizierte URL sowie die vier Stellen,
+  die beim Hostwechsel mitzuführen sind. Das ist ein anderes Signal als die
+  übrigen Live-Tests: die werden rot, wenn der alte Endpoint stirbt, dieser
+  wird rot, sobald die Registry woanders hinzeigt — früher, und mit einer
+  Handlungsanweisung statt eines Verbindungsfehlers.
+
+  Der Vergleich ist ein Prefix-Match mit Trennzeichen-Guard, kein `startswith`:
+  manche Kantone publizieren einen vollständigen Beispiel-Request
+  (`…/oereb/extract/xml?EGRID=…`) statt der Basis, `…/oereb/v20` darf aber
+  nicht als Treffer für `…/oereb/v2` durchgehen. Gegengeprüft: der Test lehnt
+  den Vor-Fix-Stand `https://oereb.geo.zh.ch` ab, ebenso einen
+  Versionssprung — hätte den Ausfall also gefangen.
+
+  Die Registry benennt Kantone in ihrer eigenen Amtssprache (`Ticino`, nicht
+  `Tessin`) und hat kein Kürzel-Feld zum Suchen, deshalb die Tabelle
+  `CANTON_REGISTRY_NAMES`. Alle 26 Namen wurden gegen den Live-Layer geprüft;
+  ein nicht-Live-Test erzwingt, dass jeder Kanton in `OEREB_ENDPOINTS` einen
+  Registry-Namen hat, damit ein neuer Kanton nicht still aus der Prüfung fällt.
+
 ### Fixed
 
 - **Both ÖREB tools had been returning nothing at all, for every parcel in the

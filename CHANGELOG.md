@@ -7,6 +7,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Der Themenfilter wird clientseitig angewendet — und funktioniert erstmals
+  überhaupt.** Betrifft `swisstopo_get_oereb_extract` und `swisstopo_oereb_at`;
+  beide Tool-Definitionen ändern sich, Clients müssen sie neu bestätigen
+  (`tool-hashes.json` aktualisiert).
+
+  Der eigentliche Defekt lag nicht upstream, sondern in der Validierung: das
+  Muster `^[\w,\-]+$` liess keine Punkte zu, jeder ÖREB-Themencode trägt aber
+  einen (`ch.Nutzungsplanung`, `ch.BE.Gewaesserschutzbereiche`). Gültige
+  Eingabe wurde also abgewiesen, bevor je ein Request rausging; durch kam nur
+  ein Code ohne `ch.`-Präfix, und der trifft nichts. Der Filter war für jeden
+  Kanton unbrauchbar, nicht nur für ZH.
+
+  Dazu kam, dass `TOPICS` kantonsabhängig ist: BE respektiert den Parameter
+  (8 → 5 Beschränkungen), ZH ignoriert ihn vollständig — auch ein
+  Unsinnswert ändert nichts. Der Parameter geht deshalb gar nicht mehr auf die
+  Leitung. Gefiltert wird nach dem Parsen, was zwei Dinge gewinnt: gleiches
+  Verhalten in jedem Kanton, und die vollständige Themenliste bleibt zur Hand.
+
+  Letzteres ist der Punkt. Wo der Upstream-Filter *funktionierte*, kam bei
+  einem unbekannten Thema ein leerer Auszug zurück — nicht unterscheidbar von
+  «dieses Grundstück ist unbelastet». Genau die stille Falschantwort, die schon
+  das Envelope-Parsing produziert hat. Ein Filter ohne Treffer meldet jetzt,
+  wie viele Beschränkungen das Grundstück in anderen Themen trägt, und nennt
+  die tatsächlich vorhandenen Themencodes für den nächsten Versuch.
+
+  Verglichen wird gegen Themencode **und** Subcode, case-insensitiv: ZH setzt
+  `SubCode` gar nicht, BE führt drei verschiedene Subcodes unter dem einen Code
+  `ch.Nutzungsplanung`. Nur auf den Code zu filtern machte diese unerreichbar,
+  nur auf den Subcode hätte ZH ganz zerlegt. Gegenprobe an echten Daten: ZH
+  18 → 7, BE 8 → 5 — Letzteres deckungsgleich mit dem, was BEs eigener
+  Upstream-Filter liefert.
+
+  Die Feld-Definition stand zweimal im Code, weshalb der Charset-Fix zunächst
+  nur bei `swisstopo_get_oereb_extract` landete und `swisstopo_oereb_at` weiter
+  keinen Themencode annahm. Beide teilen jetzt eine Konstante, und ein Test
+  vergleicht die Constraints der zwei Modelle, damit sie nicht wieder
+  auseinanderlaufen.
+
 ### Added
 
 - **Live-Test, der einen Kantonsumzug meldet, bevor der Endpoint stirbt.** Der

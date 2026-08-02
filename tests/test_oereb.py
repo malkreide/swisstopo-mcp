@@ -210,6 +210,43 @@ class TestGetOerebExtractInput:
         m = GetOerebExtractInput(egrid="CH767982496078", canton="ZH", topics="Nutzungsplanung")
         assert m.topics == "Nutzungsplanung"
 
+    @pytest.mark.parametrize(
+        "topics",
+        [
+            "ch.Nutzungsplanung",
+            "ch.BE.Gewaesserschutzbereiche",
+            "ch.Nutzungsplanung,ch.Laermempfindlichkeitsstufen",
+            # A space after the comma is what anyone writing a list does, and
+            # the parser already strips it.
+            "ch.Nutzungsplanung, ch.Laermempfindlichkeitsstufen",
+            "ch.NutzungsplanungGrundnutzungNutzungszonen",
+        ],
+    )
+    def test_topics_accepts_real_theme_codes(self, topics):
+        """Every ÖREB theme code contains a dot. The charset used to omit it,
+        so the field rejected all of these and accepted only the bare
+        `Nutzungsplanung` — which matches no theme. The filter was unusable
+        before it ever reached the network."""
+        m = GetOerebExtractInput(egrid="CH767982496078", canton="ZH", topics=topics)
+        assert m.topics == topics
+
+    def test_both_oereb_tools_validate_topics_identically(self):
+        """`swisstopo_oereb_at` collapses the two-step chain, so it takes the
+        same filter. The two field definitions were separate copies, and the
+        charset fix landed on one of them only — a caller using the one-call
+        tool still could not name a theme. They share one constant now; this
+        fails if they drift apart again."""
+        from swisstopo_mcp.oereb import OerebAtInput
+
+        def spec(model):
+            field = model.model_fields["topics"]
+            return (
+                [str(m) for m in field.metadata],
+                field.description,
+            )
+
+        assert spec(OerebAtInput) == spec(GetOerebExtractInput)
+
     def test_lang_default_de(self):
         m = GetOerebExtractInput(egrid="CH767982496078", canton="ZH")
         assert m.lang == "de"
@@ -451,9 +488,13 @@ class TestGetOerebExtractHandler:
         }
 
     def _make_restriction(self, topic="Nutzungsplanung", description="Wohnzone W2",
-                          authority="Gemeinde Zürich", legal="Bau- und Zonenordnung"):
+                          authority="Gemeinde Zürich", legal="Bau- und Zonenordnung",
+                          code="ch.Nutzungsplanung", subcode=None):
+        theme = {"Code": code, "Text": [{"Language": "de", "Text": topic}]}
+        if subcode:
+            theme["SubCode"] = subcode
         return {
-            "Theme": {"Code": "ch.Nutzungsplanung", "Text": [{"Language": "de", "Text": topic}]},
+            "Theme": theme,
             "LegendText": [{"Language": "de", "Text": description}],
             "Lawstatus": {"Code": "inForce", "Text": [{"Language": "de", "Text": "Rechtskräftig"}]},
             "ResponsibleOffice": {"Name": [{"Language": "de", "Text": authority}]},
@@ -502,6 +543,7 @@ class TestGetOerebExtractHandler:
         assert record == {
             "theme": "Nutzungsplanung",
             "theme_code": "ch.Nutzungsplanung",
+            "theme_subcode": "",
             "legend_text": "Wohnzone W2",
             "lawstatus": "Rechtskräftig",
             "responsible_office": "Gemeinde Zürich",
@@ -540,23 +582,139 @@ class TestGetOerebExtractHandler:
         assert result.match_type == "none"
         assert "CH000000000000" in result.summary
 
-    async def test_topics_filter_added_to_url(self, monkeypatch):
+    async def test_topics_never_reaches_the_url(self, monkeypatch):
+        """The filter is applied here, not upstream, and that is deliberate.
+
+        `TOPICS` is honoured by BE and ignored outright by ZH — passing it
+        would make the same call behave differently per canton. Worse, where it
+        *did* work the upstream returned a bare empty extract, so "your filter
+        matched nothing" was indistinguishable from "this parcel carries no
+        restrictions". Fetching unfiltered keeps the full theme list in hand.
+        """
         monkeypatch.setattr(settings, "oereb_cantons", "ZH,BE")
         captured = {}
         _mock_client(monkeypatch, self._make_extract_response([]), capture=captured)
         await get_oereb_extract(
             GetOerebExtractInput(
-                egrid="CH767982496078", canton="ZH", topics="Nutzungsplanung"
+                egrid="CH767982496078", canton="ZH", topics="ch.Nutzungsplanung"
             )
         )
-        assert "TOPICS=Nutzungsplanung" in captured["url"]
-
-    async def test_no_topics_filter_absent_from_url(self, monkeypatch):
-        monkeypatch.setattr(settings, "oereb_cantons", "ZH,BE")
-        captured = {}
-        _mock_client(monkeypatch, self._make_extract_response([]), capture=captured)
-        await get_oereb_extract(GetOerebExtractInput(egrid="CH767982496078", canton="ZH"))
         assert "TOPICS" not in captured["url"]
+
+    async def test_topics_filters_by_theme_code(self, monkeypatch):
+        monkeypatch.setattr(settings, "oereb_cantons", "ZH,BE")
+        _mock_client(
+            monkeypatch,
+            self._make_extract_response(
+                [
+                    self._make_restriction(code="ch.Nutzungsplanung", description="Wohnzone"),
+                    self._make_restriction(
+                        code="ch.Laermempfindlichkeitsstufen",
+                        topic="Lärm",
+                        description="ES II",
+                    ),
+                ]
+            ),
+        )
+        result = await get_oereb_extract(
+            GetOerebExtractInput(
+                egrid="CH767982496078", canton="ZH", topics="ch.Nutzungsplanung"
+            )
+        )
+        assert result.count == 1
+        assert "Wohnzone" in result.summary
+        assert "ES II" not in result.summary
+
+    async def test_topics_accepts_several_codes_and_ignores_case(self, monkeypatch):
+        monkeypatch.setattr(settings, "oereb_cantons", "ZH,BE")
+        _mock_client(
+            monkeypatch,
+            self._make_extract_response(
+                [
+                    self._make_restriction(code="ch.Nutzungsplanung"),
+                    self._make_restriction(code="ch.Laermempfindlichkeitsstufen", topic="Lärm"),
+                    self._make_restriction(code="ch.BelasteteStandorte", topic="Altlasten"),
+                ]
+            ),
+        )
+        result = await get_oereb_extract(
+            GetOerebExtractInput(
+                egrid="CH767982496078",
+                canton="ZH",
+                topics="CH.NUTZUNGSPLANUNG, ch.Laermempfindlichkeitsstufen",
+            )
+        )
+        assert result.count == 2
+
+    async def test_topics_matches_a_subcode(self, monkeypatch):
+        """BE files three different sub-codes under the single code
+        `ch.Nutzungsplanung`; matching only on the code makes them unreachable."""
+        monkeypatch.setattr(settings, "oereb_cantons", "ZH,BE")
+        _mock_client(
+            monkeypatch,
+            self._make_extract_response(
+                [
+                    self._make_restriction(
+                        subcode="ch.NutzungsplanungGrundnutzungNutzungszonen",
+                        description="Nutzungszone",
+                    ),
+                    self._make_restriction(
+                        subcode="ch.NutzungsplanungUeberlagerung",
+                        description="Überlagerung",
+                    ),
+                ],
+                wrapper="extract",
+            ),
+        )
+        result = await get_oereb_extract(
+            GetOerebExtractInput(
+                egrid="CH507635214670",
+                canton="BE",
+                topics="ch.NutzungsplanungUeberlagerung",
+            )
+        )
+        assert result.count == 1
+        assert "Überlagerung" in result.summary
+
+    async def test_topics_matching_nothing_names_the_available_themes(self, monkeypatch):
+        """The failure this guards against is the one the envelope bug had: an
+        empty answer that reads like an unencumbered parcel."""
+        monkeypatch.setattr(settings, "oereb_cantons", "ZH,BE")
+        _mock_client(
+            monkeypatch,
+            self._make_extract_response(
+                [
+                    self._make_restriction(code="ch.Nutzungsplanung"),
+                    self._make_restriction(code="ch.BelasteteStandorte", topic="Altlasten"),
+                ]
+            ),
+        )
+        result = await get_oereb_extract(
+            GetOerebExtractInput(
+                egrid="CH767982496078", canton="ZH", topics="ch.Waldgrenzen"
+            )
+        )
+        assert result.is_error is False
+        assert result.match_type == "none"
+        assert result.results == []
+        # The caller must be able to tell "wrong filter" from "nothing here",
+        # and must not have to guess the spelling for the retry.
+        assert "2 Beschränkung" in result.summary
+        assert "ch.Nutzungsplanung" in result.note
+        assert "ch.BelasteteStandorte" in result.note
+
+    async def test_an_empty_extract_does_not_blame_the_filter(self, monkeypatch):
+        """The other side of the same coin: no restrictions at all is not a
+        filter problem, and the note must not send the caller chasing one."""
+        monkeypatch.setattr(settings, "oereb_cantons", "ZH,BE")
+        _mock_client(monkeypatch, self._make_extract_response([]))
+        result = await get_oereb_extract(
+            GetOerebExtractInput(
+                egrid="CH767982496078", canton="ZH", topics="ch.Nutzungsplanung"
+            )
+        )
+        assert result.match_type == "none"
+        assert "unabhängig von einem Themenfilter" in result.note
 
     async def test_lang_passed_in_url(self, monkeypatch):
         monkeypatch.setattr(settings, "oereb_cantons", "ZH,BE")
@@ -785,6 +943,48 @@ class TestOerebLive:
         result = await get_oereb_extract(GetOerebExtractInput(egrid=egrid, canton="ZH"))
         assert result.is_error is False, result.summary
         assert result.source == OEREB_SOURCE
+
+    async def test_topics_filter_narrows_a_real_extract(self):
+        """The filter runs on our side, so only a live extract proves it picks
+        the right restrictions out of real cantonal data — and that the theme
+        codes it matches on are the ones the service actually sends."""
+        located = await get_egrid(GetEgridInput(lat=ZH_LAT, lon=ZH_LON, canton="ZH"))
+        if not located.results:
+            pytest.skip("no parcel at the probe point today")
+        egrid = located.results[0]["egrid"]
+
+        full = await get_oereb_extract(GetOerebExtractInput(egrid=egrid, canton="ZH"))
+        if full.match_type != "exact":
+            pytest.skip("parcel carries no restrictions today")
+
+        codes = {r["theme_code"] for r in full.results if r["theme_code"]}
+        assert codes, "restrictions arrived without a theme code — filter key gone"
+
+        one = sorted(codes)[0]
+        narrowed = await get_oereb_extract(
+            GetOerebExtractInput(egrid=egrid, canton="ZH", topics=one)
+        )
+        assert narrowed.is_error is False, narrowed.summary
+        assert 0 < narrowed.count <= full.count
+        assert {r["theme_code"] for r in narrowed.results} == {one}
+
+    async def test_unknown_topic_reports_the_real_ones(self):
+        """A filter that matches nothing must not look like a clean parcel."""
+        located = await get_egrid(GetEgridInput(lat=ZH_LAT, lon=ZH_LON, canton="ZH"))
+        if not located.results:
+            pytest.skip("no parcel at the probe point today")
+        result = await get_oereb_extract(
+            GetOerebExtractInput(
+                egrid=located.results[0]["egrid"],
+                canton="ZH",
+                topics="ch.GibtEsNicht",
+            )
+        )
+        assert result.is_error is False
+        assert result.match_type == "none"
+        assert result.note and "ch." in result.note, (
+            "an empty filter result must name the themes that do exist"
+        )
 
     async def test_unsupported_canton_fails_cleanly(self):
         """Not an upstream call — but it pins the behaviour a caller hits almost

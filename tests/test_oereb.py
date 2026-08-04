@@ -3,11 +3,13 @@
 
 from __future__ import annotations
 
+import httpx
 import pytest
 from pydantic import ValidationError
 
+from swisstopo_mcp.api_client import TRANSIENT_UPSTREAM_ERRORS
 from swisstopo_mcp.config import settings
-from swisstopo_mcp.models import OEREB_LICENSE, OEREB_SOURCE
+from swisstopo_mcp.models import OEREB_LICENSE, OEREB_SOURCE, ToolResponse
 from swisstopo_mcp.oereb import (
     OEREB_ENDPOINTS,
     GetEgridInput,
@@ -314,33 +316,51 @@ class TestUnsupportedCanton:
 # ---------------------------------------------------------------------------
 
 
-def _mock_client(monkeypatch, payload, status_code=200, capture=None):
+# The seam these patch is `api_client._get_client`, not `oereb._get_client`.
+# The ÖREB handlers used to call the client themselves; they now go through
+# `request_with_retry` like every other upstream, so the client they reach for
+# is the one inside `api_client`. Patching the old name would still "work" —
+# `monkeypatch.setattr` on an unused attribute raises nothing useful here — while
+# every mocked test quietly made real requests to maps.zh.ch, which is precisely
+# the failure a mocked suite must not have.
+def _mock_client(monkeypatch, payload, status_code=200, capture=None, statuses=None):
     """Point the ÖREB handlers at a canned JSON response.
 
     `capture` is an optional dict that receives the requested URL under "url".
+    `statuses` is an optional list of status codes served one per attempt, for
+    exercising the retry ladder; it falls back to `status_code` once exhausted.
     """
     import json as _json
 
     body = b"" if status_code == 204 else _json.dumps(payload).encode()
+    remaining = list(statuses or [])
 
     async def mock_get_client():
         class MockResponse:
-            content = body
-
-            def __init__(self):
-                self.status_code = status_code
+            def __init__(self, code):
+                self.status_code = code
+                self.content = b"" if code in (204, 404) else body
+                self.request = httpx.Request("GET", "https://maps.zh.ch/oereb/v2/")
+                # `retry_delay` reads `Retry-After` off the failed response
+                # before falling back to the backoff table; without this a
+                # mocked 503 crashes the retry path instead of exercising it.
+                self.headers: dict[str, str] = {}
 
             def raise_for_status(self):
-                pass
+                if self.status_code >= 400:
+                    raise httpx.HTTPStatusError(
+                        f"HTTP {self.status_code}", request=self.request, response=self
+                    )
 
             def json(self):
                 return payload
 
         class MockClient:
-            async def get(self, url):
+            async def request(self, method, url, **kwargs):
                 if capture is not None:
                     capture["url"] = url
-                return MockResponse()
+                code = remaining.pop(0) if remaining else status_code
+                return MockResponse(code)
 
             async def __aenter__(self):
                 return self
@@ -350,15 +370,15 @@ def _mock_client(monkeypatch, payload, status_code=200, capture=None):
 
         return MockClient()
 
-    monkeypatch.setattr("swisstopo_mcp.oereb._get_client", mock_get_client)
+    _install_mock_client(monkeypatch, mock_get_client)
 
 
 def _mock_raising_client(monkeypatch, exc_factory):
-    """Point the handlers at a client whose GET raises."""
+    """Point the handlers at a client whose request raises."""
 
     async def mock_get_client():
         class MockClient:
-            async def get(self, url):
+            async def request(self, method, url, **kwargs):
                 raise exc_factory(url)
 
             async def __aenter__(self):
@@ -369,7 +389,22 @@ def _mock_raising_client(monkeypatch, exc_factory):
 
         return MockClient()
 
-    monkeypatch.setattr("swisstopo_mcp.oereb._get_client", mock_get_client)
+    _install_mock_client(monkeypatch, mock_get_client)
+
+
+def _install_mock_client(monkeypatch, factory):
+    """Install a mock client and take the backoff waits out of the loop.
+
+    Retrying for real would add 2+4+8 seconds to every mocked failure test, so
+    the sleep is patched out rather than endured. The retry *decisions* still
+    run — only the waiting is skipped — which is what the tests below assert on.
+    """
+    monkeypatch.setattr("swisstopo_mcp.api_client._get_client", factory)
+
+    async def _instant(_seconds: float) -> None:
+        return None
+
+    monkeypatch.setattr("swisstopo_mcp.api_client._sleep", _instant)
 
 
 def _egrid_payload(*entries):
@@ -767,7 +802,6 @@ class TestGetOerebExtractHandler:
 # One-call aggregate (audit ARCH-007)
 # ---------------------------------------------------------------------------
 
-import httpx  # noqa: E402
 import respx  # noqa: E402
 
 from swisstopo_mcp.oereb import (  # noqa: E402
@@ -815,6 +849,22 @@ class TestFirstEgrid:
         assert _first_egrid([]) is None
 
 
+@pytest.fixture
+def _instant_backoff(monkeypatch):
+    """Run the retry ladder without the waits.
+
+    The ÖREB handlers retry now, so a mocked 500 costs 2+4+8 seconds of real
+    sleeping unless the wait is taken out. The decisions still run; only the
+    sleeping is skipped.
+    """
+
+    async def _instant(_seconds: float) -> None:
+        return None
+
+    monkeypatch.setattr("swisstopo_mcp.api_client._sleep", _instant)
+
+
+@pytest.mark.usefixtures("_instant_backoff")
 class TestOerebAt:
     @respx.mock
     async def test_resolves_egrid_and_returns_the_extract(self, monkeypatch):
@@ -857,6 +907,103 @@ class TestOerebAt:
         out = await oereb_at(OerebAtInput(lat=47.3769, lon=8.5417, canton="ZH"))
         assert out.is_error is True
         assert "boom" not in out.summary
+
+
+# ---------------------------------------------------------------------------
+# Retry on the cantonal hosts
+#
+# ÖREB was the one upstream in this server that never went through
+# `request_with_retry`: a single attempt, no backoff, no budget. That is the
+# wrong upstream to leave bare. maps.zh.ch and oereb2.apps.be.ch are run by
+# individual cantons rather than by the Confederation and are not behind a CDN,
+# and a nightly BE probe duly spent 30 seconds on one hanging `getegrid` and
+# came back as a hard tool error — the retry the rest of the server has by
+# default would have taken a second attempt at it.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.usefixtures("_instant_backoff")
+class TestOerebRetriesTransientFailures:
+    @respx.mock
+    async def test_a_blip_on_getegrid_is_retried_not_surfaced(self, monkeypatch):
+        monkeypatch.setattr(settings, "oereb_cantons", "ZH")
+        route = respx.get(url__startswith=f"{_ZH}/getegrid/json/").mock(
+            side_effect=[
+                httpx.Response(503),
+                httpx.Response(200, json=_EGRID_PAYLOAD),
+            ]
+        )
+        out = await get_egrid(GetEgridInput(lat=47.3769, lon=8.5417, canton="ZH"))
+        assert route.call_count == 2, "the 503 was not retried"
+        assert out.is_error is False
+        assert out.results[0]["egrid"] == "CH807306036483"
+
+    @respx.mock
+    async def test_a_blip_on_extract_is_retried_not_surfaced(self, monkeypatch):
+        monkeypatch.setattr(settings, "oereb_cantons", "ZH")
+        route = respx.get(url__startswith=f"{_ZH}/extract/json/").mock(
+            side_effect=[
+                httpx.Response(502),
+                httpx.Response(200, json={"extract": {}}),
+            ]
+        )
+        out = await get_oereb_extract(GetOerebExtractInput(egrid="CH807306036483", canton="ZH"))
+        assert route.call_count == 2, "the 502 was not retried"
+        assert out.is_error is False
+
+    @respx.mock
+    async def test_a_read_timeout_is_retried(self, monkeypatch):
+        """The failure the nightly run actually hit — a hanging cantonal host,
+        not an error status."""
+        monkeypatch.setattr(settings, "oereb_cantons", "ZH")
+        route = respx.get(url__startswith=f"{_ZH}/getegrid/json/").mock(
+            side_effect=[
+                httpx.ReadTimeout("too slow"),
+                httpx.Response(200, json=_EGRID_PAYLOAD),
+            ]
+        )
+        out = await get_egrid(GetEgridInput(lat=47.3769, lon=8.5417, canton="ZH"))
+        assert route.call_count == 2, "the timeout was not retried"
+        assert out.is_error is False
+
+    @respx.mock
+    async def test_an_unknown_egrid_is_not_retried(self, monkeypatch):
+        """A 404 is an answer here, not a blip. Retrying it would spend the
+        budget three times over to be told the same thing, and — since
+        `request_with_retry` raises on 4xx — it must still come back as the soft
+        miss the 204 produces, not as an error."""
+        monkeypatch.setattr(settings, "oereb_cantons", "ZH")
+        route = respx.get(url__startswith=f"{_ZH}/extract/json/").mock(
+            return_value=httpx.Response(404)
+        )
+        out = await get_oereb_extract(GetOerebExtractInput(egrid="CH000000000000", canton="ZH"))
+        assert route.call_count == 1, "a 404 must not be retried"
+        assert out.is_error is False
+        assert out.match_type == "none"
+        assert "CH000000000000" in out.summary
+
+    @respx.mock
+    async def test_the_per_attempt_timeout_stays_under_the_budget(self, monkeypatch):
+        """Not a style point. With the 30s default, one hanging request outlasts
+        the 25s budget and the ladder never gets a second attempt — the retry
+        above would be unreachable for exactly the failure it exists for."""
+        from swisstopo_mcp.api_client import TOTAL_BUDGET_S
+        from swisstopo_mcp.oereb import OEREB_ATTEMPT_TIMEOUT
+
+        assert OEREB_ATTEMPT_TIMEOUT * 2 < TOTAL_BUDGET_S
+
+    @respx.mock
+    async def test_the_attempt_timeout_reaches_the_wire(self, monkeypatch):
+        """A constant nothing passes to httpx is a comment, not a timeout."""
+        monkeypatch.setattr(settings, "oereb_cantons", "ZH")
+        from swisstopo_mcp.oereb import OEREB_ATTEMPT_TIMEOUT
+
+        route = respx.get(url__startswith=f"{_ZH}/getegrid/json/").mock(
+            return_value=httpx.Response(200, json=_EGRID_PAYLOAD)
+        )
+        await get_egrid(GetEgridInput(lat=47.3769, lon=8.5417, canton="ZH"))
+        timeout = route.calls[0].request.extensions["timeout"]
+        assert timeout["read"] == pytest.approx(OEREB_ATTEMPT_TIMEOUT)
 
     async def test_accepts_lv95_input(self, monkeypatch):
         monkeypatch.setattr(settings, "oereb_cantons", "ZH")
@@ -902,6 +1049,71 @@ def both_cantons(monkeypatch):
     monkeypatch.setattr(settings, "oereb_cantons", "ZH,BE")
 
 
+def reached_upstream(result):
+    """Skip when the cantonal host was unreachable; otherwise hand the result back.
+
+    These probes ask one question: does the payload still parse the way the
+    parser assumes. A host that did not answer at all has not answered that
+    question either way, and failing on it reports an outage in Bern as a defect
+    here. The BE probes did exactly that — two reds, both `Zeitüberschreitung`,
+    on a `getegrid` that answers in about a second when the host is well.
+
+    Deliberately narrow. Only the two transport failures skip; every status
+    error, every parse failure, every changed field still fails, and
+    `TestOerebEndpointRegistryLive` below fails hard if an endpoint moves — so a
+    canton that goes away for good does not sit here quietly green.
+
+    The strings come from `api_client` rather than being spelled out again here:
+    a copy would keep matching a message this suite no longer produces, and the
+    skip would turn into a permanent one nobody notices.
+    """
+    if result.is_error and any(m in result.summary for m in TRANSIENT_UPSTREAM_ERRORS):
+        pytest.skip(f"cantonal ÖREB host unreachable right now: {result.summary}")
+    return result
+
+
+class TestReachedUpstream:
+    """Not a network test. `reached_upstream` decides whether a live red is a
+    real one, so a version of it that skipped on everything — or on nothing —
+    would be invisible: the live suite would go green either way. These drive it
+    against the messages the handlers actually build.
+    """
+
+    def _errored(self, exc):
+        from swisstopo_mcp.api_client import handle_api_error
+
+        return ToolResponse.error(
+            handle_api_error(exc, "EGRID-Abfrage Kanton BE"), source=OEREB_SOURCE
+        )
+
+    @pytest.mark.parametrize(
+        "exc",
+        [
+            httpx.ReadTimeout("too slow"),
+            # The budget-exhaustion exception `request_with_retry` raises. It is
+            # the builtin, not an httpx one, and it is what the failing BE probe
+            # will produce now that the ÖREB calls are bounded.
+            TimeoutError(),
+            httpx.ConnectError("no route"),
+        ],
+    )
+    def test_a_host_that_did_not_answer_skips(self, exc):
+        with pytest.raises(pytest.skip.Exception):
+            reached_upstream(self._errored(exc))
+
+    def test_a_host_that_answered_badly_still_fails(self):
+        """A 500 is the upstream talking. Skipping it would hide real breakage."""
+        response = httpx.Response(500, request=httpx.Request("GET", "https://example.invalid"))
+        result = self._errored(
+            httpx.HTTPStatusError("boom", request=response.request, response=response)
+        )
+        assert reached_upstream(result) is result
+
+    def test_a_good_answer_passes_through_untouched(self):
+        ok = ToolResponse.ok("fine", [{"egrid": "CH1"}], source=OEREB_SOURCE)
+        assert reached_upstream(ok) is ok
+
+
 @pytest.mark.live
 class TestOerebLive:
     @pytest.mark.parametrize("canton,lat,lon", LIVE_CANTONS)
@@ -909,7 +1121,7 @@ class TestOerebLive:
         """Same contract, both implementations. `getegrid` is where the 2.0
         envelope first shows up, and BE served it correctly the whole time the
         parser was reading GeoJSON — a BE probe here would have caught that."""
-        result = await get_egrid(GetEgridInput(lat=lat, lon=lon, canton=canton))
+        result = reached_upstream(await get_egrid(GetEgridInput(lat=lat, lon=lon, canton=canton)))
         assert result.is_error is False, result.summary
         assert result.source == OEREB_SOURCE
         assert result.match_type in {"exact", "none"}
@@ -924,12 +1136,14 @@ class TestOerebLive:
         Asserting on `match_type` alone would not catch it — an empty extract is
         a legitimate answer — so this also requires the restriction records to
         carry the fields the formatter and the topics filter read."""
-        located = await get_egrid(GetEgridInput(lat=lat, lon=lon, canton=canton))
+        located = reached_upstream(await get_egrid(GetEgridInput(lat=lat, lon=lon, canton=canton)))
         if not located.results:
             pytest.skip(f"no parcel at the {canton} probe point today")
         egrid = located.results[0]["egrid"]
 
-        result = await get_oereb_extract(GetOerebExtractInput(egrid=egrid, canton=canton))
+        result = reached_upstream(
+            await get_oereb_extract(GetOerebExtractInput(egrid=egrid, canton=canton))
+        )
         assert result.is_error is False, result.summary
         assert result.source == OEREB_SOURCE
         if result.match_type == "exact":
@@ -944,7 +1158,7 @@ class TestOerebLive:
 
     @pytest.mark.parametrize("canton,lat,lon", LIVE_CANTONS)
     async def test_each_canton_answers_the_one_call_aggregate(self, canton, lat, lon, both_cantons):
-        result = await oereb_at(OerebAtInput(lat=lat, lon=lon, canton=canton))
+        result = reached_upstream(await oereb_at(OerebAtInput(lat=lat, lon=lon, canton=canton)))
         assert result.is_error is False, result.summary
         assert result.source == OEREB_SOURCE
         assert result.license == OEREB_LICENSE
@@ -953,7 +1167,9 @@ class TestOerebLive:
             assert result.note, "an empty ÖREB answer must carry a next step"
 
     async def test_get_egrid_resolves_a_zurich_point(self):
-        result = await get_egrid(GetEgridInput(lat=ZH_LAT, lon=ZH_LON, canton="ZH"))
+        result = reached_upstream(
+            await get_egrid(GetEgridInput(lat=ZH_LAT, lon=ZH_LON, canton="ZH"))
+        )
         assert result.is_error is False, result.summary
         # An empty answer is legitimate on a parcel boundary, so the contract
         # assertion is on the envelope, not on finding a parcel.
@@ -966,7 +1182,7 @@ class TestOerebLive:
     async def test_oereb_at_returns_one_call_answer(self):
         """The aggregate is the tool a caller should reach for; if the chain it
         collapses breaks upstream, this is where it shows."""
-        result = await oereb_at(OerebAtInput(lat=ZH_LAT, lon=ZH_LON, canton="ZH"))
+        result = reached_upstream(await oereb_at(OerebAtInput(lat=ZH_LAT, lon=ZH_LON, canton="ZH")))
         assert result.is_error is False, result.summary
         assert result.source == OEREB_SOURCE
         assert result.license == OEREB_LICENSE
@@ -977,11 +1193,15 @@ class TestOerebLive:
     async def test_get_oereb_extract_accepts_a_resolved_egrid(self):
         """Chained on purpose: a hardcoded EGRID would rot, and resolving it
         first is also what exercises the pair the aggregate replaced."""
-        located = await get_egrid(GetEgridInput(lat=ZH_LAT, lon=ZH_LON, canton="ZH"))
+        located = reached_upstream(
+            await get_egrid(GetEgridInput(lat=ZH_LAT, lon=ZH_LON, canton="ZH"))
+        )
         if not located.results:
             pytest.skip("no parcel at the probe point today")
         egrid = located.results[0]["egrid"]
-        result = await get_oereb_extract(GetOerebExtractInput(egrid=egrid, canton="ZH"))
+        result = reached_upstream(
+            await get_oereb_extract(GetOerebExtractInput(egrid=egrid, canton="ZH"))
+        )
         assert result.is_error is False, result.summary
         assert result.source == OEREB_SOURCE
 
@@ -989,12 +1209,16 @@ class TestOerebLive:
         """The filter runs on our side, so only a live extract proves it picks
         the right restrictions out of real cantonal data — and that the theme
         codes it matches on are the ones the service actually sends."""
-        located = await get_egrid(GetEgridInput(lat=ZH_LAT, lon=ZH_LON, canton="ZH"))
+        located = reached_upstream(
+            await get_egrid(GetEgridInput(lat=ZH_LAT, lon=ZH_LON, canton="ZH"))
+        )
         if not located.results:
             pytest.skip("no parcel at the probe point today")
         egrid = located.results[0]["egrid"]
 
-        full = await get_oereb_extract(GetOerebExtractInput(egrid=egrid, canton="ZH"))
+        full = reached_upstream(
+            await get_oereb_extract(GetOerebExtractInput(egrid=egrid, canton="ZH"))
+        )
         if full.match_type != "exact":
             pytest.skip("parcel carries no restrictions today")
 
@@ -1011,7 +1235,9 @@ class TestOerebLive:
 
     async def test_unknown_topic_reports_the_real_ones(self):
         """A filter that matches nothing must not look like a clean parcel."""
-        located = await get_egrid(GetEgridInput(lat=ZH_LAT, lon=ZH_LON, canton="ZH"))
+        located = reached_upstream(
+            await get_egrid(GetEgridInput(lat=ZH_LAT, lon=ZH_LON, canton="ZH"))
+        )
         if not located.results:
             pytest.skip("no parcel at the probe point today")
         result = await get_oereb_extract(

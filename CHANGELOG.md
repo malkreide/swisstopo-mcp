@@ -36,6 +36,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Die ÖREB-Tools waren der einzige Upstream ohne Retry — ausgerechnet der
+  wackligste.** `swisstopo_get_egrid`, `swisstopo_get_oereb_extract` und
+  `swisstopo_oereb_at` riefen den Client direkt auf und umgingen
+  `request_with_retry` vollständig: ein Versuch, kein Backoff, kein Budget. Ein
+  einzelner Aussetzer kam als harter Tool-Fehler zurück. Genau diese Hosts
+  betreiben die Kantone selbst — kein Bund, kein CDN — und der nächtliche
+  BE-Lauf verbrachte prompt 30 Sekunden an einem hängenden `getegrid`
+  (`Zeitüberschreitung`), obwohl derselbe Aufruf im gesunden Zustand in rund
+  einer Sekunde antwortet.
+
+  Retries allein hätten das nicht behoben. `REQUEST_TIMEOUT` liegt bei 30s,
+  `TOTAL_BUDGET_S` bei 25s — eine einzige hängende Anfrage verbraucht also das
+  ganze Budget, und die Retry-Leiter läuft nie an. Neu begrenzt
+  `OEREB_ATTEMPT_TIMEOUT = 10.0` jeden einzelnen Versuch *unterhalb* des
+  Budgets; damit sind zwei Versuche plus Backoff darin erreichbar. Ein 404 auf
+  `extract` bleibt eine Antwort und keine Panne: er wird weiterhin nicht wieder-
+  holt und liefert dieselbe weiche Fehlmeldung wie ein 204.
+
+- **Ein ausgeschöpftes Retry-Budget meldete sich schlechter als ein
+  unbegrenztes Warten.** `request_with_retry` begrenzt einen Aufruf mit
+  `asyncio.timeout`, und das wirft den *eingebauten* `TimeoutError` — keine
+  httpx-Ausnahme. `handle_api_error` kannte nur `httpx.TimeoutException`, also
+  fiel der begrenzte Fall auf «Unerwarteter interner Fehler» durch: Aufrufende
+  konnten einen langsamen Upstream nicht von einem Defekt hier unterscheiden.
+  Beide Fälle melden jetzt dieselbe Zeitüberschreitung.
+
 - **Fehler konnten keinen nächsten Schritt tragen — strukturell nicht.**
   ARCH-003 hat durchgesetzt, dass ein *leeres* Ergebnis einen Hinweis führt, und
   ein AST-Sweep bewacht das. Aber `ToolResponse.error` hatte gar keinen

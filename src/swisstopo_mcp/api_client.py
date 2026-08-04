@@ -641,6 +641,19 @@ async def openplz_request(
 # --- Error Handling ---
 
 
+# --- Transient-failure messages ------------------------------------------------
+#
+# Named rather than inlined below because they are the one part of an error
+# message a caller can act on differently: everything else says "this request
+# was wrong", these two say "the upstream was unreachable just now, the same
+# request may work in a minute". The live suite reads `TRANSIENT_UPSTREAM_ERRORS`
+# to tell an upstream outage apart from contract drift, and a copy of the German
+# string in a test file would silently stop matching the day this one is reworded.
+TIMEOUT_MESSAGE = "Zeitüberschreitung. Der Server hat nicht rechtzeitig geantwortet."
+CONNECT_MESSAGE = "Verbindungsfehler. Prüfe die Netzwerkverbindung."
+TRANSIENT_UPSTREAM_ERRORS: tuple[str, ...] = (TIMEOUT_MESSAGE, CONNECT_MESSAGE)
+
+
 def handle_api_error(e: Exception, context: str = "") -> str:
     """Translate exceptions into German user-friendly error messages."""
     prefix = f"Fehler bei {context}: " if context else "Fehler: "
@@ -657,11 +670,18 @@ def handle_api_error(e: Exception, context: str = "") -> str:
             return f"{prefix}Serverfehler bei Swisstopo (500). Bitte später erneut versuchen."
         return f"{prefix}HTTP-Fehler {status}."
 
-    if isinstance(e, httpx.TimeoutException):
-        return f"{prefix}Zeitüberschreitung. Der Server hat nicht rechtzeitig geantwortet."
+    # `TimeoutError` alongside the httpx one on purpose: the two arrive from
+    # different layers of the same wait. httpx raises `TimeoutException` when a
+    # single connect/read/write step runs out, `request_with_retry` raises the
+    # builtin when `TOTAL_BUDGET_S` runs out across all attempts (`asyncio.timeout`
+    # raises the builtin, which is not an httpx exception and so fell through to
+    # "Unerwarteter interner Fehler" — the *bounded* wait, the one this server
+    # promises, reported worse than the unbounded one).
+    if isinstance(e, httpx.TimeoutException | TimeoutError):
+        return f"{prefix}{TIMEOUT_MESSAGE}"
 
     if isinstance(e, httpx.ConnectError):
-        return f"{prefix}Verbindungsfehler. Prüfe die Netzwerkverbindung."
+        return f"{prefix}{CONNECT_MESSAGE}"
 
     # Egress refusals carry internal configuration — the ten-host allow-list, or
     # the internal address a name resolved to. The model needs to know the

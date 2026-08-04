@@ -3,15 +3,15 @@
 
 from __future__ import annotations
 
+import httpx
 from mcp.server.mcpserver import Context
 from pydantic import BaseModel, ConfigDict, Field
 
 from swisstopo_mcp.api_client import (
     CANTON_PATTERN,
     LANG_PATTERN,
-    _get_client,
-    assert_host_allowed,
     handle_api_error,
+    request_with_retry,
 )
 from swisstopo_mcp.config import settings
 from swisstopo_mcp.coords import SwissPointInput
@@ -31,6 +31,23 @@ OEREB_ENDPOINTS: dict[str, str] = {
     "ZH": "https://maps.zh.ch/oereb/v2",
     "BE": "https://www.oereb2.apps.be.ch",
 }
+
+# Per-attempt timeout for the cantonal hosts, below the retry budget on purpose.
+#
+# These are the only upstreams here that are neither operated by the
+# Confederation nor fronted by a CDN — one canton, one machine — and they are
+# the ones that go slow. Until this constant existed, ÖREB was also the only
+# upstream that bypassed `request_with_retry` entirely: one attempt, no backoff,
+# and a blip came back as a hard tool error.
+#
+# Retries alone would not have fixed that. `REQUEST_TIMEOUT` is 30s and
+# `TOTAL_BUDGET_S` is 25s, so one hanging request exhausts the whole budget and
+# the ladder never runs — which is exactly the failure mode a degraded cantonal
+# host produces, and exactly what took a BE probe down for 30s at a stretch. A
+# per-attempt bound *below* the budget is what makes the retries reachable: two
+# attempts and a backoff fit inside 25s. Healthy ZH and BE answer `getegrid` and
+# `extract` in 0.6-2.2s, so 10s is roughly five times the worst honest response.
+OEREB_ATTEMPT_TIMEOUT = 10.0
 
 
 def get_active_cantons() -> dict[str, str]:
@@ -182,24 +199,22 @@ def _parse_egrid_payload(data: object) -> list[dict]:
     return [r for r in (_egrid_record(c) for c in candidates) if r]
 
 
-async def _fetch_egrid_records(base: str, easting: float, northing: float) -> list[dict]:
+async def _fetch_egrid_records(
+    base: str, easting: float, northing: float, ctx: Context | None = None
+) -> list[dict]:
     """Resolve an LV95 point to its parcel record(s) at a cantonal ÖREB endpoint.
 
     Shared by `swisstopo_get_egrid` and `swisstopo_oereb_at` so the one-call
     aggregate does not re-enter the tool layer to reach it (ARCH-007).
     """
     url = f"{base}/getegrid/json/?EN={easting},{northing}"
-    assert_host_allowed(url)
-    async with await _get_client() as client:
-        response = await client.get(url)
-        response.raise_for_status()
-        # A point with no parcel under it answers `204 No Content` with an empty
-        # body rather than a 200 carrying an empty list — and an empty body is
-        # not JSON, so parsing it would turn a legitimate miss into an error.
-        if response.status_code == 204 or not response.content.strip():
-            return []
-        data = response.json()
-    return _parse_egrid_payload(data)
+    response = await request_with_retry("GET", url, timeout=OEREB_ATTEMPT_TIMEOUT, ctx=ctx)
+    # A point with no parcel under it answers `204 No Content` with an empty
+    # body rather than a 200 carrying an empty list — and an empty body is
+    # not JSON, so parsing it would turn a legitimate miss into an error.
+    if response.status_code == 204 or not response.content.strip():
+        return []
+    return _parse_egrid_payload(response.json())
 
 
 def _first_egrid(records: list[dict]) -> str | None:
@@ -394,28 +409,32 @@ async def get_oereb_extract(
         # unfiltered extract.
         url = f"{base}/extract/json/?EGRID={params.egrid}&GEOMETRY=false&LANG={params.lang}"
 
-        assert_host_allowed(url)
-        async with await _get_client() as client:
-            response = await client.get(url)
-            # An unknown EGRID is a 204 with an empty body on ZH and a 404
-            # elsewhere. Both mean "no such parcel here", and neither is JSON.
-            if response.status_code in (204, 404):
-                return ToolResponse.ok(
-                    f"EGRID '{params.egrid}' nicht gefunden in Kanton {canton}.",
-                    [],
-                    match_type="none",
-                    note=(
-                        f"Der EGRID {params.egrid} ist im Kanton {canton} unbekannt. "
-                        "Kanton prüfen — EGRIDs sind kantonal geführt — oder den "
-                        "EGRID via swisstopo_get_egrid neu ermitteln."
-                    ),
-                    source=OEREB_SOURCE,
-                    license=OEREB_LICENSE,
-                )
-            response.raise_for_status()
-            data = response.json()
+        # An unknown EGRID is a 204 with an empty body on ZH and a 404
+        # elsewhere. Both mean "no such parcel here", and neither is JSON.
+        # `request_with_retry` raises on a 404 rather than returning it — that is
+        # right for every other caller and wrong for this one, where the 404 is
+        # an answer, so it is caught back into the same reply the 204 produces.
+        try:
+            response = await request_with_retry("GET", url, timeout=OEREB_ATTEMPT_TIMEOUT, ctx=ctx)
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code != 404:
+                raise
+            response = exc.response
+        if response.status_code in (204, 404) or not response.content.strip():
+            return ToolResponse.ok(
+                f"EGRID '{params.egrid}' nicht gefunden in Kanton {canton}.",
+                [],
+                match_type="none",
+                note=(
+                    f"Der EGRID {params.egrid} ist im Kanton {canton} unbekannt. "
+                    "Kanton prüfen — EGRIDs sind kantonal geführt — oder den "
+                    "EGRID via swisstopo_get_egrid neu ermitteln."
+                ),
+                source=OEREB_SOURCE,
+                license=OEREB_LICENSE,
+            )
 
-        restriction_measures = _parse_restrictions(data)
+        restriction_measures = _parse_restrictions(response.json())
 
         if not restriction_measures:
             return ToolResponse.ok(
@@ -552,7 +571,7 @@ async def oereb_at(params: OerebAtInput, ctx: Context | None = None) -> ToolResp
 
     try:
         lat, lon = params.as_wgs84
-        records = await _fetch_egrid_records(base, *params.as_lv95)
+        records = await _fetch_egrid_records(base, *params.as_lv95, ctx=ctx)
         egrid = _first_egrid(records)
     except Exception as e:
         return ToolResponse.error(

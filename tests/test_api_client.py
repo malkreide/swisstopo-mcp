@@ -71,6 +71,17 @@ class TestHandleApiError:
         result = handle_api_error(httpx.TimeoutException("timeout"), "Test")
         assert "Zeitüberschreitung" in result or "zeitüberschreitung" in result.lower()
 
+    def test_the_budget_timeout_reads_as_a_timeout_too(self):
+        """`request_with_retry` bounds a call with `asyncio.timeout`, which
+        raises the *builtin* `TimeoutError` — not an httpx exception. It fell
+        through to "Unerwarteter interner Fehler", so the one wait this server
+        promises to bound reported worse than an unbounded one, and a caller
+        could not tell a slow upstream from a bug here.
+        """
+        result = handle_api_error(TimeoutError(), "Test")
+        assert "Zeitüberschreitung" in result
+        assert "Unerwarteter" not in result
+
     def test_connection_error(self):
         result = handle_api_error(httpx.ConnectError("fail"), "Test")
         assert "Verbindung" in result or "verbindung" in result.lower()

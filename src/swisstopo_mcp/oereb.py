@@ -155,20 +155,46 @@ def _localized_text(value: object, lang: str = "de") -> str:
     return ""
 
 
+def _lower_keys(entry: dict) -> dict:
+    """Lower the key casing of one parcel entry.
+
+    The cantonal ÖREB services disagree on casing — `egrid`/`EGRID`,
+    `identDN`/`IdentDN`, `municipality`/`MunicipalityName` all occur. Reading
+    each spelling with its own literal means one assumption per canton, and all
+    of them only happen to hold today: a service that ships `IDENTDN` or
+    `Egrid` tomorrow returns a parcel without an identifier, which reads to the
+    caller like a parcel that has none (FID-006).
+
+    This is the single place where the casing question is answered. What comes
+    out of here is lower-case, and everything downstream may assume it.
+
+    Only the **casing** is folded, never the name. `municipality` and
+    `MunicipalityName` collapse into one key here; `gemeindename` stays a
+    different field and is still read separately below — normalising until
+    something matches would merge two fields that mean different things.
+    """
+    return {str(k).lower(): v for k, v in entry.items()}
+
+
 def _egrid_record(entry: dict) -> dict | None:
-    """Normalise one parcel entry to `{egrid, number, identDN, municipality}`."""
-    egrid = entry.get("egrid") or entry.get("EGRID")
+    """Normalise one parcel entry to `{egrid, number, identDN, municipality}`.
+
+    Reads lower-case keys only; `_lower_keys` has already run. The **output**
+    keys keep their original spelling — `identDN` is this server's own contract
+    with its callers and has nothing to do with how the canton spelled it.
+    """
+    egrid = entry.get("egrid")
     if not egrid:
         return None
     record: dict = {"egrid": str(egrid)}
-    number = entry.get("number") or entry.get("Number")
+    number = entry.get("number")
     if number:
         record["number"] = str(number)
-    ident = entry.get("identDN") or entry.get("IdentDN")
+    ident = entry.get("identdn")
     if ident:
         record["identDN"] = str(ident)
     municipality = (
-        entry.get("gemeindename") or entry.get("municipality") or entry.get("MunicipalityName")
+        entry.get("gemeindename") or entry.get("municipality") or entry.get("municipalityname")
     )
     if municipality:
         record["municipality"] = str(municipality)
@@ -196,7 +222,7 @@ def _parse_egrid_payload(data: object) -> list[dict]:
             for f in (features if isinstance(features, list) else [])
             if isinstance(f, dict) and isinstance(f.get("properties"), dict)
         ]
-    return [r for r in (_egrid_record(c) for c in candidates) if r]
+    return [r for r in (_egrid_record(_lower_keys(c)) for c in candidates) if r]
 
 
 async def _fetch_egrid_records(

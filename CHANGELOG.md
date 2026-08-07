@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Die Schreibweise der ÖREB-Feldnamen wird jetzt gesenkt statt geraten.**
+  `_egrid_record` las jedes Feld mit einer Alternation aus genau den
+  Schreibweisen, die jemand einmal gesehen hatte: `egrid`/`EGRID`,
+  `number`/`Number`, `identDN`/`IdentDN`,
+  `municipality`/`MunicipalityName`. Der Kommentar im Testfall sagt, warum es
+  überhaupt Alternationen gab — «cantonal endpoints disagree on the casing».
+
+  Jede dieser Annahmen stimmt, und zusammen sind es vier Annahmen pro Kanton,
+  die alle **heute** stimmen. Ein Dienst, der `IDENTDN` oder `Egrid` liefert,
+  gab eine Parzelle ohne Kennung zurück — und das liest sich beim Aufrufer wie
+  eine Parzelle, die keine hat.
+
+  `_lower_keys()` senkt die Schlüssel jetzt an **genau einer** Stelle, dort wo
+  die Rohzeile entsteht; `_egrid_record` liest danach nur noch kleingeschrieben
+  und ist gegen den nächsten Wechsel unempfindlich
+  ([`FID-006`](https://github.com/malkreide/mcp-audit-skill/blob/main/checks/FID-006.md)).
+
+  **Nur die Schreibweise wird gefaltet, nie der Name.** `gemeindename` und
+  `municipality` sind zwei verschiedene Felder aus zwei Antwortformen und
+  bleiben getrennt — so weit zu normalisieren, bis irgendetwas passt, würde sie
+  zu einem verschmelzen.
+
+  **Die Ausgabe behält ihre eigene Schreibweise.** `identDN` nach aussen ist die
+  Zusage dieses Servers an seine Aufrufer und hat nichts damit zu tun, wie der
+  Kanton das Feld geschrieben hat; ein Test hält fest, dass die Normalisierung
+  nicht bis in den Vertrag durchschlägt.
+
 ### Added
 
 - **Retry policy toward the geo upstreams** (ARCH-014): `Retry-After` is read

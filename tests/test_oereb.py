@@ -829,6 +829,64 @@ class TestParseEgridPayload:
         payload = {"GetEGRIDResponse": [{"number": "1"}, {"egrid": "CH3"}]}
         assert _parse_egrid_payload(payload) == [{"egrid": "CH3"}]
 
+    def test_any_casing_of_a_key_is_read(self):
+        """Die Schreibweise wird an der Parse-Grenze gesenkt, nicht erraten.
+
+        Vorher stand pro Feld eine Alternation aus genau den Schreibweisen, die
+        jemand einmal gesehen hatte — `egrid`/`EGRID`, `identDN`/`IdentDN`.
+        Jede davon stimmte, und alle zusammen waren eine Annahme pro Kanton.
+        Ein Dienst, der `IDENTDN` oder `Egrid` liefert, gab eine Parzelle ohne
+        Kennung zurück, und das liest sich beim Aufrufer wie eine Parzelle, die
+        keine hat (FID-006).
+        """
+        for egrid_key, ident_key in (
+            ("egrid", "identDN"),
+            ("EGRID", "IdentDN"),
+            ("EGRID", "IDENTDN"),
+            ("Egrid", "identdn"),
+            ("eGrid", "IdEnTdN"),
+        ):
+            payload = {"GetEGRIDResponse": [{egrid_key: "CH9", ident_key: "ZH1"}]}
+            assert _parse_egrid_payload(payload) == [{"egrid": "CH9", "identDN": "ZH1"}], (
+                f"{egrid_key}/{ident_key} nicht gelesen"
+            )
+
+    def test_the_output_keys_keep_their_own_spelling(self):
+        """Normalisiert wird die **Eingabe**, nicht der eigene Vertrag.
+
+        `identDN` nach aussen ist die Zusage dieses Servers an seine Aufrufer
+        und hat nichts damit zu tun, wie der Kanton das Feld geschrieben hat.
+        Würde die Normalisierung bis in die Ausgabe durchschlagen, hiesse der
+        Schlüssel plötzlich `identdn` — eine stille Vertragsänderung.
+        """
+        payload = {"GetEGRIDResponse": [{"EGRID": "CH9", "IDENTDN": "ZH1"}]}
+        assert list(_parse_egrid_payload(payload)[0]) == ["egrid", "identDN"]
+
+    def test_casing_is_folded_but_names_are_not(self):
+        """Erlaubt ist genau die Schreibweise, nicht die Identität des Namens.
+
+        `gemeindename` und `municipality` sind zwei **verschiedene** Felder aus
+        zwei Antwortformen. Sie dürfen nicht ineinanderfallen — nur ihre
+        Schreibweisen dürfen es.
+        """
+        assert _parse_egrid_payload(
+            {"GetEGRIDResponse": [{"egrid": "CH9", "MunicipalityName": "Uster"}]}
+        ) == [{"egrid": "CH9", "municipality": "Uster"}]
+        assert _parse_egrid_payload(
+            {"features": [{"properties": {"egrid": "CH9", "GEMEINDENAME": "Uster"}}]}
+        ) == [{"egrid": "CH9", "municipality": "Uster"}]
+
+    def test_a_non_string_key_does_not_crash_the_parse(self):
+        """JSON-Objekte haben Zeichenketten als Schlüssel — ein Fixture nicht.
+
+        `_lower_keys` ruft `str(k).lower()`; ohne das `str()` wäre ein
+        versehentlich numerischer Schlüssel ein `AttributeError` auf dem
+        Fehlerpfad, also dort, wo es ohnehin schon schlecht läuft.
+        """
+        assert _parse_egrid_payload({"GetEGRIDResponse": [{1: "x", "egrid": "CH9"}]}) == [
+            {"egrid": "CH9"}
+        ]
+
     def test_reads_the_legacy_geojson_shape(self):
         payload = {"features": [{"properties": {"egrid": "CH4", "gemeindename": "Uster"}}]}
         assert _parse_egrid_payload(payload) == [{"egrid": "CH4", "municipality": "Uster"}]

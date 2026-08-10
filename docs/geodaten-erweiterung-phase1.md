@@ -118,6 +118,17 @@ av (Amtliche Vermessung) 20/27, planungszonen 18/27, npl_nutzungsplanung 17/27, 
   `numberMatched`, `limit`, `bbox`), deutlich handlicher als WFS-XML.
 - URL-Muster: `https://geodienste.ch/db/{topic}_{version}/deu/ogcapi/…`.
   `?f=json` ist für JSON zwingend.
+- **Nachtrag 2026-08-10 — `crs` ist bei `/items` zwingend geworden.** Die
+  Probe oben lief noch ohne den Parameter durch; seit dem 9. August 2026
+  antwortet jeder freie Datensatz auf eine `items`-Anfrage ohne CRS-Angabe mit
+  **403 Forbidden** («Request Query must contain crs=…») statt mit einem 400.
+  Angenommen wird ausschliesslich
+  `crs=http://www.opengis.net/def/crs/EPSG/0/2056`; CRS84, EPSG:4326 und
+  EPSG:3857 werden ebenfalls mit 403 abgewiesen. Die Geometrien kommen damit
+  in LV95 zurück, und `format="geojson"` muss sie zurückrechnen, weil eine
+  `FeatureCollection` ohne CRS-Angabe nach RFC 7946 als WGS84 gelesen wird.
+  `bbox` bleibt ohne `bbox-crs` weiterhin in CRS84 — dieser Standardwert gilt
+  noch, wird aber seither ausdrücklich mitgeschickt.
 - Attribut-Beispiel (belastete Standorte): `egrid, kanton, katastername,
   katasternummer, deponietypen, inbetrieb, nachsorge, ersteintrag, …`.
 

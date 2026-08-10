@@ -9,6 +9,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **geodienste-Abfragen scheiterten mit «Zugriff verweigert (403)».**
+  geodienste.ch verlangt seit dem 9. August 2026 bei jeder `items`-Anfrage der
+  OGC API Features einen expliziten Ausgabe-CRS — und lehnt eine Anfrage ohne
+  ihn mit **403** ab statt mit dem 400, das ein fehlender Parameter sonst
+  bekommt. Deshalb las sich die Störung im Live-Test wie ein Rechteentzug und
+  nicht wie eine Vertragsänderung. Betroffen war jeder frei zugängliche
+  geodienste-Datensatz, nicht nur der Kataster der belasteten Standorte.
+
+  `_query_geodienste` sendet jetzt `crs=EPSG:2056`. Das ist kein Vorzug,
+  sondern der einzige Wert, den der Dienst annimmt: CRS84, EPSG:4326 und
+  EPSG:3857 werden ebenfalls mit 403 abgewiesen (live gemessen).
+
+  **Die Geometrien kommen dadurch in LV95 zurück — `format="geojson"` rechnet
+  sie zurück nach WGS84.** Eine `FeatureCollection` ohne CRS-Angabe wird nach
+  RFC 7946 als WGS84 gelesen; die Schweizer Koordinaten unverändert
+  durchzureichen hätte jedes Objekt wortlos in den Indischen Ozean gesetzt.
+  Die Umrechnung nutzt dasselbe Näherungspolynom (~1 m) wie die übrigen
+  Punktabfragen dieses Servers und sagt im `note`-Feld, dass sie stattgefunden
+  hat. Für amtliche Genauigkeit bleibt `swisstopo_convert_coordinates`
+  (REFRAME) zuständig.
+
+  `bbox-crs=CRS84` wird jetzt ebenfalls ausdrücklich mitgeschickt. Die bbox war
+  schon immer in Grad, der Standardwert deckte das ab — aber genau dieser
+  Standardwert ist beim `crs` gerade weggefallen.
+
 - **Die Schreibweise der ÖREB-Feldnamen wird jetzt gesenkt statt geraten.**
   `_egrid_record` las jedes Feld mit einer Alternation aus genau den
   Schreibweisen, die jemand einmal gesehen hatte: `egrid`/`EGRID`,

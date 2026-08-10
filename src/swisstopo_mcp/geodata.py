@@ -34,6 +34,7 @@ from swisstopo_mcp.api_client import (
     TEXT_PATTERN,
     geo_admin_request,
     handle_api_error,
+    lv95_to_wgs84,
     request_with_retry,
     wgs84_to_lv95,
 )
@@ -65,6 +66,16 @@ _MAX_LIMIT = 50
 # partial scan as complete.
 _COLLECTION_CONCURRENCY = 4
 _MAX_COLLECTIONS_SCANNED = 12
+
+# geodienste.ch rejects an OGC API `items` request that does not name an output
+# CRS — with **403 Forbidden** ("Request Query must contain crs=…"), not the 400
+# a missing parameter usually earns, which is why this surfaced as "Zugriff
+# verweigert" in the live suite (probed 2026-08-10, every free OGC-API dataset).
+# EPSG:2056 is the only value the service accepts: CRS84, EPSG:4326 and
+# EPSG:3857 are all refused. So features now arrive in LV95 and the `geojson`
+# format has to project them back — see `_feature_to_wgs84`.
+_OGC_CRS_LV95 = "http://www.opengis.net/def/crs/EPSG/0/2056"
+_OGC_CRS_WGS84 = "http://www.opengis.net/def/crs/OGC/1.3/CRS84"
 
 # Static (non-geodienste) façade layers.
 # Per-record licences for the layer catalogue. The records use a short source
@@ -160,6 +171,50 @@ def _bbox_from_point(lat: float, lon: float, radius_m: float) -> tuple[float, fl
     dlat = radius_m / 111_320.0
     dlon = radius_m / (111_320.0 * max(math.cos(math.radians(lat)), 0.01))
     return (lon - dlon, lat - dlat, lon + dlon, lat + dlat)
+
+
+def _coords_to_wgs84(coords: Any) -> Any:
+    """Project a GeoJSON coordinate structure from LV95 to WGS84, in place of
+    the shape it came in — a position, or any nesting of them."""
+    if not isinstance(coords, list):
+        return coords
+    if len(coords) >= 2 and all(
+        isinstance(v, int | float) and not isinstance(v, bool) for v in coords[:2]
+    ):
+        lat, lon = lv95_to_wgs84(float(coords[0]), float(coords[1]))
+        # GeoJSON positions are [lon, lat]; anything past them (height, m) rides
+        # along untouched — the polynomial only speaks planimetry.
+        return [lon, lat, *coords[2:]]
+    return [_coords_to_wgs84(c) for c in coords]
+
+
+def _feature_to_wgs84(feature: dict[str, Any]) -> dict[str, Any]:
+    """Return the feature with its geometry projected LV95 → WGS84.
+
+    geodienste only serves LV95 now (see ``_OGC_CRS_LV95``), but a
+    ``FeatureCollection`` is read as WGS84 by default (RFC 7946), so handing the
+    Swiss coordinates straight through would put every feature in the Indian
+    Ocean without saying so. The conversion uses the same ~1 m polynomial the
+    rest of this server uses for point queries.
+    """
+    geometry = feature.get("geometry")
+    if not isinstance(geometry, dict):
+        return feature
+    return {**feature, "geometry": _geometry_to_wgs84(geometry)}
+
+
+def _geometry_to_wgs84(geometry: dict[str, Any]) -> dict[str, Any]:
+    if "geometries" in geometry:  # GeometryCollection
+        return {
+            **geometry,
+            "geometries": [
+                _geometry_to_wgs84(g) if isinstance(g, dict) else g
+                for g in geometry.get("geometries") or []
+            ],
+        }
+    if "coordinates" in geometry:
+        return {**geometry, "coordinates": _coords_to_wgs84(geometry.get("coordinates"))}
+    return geometry
 
 
 # ---------------------------------------------------------------------------
@@ -531,7 +586,18 @@ async def _query_geodienste(params: QueryGeodataInput) -> ToolResponse:
     async def _fetch(cid: str) -> tuple[str, dict[str, Any]]:
         items_url = f"{ogc_base.rstrip('/')}/collections/{cid}/items"
         response = await request_with_retry(
-            "GET", items_url, params={"f": "json", "bbox": bbox, "limit": params.limit}
+            "GET",
+            items_url,
+            params={
+                "f": "json",
+                "bbox": bbox,
+                "limit": params.limit,
+                # Mandatory upstream (403 without it). `bbox-crs` is CRS84 by
+                # default, but naming it keeps our WGS84 bbox correct even if
+                # geodienste tightens that default the way it tightened `crs`.
+                "crs": _OGC_CRS_LV95,
+                "bbox-crs": _OGC_CRS_WGS84,
+            },
         )
         return cid, response.json()
 
@@ -547,7 +613,7 @@ async def _query_geodienste(params: QueryGeodataInput) -> ToolResponse:
                 props = f.get("properties", {})
                 all_records.append({"collection": cid, **props})
                 if params.format == "geojson":
-                    features_out.append(f)
+                    features_out.append(_feature_to_wgs84(f))
         if len(all_records) >= params.limit:
             stopped_early = True
             break
@@ -567,6 +633,15 @@ async def _query_geodienste(params: QueryGeodataInput) -> ToolResponse:
     if params.format == "geojson":
         summary = f"**{title}** — {len(features_out)} Feature(s), numberMatched≈{total_matched}."
         payload_records: list[dict[str, Any]] = features_out[: params.limit]
+        # The upstream only serves LV95; say that the coordinates handed back
+        # were converted rather than measured (~1 m polynomial).
+        if features_out:
+            crs_note = (
+                "Geometrien aus LV95 (EPSG:2056) nach WGS84 umgerechnet "
+                "(Näherungspolynom, ~1 m). Für amtliche Genauigkeit "
+                "swisstopo_convert_coordinates (REFRAME) verwenden."
+            )
+            truncated_note = f"{truncated_note} {crs_note}" if truncated_note else crs_note
     else:
         summary = _format_records(
             f"{title} — numberMatched≈{total_matched}", all_records, params.format

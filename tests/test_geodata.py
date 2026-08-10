@@ -263,6 +263,31 @@ async def test_live_geodienste_zh_kbs():
 
 
 @pytest.mark.live
+async def test_live_geodienste_geojson_is_in_wgs84():
+    """The upstream serves LV95 only. A FeatureCollection is read as WGS84, so
+    an unprojected passthrough would silently move Zurich into the ocean —
+    the mocked test cannot see the day geodienste changes its output CRS again.
+    """
+    r = await query_geodata(
+        QueryGeodataInput(
+            layer="geodienste:kataster_belasteter_standorte:ZH",
+            point="47.360966,8.525343",
+            radius_m=1000,
+            limit=2,
+            format="geojson",
+        )
+    )
+    assert not r.is_error
+    assert r.count > 0, "no features to check the CRS against"
+    coords = r.results[0]["geometry"]["coordinates"]
+    while isinstance(coords[0], list):
+        coords = coords[0]
+    lon, lat = coords[0], coords[1]
+    assert 5.9 < lon < 10.6, f"longitude {lon} is outside Switzerland"
+    assert 45.8 < lat < 47.9, f"latitude {lat} is outside Switzerland"
+
+
+@pytest.mark.live
 async def test_live_list_layers_zh():
     r = await list_available_layers(ListLayersInput(source="geodienste", canton="ZH"))
     assert r.count > 0
@@ -403,3 +428,144 @@ class TestCollectionFanOut:
     async def test_no_truncation_note_when_everything_was_scanned(self, monkeypatch):
         result, _ = await self._run(monkeypatch, 3, {"C0": 1}, limit=50)
         assert result.note is None or "Collections" not in result.note
+
+
+# ---------------------------------------------------------------------------
+# Output CRS (live failure 2026-08-09)
+#
+# geodienste started refusing every `items` request that does not name an output
+# CRS — and it refuses with 403, not 400, so the live suite reported "Zugriff
+# verweigert" and read like a permissions change rather than a parameter one.
+# EPSG:2056 is the only value accepted, which means the features arrive in LV95
+# and a FeatureCollection that passes them straight through would place every
+# object in the Indian Ocean (RFC 7946 reads bare GeoJSON as WGS84).
+#
+# Both halves are held here: the parameter that stops the 403, and the
+# projection that keeps `format="geojson"` meaning what its consumers think it
+# means.
+# ---------------------------------------------------------------------------
+
+ZURICH_LV95 = [2683000.0, 1247000.0]
+
+
+class TestGeodiensteOutputCrs:
+    @staticmethod
+    def _install(monkeypatch, feature, captured):
+        async def fake_catalog(force=False):
+            return [
+                {
+                    "canton": "ZH",
+                    "base_topic": "kataster_belasteter_standorte",
+                    "topic_title": "Kataster der belasteten Standorte",
+                    "opendata_terms_wms": "Freie Nutzung",
+                    "contract_required_wms": False,
+                    "ogc_api_features": ["https://geodienste.ch/db/kbs/deu/ogcapi"],
+                }
+            ]
+
+        class _Resp:
+            def __init__(self, payload):
+                self._payload = payload
+
+            def json(self):
+                return self._payload
+
+        async def fake_request(method, url, **kwargs):
+            if url.endswith("/collections"):
+                return _Resp({"collections": [{"id": "belastete_standorte_flaechen"}]})
+            captured.append(kwargs.get("params", {}))
+            return _Resp({"numberMatched": 1, "features": [feature]})
+
+        monkeypatch.setattr(geodata, "load_geodienste_catalog", fake_catalog)
+        monkeypatch.setattr(geodata, "request_with_retry", fake_request)
+
+    async def _run(self, monkeypatch, feature, fmt="records"):
+        captured: list[dict] = []
+        self._install(monkeypatch, feature, captured)
+        result = await query_geodata(
+            QueryGeodataInput(
+                layer="geodienste:kataster_belasteter_standorte:ZH",
+                point="47.360966,8.525343",
+                radius_m=1000,
+                limit=2,
+                format=fmt,
+            )
+        )
+        return result, captured
+
+    async def test_items_request_names_the_required_output_crs(self, monkeypatch):
+        """Without this parameter geodienste answers 403 — the whole failure."""
+        _, captured = await self._run(monkeypatch, {"properties": {"id": "x"}, "geometry": None})
+        assert captured, "no items request was made"
+        assert captured[0].get("crs") == geodata._OGC_CRS_LV95
+
+    async def test_bbox_stays_declared_as_wgs84(self, monkeypatch):
+        """We send a WGS84 bbox; with the output CRS now pinned to LV95 the
+        bbox CRS must not be left to a default that could follow it."""
+        _, captured = await self._run(monkeypatch, {"properties": {"id": "x"}, "geometry": None})
+        assert captured[0].get("bbox-crs") == geodata._OGC_CRS_WGS84
+        min_lon, min_lat, _, _ = (float(v) for v in captured[0]["bbox"].split(","))
+        assert 5 < min_lon < 11 and 45 < min_lat < 48, "bbox is not in degrees"
+
+    async def test_geojson_geometry_is_projected_back_to_wgs84(self, monkeypatch):
+        feature = {
+            "type": "Feature",
+            "properties": {"id": "x"},
+            "geometry": {"type": "Point", "coordinates": ZURICH_LV95},
+        }
+        result, _ = await self._run(monkeypatch, feature, fmt="geojson")
+        lon, lat = result.results[0]["geometry"]["coordinates"]
+        assert 8.5 < lon < 8.6, f"longitude {lon} is not Zurich — LV95 leaked through"
+        assert 47.3 < lat < 47.4, f"latitude {lat} is not Zurich — LV95 leaked through"
+
+    async def test_geojson_says_the_coordinates_were_converted(self, monkeypatch):
+        feature = {
+            "type": "Feature",
+            "properties": {"id": "x"},
+            "geometry": {"type": "Point", "coordinates": ZURICH_LV95},
+        }
+        result, _ = await self._run(monkeypatch, feature, fmt="geojson")
+        assert result.note and "LV95" in result.note
+
+    async def test_records_format_is_untouched_by_the_projection(self, monkeypatch):
+        feature = {
+            "type": "Feature",
+            "properties": {"id": "x"},
+            "geometry": {"type": "Point", "coordinates": ZURICH_LV95},
+        }
+        result, _ = await self._run(monkeypatch, feature)
+        assert result.results[0]["id"] == "x"
+        assert result.note is None
+
+
+class TestCoordinateProjection:
+    def test_nested_polygon_rings(self):
+        from swisstopo_mcp.geodata import _coords_to_wgs84
+
+        out = _coords_to_wgs84([[[2683000.0, 1247000.0], [2683100.0, 1247100.0]]])
+        assert 8.5 < out[0][0][0] < 8.6
+        assert 47.3 < out[0][0][1] < 47.4
+        assert out[0][1][0] > out[0][0][0]
+
+    def test_third_ordinate_rides_along(self):
+        from swisstopo_mcp.geodata import _coords_to_wgs84
+
+        out = _coords_to_wgs84([2683000.0, 1247000.0, 408.0])
+        assert out[2] == 408.0
+
+    def test_geometry_collection(self):
+        from swisstopo_mcp.geodata import _geometry_to_wgs84
+
+        out = _geometry_to_wgs84(
+            {
+                "type": "GeometryCollection",
+                "geometries": [{"type": "Point", "coordinates": [2683000.0, 1247000.0]}],
+            }
+        )
+        assert 8.5 < out["geometries"][0]["coordinates"][0] < 8.6
+
+    def test_missing_geometry_is_left_alone(self):
+        from swisstopo_mcp.geodata import _feature_to_wgs84
+
+        feature = {"type": "Feature", "properties": {"id": "x"}}
+        assert _feature_to_wgs84(feature) == feature

@@ -1,0 +1,77 @@
+{
+  "stac_version": "0.9.0",
+  "id": "ch.swisstopo.swissalti3d",
+  "title": "swissALTI3D",
+  "description": "swissALTI3D is an extremely precise digital elevation model which describes the surface of Switzerland and the Principality of Liechtenstein without vegetation and development. It is updated in an cycle of 6 years.",
+  "summaries": {
+    "proj:epsg": [
+      2056
+    ],
+    "eo:gsd": [
+      0.5,
+      2.0
+    ]
+  },
+  "extent": {
+    "spatial": {
+      "bbox": [
+        [
+          5.9503666,
+          45.7213375,
+          10.4998461,
+          47.8216742
+        ]
+      ]
+    },
+    "temporal": {
+      "interval": [
+        [
+          "2019-01-01T00:00:00Z",
+          "2025-01-01T00:00:00Z"
+        ]
+      ]
+    }
+  },
+  "providers": [
+    {
+      "name": "Federal Office of Topography swisstopo",
+      "roles": [
+        "producer",
+        "licensor"
+      ],
+      "url": "https://www.swisstopo.admin.ch/en/home.html"
+    }
+  ],
+  "license": "proprietary",
+  "created": "2021-02-05T13:54:56.380277Z",
+  "updated": "2026-06-25T20:00:03.010071Z",
+  "links": [
+    {
+      "rel": "self",
+      "href": "https://data.geo.admin.ch/api/stac/v0.9/collections/ch.swisstopo.swissalti3d"
+    },
+    {
+      "rel": "root",
+      "href": "https://data.geo.admin.ch/api/stac/v0.9/"
+    },
+    {
+      "rel": "parent",
+      "href": "https://data.geo.admin.ch/api/stac/v0.9/"
+    },
+    {
+      "rel": "items",
+      "href": "https://data.geo.admin.ch/api/stac/v0.9/collections/ch.swisstopo.swissalti3d/items"
+    },
+    {
+      "rel": "alternate",
+      "title": "STAC Browser",
+      "type": "text/html",
+      "href": "https://data.geo.admin.ch/browser/index.html#/collections/ch.swisstopo.swissalti3d"
+    }
+  ],
+  "crs": [
+    "http://www.opengis.net/def/crs/OGC/1.3/CRS84"
+  ],
+  "itemType": "Feature",
+  "assets": {}
+}

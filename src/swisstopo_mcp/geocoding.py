@@ -12,6 +12,7 @@ from swisstopo_mcp.api_client import (
     geo_admin_request,
     handle_api_error,
     validate_sr,
+    wgs84_to_lv95,
 )
 from swisstopo_mcp.logging_config import log_tool_call
 from swisstopo_mcp.models import ToolResponse
@@ -90,14 +91,15 @@ class ReverseGeocodeInput(BaseModel):
     lat: float = Field(..., ge=45.8, le=47.9, description="Breitengrad (WGS84)")
     lon: float = Field(..., ge=5.9, le=10.5, description="Längengrad (WGS84)")
     limit: int = Field(default=5, ge=1, le=10, description="Maximale Trefferanzahl")
-    sr: int = Field(default=4326, description="Koordinatensystem (EPSG-Code)")
+    radius_m: int = Field(
+        default=500, ge=50, le=5000, description="Suchradius in Metern um den Punkt"
+    )
 
-    @field_validator("sr")
-    @classmethod
-    def _validate_sr(cls, v: int) -> int:
-        # Wires up validate_sr(), which existed but was never called — an
-        # arbitrary int used to be forwarded straight upstream (SEC-018).
-        return validate_sr(v)
+    # Kein `sr` mehr. Es liess sich nicht einhalten: der SearchServer wertet die
+    # `bbox` nur mit `sr=2056` aus (Messung unten in `reverse_geocode`), und ein
+    # Feld, das die Anfrage nicht beeinflussen kann, ist eine Zusage, die der
+    # Server nicht hält. Was ein Aufrufer daraus las — `attrs.lat` / `attrs.lon`
+    # — kommt ohnehin in WGS84 zurück, unabhängig von `sr`.
 
 
 # ---------------------------------------------------------------------------
@@ -221,10 +223,27 @@ async def geocode(params: GeocodeInput) -> ToolResponse:
 async def reverse_geocode(params: ReverseGeocodeInput) -> ToolResponse:
     """Find the nearest addresses to given coordinates."""
     try:
-        # Build a ~500 m bounding box (approx. 0.005 degrees)
-        bbox = (
-            f"{params.lon - 0.005},{params.lat - 0.005},{params.lon + 0.005},{params.lat + 0.005}"
-        )
+        # Die Bounding-Box in LV95, und `sr=2056` dazu.
+        #
+        # Vorher stand hier die Box in WGS84-Grad und `sr` kam aus der Eingabe
+        # (Standard 4326). Der SearchServer wertet die `bbox` aber nur aus, wenn
+        # sie in LV95 steht **und** `sr=2056` mitkommt; alles andere liefert
+        # HTTP 200 mit `results: []`. Gemessen am 15.08.2026 am Zürcher
+        # Hauptbahnhof:
+        #
+        #     bbox=Grad, sr=4326 → 0     bbox=LV95, sr=4326 → 0
+        #     bbox=Grad, sr=2056 → 0     bbox=LV95, sr=2056 → 3
+        #
+        # Dieses Werkzeug hat also für jeden Punkt der Schweiz nichts gefunden
+        # und das als «womöglich ausserhalb besiedelten Gebiets» erklärt — ein
+        # Ausfall, der wie ein gültiger Negativbefund aussah.
+        #
+        # Der Radius rechnet ausserdem jetzt in Metern. Die alten 0.005 Grad
+        # waren auf 47° Breite rund 556 m nord-süd und 377 m ost-west, während
+        # der Kommentar daneben «~500 m» versprach.
+        east, north = wgs84_to_lv95(params.lat, params.lon)
+        r = params.radius_m
+        bbox = f"{east - r},{north - r},{east + r},{north + r}"
         data = await geo_admin_request(
             "/rest/services/ech/SearchServer",
             {
@@ -232,7 +251,7 @@ async def reverse_geocode(params: ReverseGeocodeInput) -> ToolResponse:
                 "origins": "address",
                 "bbox": bbox,
                 "limit": params.limit,
-                "sr": params.sr,
+                "sr": 2056,
                 "returnGeometry": "true",
             },
         )
@@ -244,7 +263,7 @@ async def reverse_geocode(params: ReverseGeocodeInput) -> ToolResponse:
             note=(
                 None
                 if results
-                else "Keine Adresse im 500-m-Umkreis — der Punkt liegt womöglich "
+                else f"Keine Adresse im {params.radius_m}-m-Umkreis — der Punkt liegt womöglich "
                 "ausserhalb besiedelten Gebiets. swisstopo_municipality_at nennt "
                 "die zuständige Gemeinde auch dort, wo es keine Adresse gibt."
             ),

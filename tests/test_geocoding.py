@@ -73,12 +73,22 @@ class TestReverseGeocodeInput:
     def test_defaults(self):
         m = ReverseGeocodeInput(lat=47.38, lon=8.54)
         assert m.limit == 5
-        assert m.sr == 4326
+        assert m.radius_m == 500
 
     def test_custom_values(self):
-        m = ReverseGeocodeInput(lat=46.95, lon=7.44, limit=3, sr=2056)
+        m = ReverseGeocodeInput(lat=46.95, lon=7.44, limit=3, radius_m=1000)
         assert m.limit == 3
-        assert m.sr == 2056
+        assert m.radius_m == 1000
+
+    def test_sr_ist_kein_feld_mehr(self):
+        """Hier stand `assert m.sr == 4326` — und das war das Problem.
+
+        Der SearchServer wertet die `bbox` nur mit `sr=2056` aus. Ein Feld, das
+        4326 verspricht und dessen Wert die Anfrage unbrauchbar macht, ist eine
+        Zusage, die der Server nicht halten kann; es ist weg.
+        """
+        with pytest.raises(ValidationError):
+            ReverseGeocodeInput(lat=47.0, lon=8.0, sr=4326)
 
     def test_lat_too_low(self):
         with pytest.raises(ValidationError):
@@ -322,12 +332,19 @@ class TestReverseGeocodeHandler:
         p = captured["params"]
         assert p["type"] == "locations"
         assert p["origins"] == "address"
-        # bbox should be set and contain the coordinates
         assert "bbox" in p
-        bbox_str = p["bbox"]
-        # bbox = lon-0.005, lat-0.005, lon+0.005, lat+0.005
-        assert "7.995" in bbox_str
-        assert "46.995" in bbox_str
+
+        # Hier stand `assert "7.995" in bbox_str` — die Box in WGS84-Grad. Das
+        # war genau die Anfrage, auf die der SearchServer an jedem Punkt der
+        # Schweiz `results: []` antwortet; der Test hat den Defekt festgehalten
+        # statt ihn zu zeigen. Gemessen am 15.08.2026 am Zürcher Hauptbahnhof:
+        # Grad/4326 → 0, Grad/2056 → 0, LV95/4326 → 0, LV95/2056 → 3.
+        assert p["sr"] == 2056
+        ecken = [float(v) for v in p["bbox"].split(",")]
+        assert all(v > 1000 for v in ecken), f"die bbox steht nicht in Metern: {ecken}"
+        # 47.0 N / 8.0 E liegt in LV95 bei rund 2642695 / 1205590.
+        assert 2_641_000 < ecken[0] < 2_643_000, ecken
+        assert 1_204_000 < ecken[1] < 1_206_000, ecken
 
     async def test_reverse_geocode_api_error(self, monkeypatch):
         import httpx

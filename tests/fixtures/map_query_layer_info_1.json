@@ -1,0 +1,62 @@
+{
+  "id": "ch.bfs.gebaeude_wohnungs_register",
+  "name": "GWR: Gebäudestatus",
+  "fields": [
+    {
+      "name": "stroffiziel",
+      "type": "VARCHAR",
+      "alias": "Strassenbezeichnung offiziell",
+      "values": [
+        "",
+        "1"
+      ]
+    },
+    {
+      "name": "ggdename",
+      "type": "VARCHAR",
+      "alias": "Gemeindename",
+      "values": [
+        "Birmenstorf (AG)",
+        "Ferden",
+        "Fully",
+        "Laténa",
+        "Schlierbach"
+      ]
+    },
+    {
+      "name": "gvolsce",
+      "type": "SMALLINT",
+      "alias": "Informationsquelle zum Gebäudevolumen",
+      "values": [
+        null,
+        859,
+        852,
+        869,
+        853
+      ]
+    },
+    {
+      "name": "gklas",
+      "type": "SMALLINT",
+      "alias": "Gebäudeklasse",
+      "values": [
+        1110,
+        1122,
+        1252,
+        1271,
+        1274
+      ]
+    },
+    {
+      "name": "gvolnorm",
+      "type": "SMALLINT",
+      "alias": "Gebäudevolumen: Norm",
+      "values": [
+        null,
+        969,
+        961,
+        962
+      ]
+    }
+  ]
+}

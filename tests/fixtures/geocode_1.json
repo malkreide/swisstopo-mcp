@@ -1,0 +1,36 @@
+{
+  "results": [
+    {
+      "attrs": {
+        "detail": "bahnhofplatz 1 8001 zuerich 261 zuerich ch zh",
+        "featureId": "2372938_0",
+        "geom_quadindex": "030003122231003313033",
+        "geom_st_box2d": "BOX(8.541117 47.376849,8.541117 47.376849)",
+        "label": "Bahnhofplatz 1 <b>8001 Zürich</b>",
+        "lat": 47.37684631347656,
+        "links": [
+          {
+            "href": "/rest/services/ech/MapServer/ch.swisstopo.amtliches-gebaeudeadressverzeichnis/101146632",
+            "rel": "related",
+            "title": "ch.swisstopo.amtliches-gebaeudeadressverzeichnis"
+          },
+          {
+            "href": "/rest/services/ech/MapServer/ch.bfs.gebaeude_wohnungs_register/2372938_0",
+            "rel": "related",
+            "title": "ch.bfs.gebaeude_wohnungs_register"
+          }
+        ],
+        "lon": 8.541129112243652,
+        "num": 1,
+        "objectclass": "",
+        "origin": "address",
+        "rank": 7,
+        "x": 8.541129112243652,
+        "y": 47.37684631347656,
+        "zoomlevel": 10
+      },
+      "id": 1960253,
+      "weight": 1
+    }
+  ]
+}

@@ -7,7 +7,69 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Breaking
+
+- **`swisstopo_reverse_geocode` verliert das Feld `sr`, bekommt `radius_m`.**
+  Betroffenes Tool-Schema: `swisstopo_reverse_geocode` (`tool-hashes.json`
+  aktualisiert — Clients müssen die geänderte Definition neu bestätigen). `sr`
+  liess sich nicht einhalten: der SearchServer wertet die Bounding-Box nur in
+  LV95 und nur mit `sr=2056` aus, jeder andere Wert liefert HTTP 200 mit
+  `results: []`. Ein Feld, das eine Zusage macht, die der Server nicht halten
+  kann, ist schlechter als keines. Was ein Aufrufer daraus las — `attrs.lat` /
+  `attrs.lon` — kommt ohnehin in WGS84 zurück, unabhängig von `sr`.
+  `radius_m` (50–5000, Standard 500) ersetzt die bisher fest verdrahteten
+  0.005 Grad.
+
+### Added
+
+- **Aufgezeichnete Fixtures** in `tests/fixtures/` — 21 echte Antworten, eine je
+  **Anfrage** (nicht je Endpunkt: sieben Hosts, aber weit mehr Abfrageformen —
+  der `/rest/services`-Zweig allein bedient fünf Operationen). Aufgenommen über
+  einen httpx-Response-Hook auf dem geteilten Client, ausgelöst von den
+  Werkzeugen selbst. Herkunft, Datum, Auswahlregel und SHA-256 je Datei in
+  `tests/fixtures/PROVENANCE.md`, neu aufzeichnen mit
+  `scripts/record_fixtures.py`, geladen über `tests/fixture_data.py`.
+  Portfolio-Konvention, gleich wie in `meteoswiss-mcp` und
+  `swiss-statistics-mcp`.
+
+  Zugeordnet wird beim Abspielen nach der **Anfrage** und nicht nach der
+  Reihenfolge — `_query_geodienste` fährt seine Kantone per `asyncio.gather`.
+  Den Schlüssel dafür liest der Test aus `PROVENANCE.md`: der Nachweis trägt
+  den Abspielbetrieb, statt Prosa neben den Dateien zu sein.
+
+  Gekürzt ist nur die **Zahl** der Listeneinträge, nie ein Feld — und zwei
+  Dateien gar nicht. `municipality_at` sucht in 177 Jahres-Polygonen das mit
+  `is_current_jahr`, und der geodienste-Katalog wird nach Kanton gefiltert; ein
+  Schnitt auf die ersten fünf Zeilen erfand dort einen Negativbefund. Wo ein
+  Werkzeug *in* einer Liste filtert, ist Kürzen nicht harmlos.
+
+- **`tests/test_recorded_fixtures.py`** — 32 Zusicherungen, die jedes der 20
+  Werkzeuge aus seiner eigenen Aufzeichnung fahren, darunter
+  `test_keine_aufzeichnung_ist_leer`: eine leere Antwort sieht aus wie eine
+  gültige und prüft nichts. Genau daran fiel der Fehler unten auf.
+
 ### Fixed
+
+- **`swisstopo_reverse_geocode` fand an keinem Punkt der Schweiz eine Adresse.**
+  Die Bounding-Box ging in WGS84-Grad hinaus, obwohl der SearchServer sie nur
+  in LV95 auswertet. Gemessen am 15.08.2026 am Zürcher Hauptbahnhof:
+
+  | bbox | `sr` | Treffer |
+  |---|---|---|
+  | Grad | 4326 | 0 |
+  | Grad | 2056 | 0 |
+  | LV95 | 4326 | 0 |
+  | LV95 | 2056 | 3 |
+
+  Das Werkzeug meldete daraufhin «Keine Adresse im 500-m-Umkreis — der Punkt
+  liegt womöglich ausserhalb besiedelten Gebiets»: ein Ausfall in der Form
+  eines gültigen Negativbefunds, den ein Modell nicht von einem echten
+  unterscheiden kann. `test_reverse_geocode_bbox_params` hielt die kaputte
+  Anfrage sogar fest (`assert "7.995" in bbox_str`) und war deshalb grün.
+
+  Nebenbei stimmte der Radius nie: 0.005 Grad sind auf 47° Breite 556 m
+  nord-süd und 377 m ost-west, während der Kommentar daneben «~500 m»
+  versprach.
 
 - **geodienste-Abfragen scheiterten mit «Zugriff verweigert (403)».**
   geodienste.ch verlangt seit dem 9. August 2026 bei jeder `items`-Anfrage der

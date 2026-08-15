@@ -1,0 +1,74 @@
+{
+  "results": [
+    {
+      "attrs": {
+        "detail": "gebaeude- und wohnungsstatistik: gebaeude | seit 1990 werden fuer die im rahmen der eidgenoessischen volkszaehlungen erfassten gebaeuden mit wohnzweck koordinaten bestimmt. seit 2010 loest die auf der hauptgrundlage des eidg. gebaeude- und wohnungsregisters _gwr_ jaehrlich aktualisierte gebaeude- und wohnungsstatistik _gws_ die einst alle 10 jahre im rahmen der volkszaehlung _vz_ stattfindende gebaeude- und wohnungserhebung ab. sie liefert informationen zur struktur des gesamten gebaeude- und wohnungsparks und ueber die wohnverhaeltnisse _z.b. wohn- und belegungsdichte, flaeche pro bewohner_ der bevoelkerung. | eidg. volks-, gebaeude- und wohnungszaehlungen | swisstopo | bundesamt fuer landestopografie swisstopo | bundesamt fuer statistik bfs",
+        "label": "<b>Gebäude</b>",
+        "lang": "de",
+        "layer": "ch.bfs.volkszaehlung-gebaeudestatistik_gebaeude",
+        "origin": "layer",
+        "staging": "prod",
+        "title": "gebaeude",
+        "topics": "api,bfs,ech,inspire,schule,service-wms"
+      },
+      "id": 1095,
+      "weight": 95
+    },
+    {
+      "attrs": {
+        "detail": "schaetzung der direkten co₂-emissionen aufgrund des waermebedarfs gemaess sia -norm 380/1 _2016_ | der schweizer gebaeudepark ist fuer rund einen viertel der co2-emissionen verantwortlich. reduktionen in diesem bereich sind zentral fuer die erreichung der klimaziele.</p><p> mit der karte «co2-emissionen gebaeude _sia 380/1_» kann fuer jedes wohngebaeude abgeschaetzt werden, wie viel co2 ausgestossen wird. diese co2-emissionen werden fuer normbedingungen fuer den heizwaerme- und warmwasserbedarf gerechnet. fuer die berechnung werden die oeffentlich zugaenglichen input-daten aus dem eidgenoessischen gebaeude- und wohnungsregister gwr des bundesamtes fuer statistik beigezogen. diese daten sind nicht ueberall aktuell und beinhalten keine ausreichenden informationen zu gebaeudesanierungen. mit einem interaktiven co₂-rechner kann simuliert werden, wie sich der co2-wert veraendert, wenn energetische sanierungen mitberuecksichtigt werden oder ein energietraegerwechsel vorgenommen wird. die eingegebenen daten werden nicht gespeichert. dieses tool koennen sie bei jedem gebaeude unter «objekt-information» nutzen.</p><p> die angaben sind als grobe einschaetzung zu verstehen und stellen keine amtlichen oder verbindlichen angaben dar.</p><p> die co2-visualisierung mit dem co2-rechner schafft transparenz und zeigt auf, dass es besonders wichtig ist, die gwr-daten aktuell zu halten. gebaeudebesitzende koennen selber mithelfen, die klima- und energierelevanten gebaeudedaten im gwr aktuell zu halten. in einem link bei «objekt-information» zu jedem gebaeude findet sich der beschrieb, wie allfaellige veraltete angaben gemeldet werden koennen.</p><p> weitere informationen finden sie unter https://www.bafu.admin.ch/de/co2-rechner-gebaeude. | swisstopo | bundesamt fuer landestopografie swisstopo | bundesamt fuer umwelt bafu",
+        "label": "<b>CO₂-Emissionen Gebäude (SIA 380/1)</b>",
+        "lang": "de",
+        "layer": "ch.bafu.klima-co2_ausstoss_gebaeude",
+        "origin": "layer",
+        "staging": "prod",
+        "title": "co₂-emissionen gebaeude _sia 380/1_",
+        "topics": "api,bafu,ech,inspire,schule,service-wms"
+      },
+      "id": 1460,
+      "weight": 87
+    },
+    {
+      "attrs": {
+        "detail": "eidg. gebaeude- und wohnungsregister: gebaeudestatus | das eidgenoessische gebaeude- und wohnungsregister _gwr_ wurde anhand von daten der volkszaehlung 2000 zu statistischen zwecken erstellt.das gwr hat sich nicht zuletzt dank der am 1. juli 2017 in kraft getretenen totalrevision der verordnung _vgwr_ als massgebendes nationales informationssystem fuer gebaeude etabliert. das gwr enthaelt informationen zu bauprojekten, gebaeuden, wohnungen, gebaeudeeingaengen und strassen. daten der stufe a sind oeffentlich und koennen ohne einschraenkung verwendet werden. die datenebene \"gwr: gebaeudestatus\" veranschaulicht grafisch den status von gebaeuden und deren eingangsnummer_n_. | eidg. gebaeude- und wohnungsregister gwr | swisstopo | bundesamt fuer landestopografie swisstopo | bundesamt fuer statistik bfs",
+        "label": "<b>GWR: Gebäudestatus</b>",
+        "lang": "de",
+        "layer": "ch.bfs.gebaeude_wohnungs_register",
+        "origin": "layer",
+        "staging": "prod",
+        "title": "gwr: gebaeudestatus",
+        "topics": "api,bfs,cadastre,ech,inspire,kgs,service-wms,swissmaponline"
+      },
+      "id": 135,
+      "weight": 82
+    },
+    {
+      "attrs": {
+        "detail": "amtliches verzeichnis der gebaeudeadressen | offizieller datensatz fuer «amtliches verzeichnis der gebaeudeadressen», id197, gemaess katalog der geobasisdaten nach bundesrecht. das amtliche verzeichnis der gebaeudeadressen beinhaltet saemtliche offiziellen und damit behoerdenverbindlichen gebaeudeadressen der schweiz. alle gebaeude muessen eine oder mehrere eindeutige adressen aufweisen. gebaeude mit wohnnutzung, arbeitsstaetten sowie gebaeude von allgemein oeffentlichem interesse muessen zwingend im amtlichen verzeichnis der gebaeudeadressen erscheinen.es handelt sich um eine collection, die sowohl zugriff auf die gebaeudeadressen der schweiz als auch liechtensteins bietet. | swisstopo | bundesamt fuer landestopografie swisstopo | bundesamt fuer landestopografie swisstopo",
+        "label": "<b>Amtliches Gebäudeadressverzeichnis</b>",
+        "lang": "de",
+        "layer": "ch.swisstopo.amtliches-gebaeudeadressverzeichnis",
+        "origin": "layer",
+        "staging": "prod",
+        "title": "amtliches gebaeudeadressverzeichnis",
+        "topics": "api,cadastre,ech,inspire,kgs,service-wms,swisstopo"
+      },
+      "id": 1318,
+      "weight": 80
+    },
+    {
+      "attrs": {
+        "detail": "gebaeude- und wohnungsstatistik: wohnungen | seit 1990 werden fuer die im rahmen der eidgenoessischen volkszaehlungen erfassten gebaeude mit wohnzweck koordinaten bestimmt. seit 2010 loest die auf der hauptgrundlage des eidg. gebaeude- und wohnungsregisters _gwr_ jaehrlich aktualisierte gebaeude- und wohnungsstatistik _gws_ die einst alle 10 jahre im rahmen der volkszaehlung _vz_ stattfindende gebaeude- und wohnungserhebung ab. sie liefert informationen zur struktur des gesamten gebaeude- und wohnungsparks und ueber die wohnverhaeltnisse _z.b. wohn- und belegungsdichte, flaeche pro bewohner_ der bevoelkerung. | eidg. volks-, gebaeude- und wohnungszaehlungen | swisstopo | bundesamt fuer landestopografie swisstopo | bundesamt fuer statistik bfs",
+        "label": "<b>Wohnungen</b>",
+        "lang": "de",
+        "layer": "ch.bfs.volkszaehlung-gebaeudestatistik_wohnungen",
+        "origin": "layer",
+        "staging": "prod",
+        "title": "wohnungen",
+        "topics": "api,bfs,ech,inspire,schule,service-wms"
+      },
+      "id": 1096,
+      "weight": 73
+    }
+  ]
+}

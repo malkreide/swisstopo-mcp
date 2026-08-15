@@ -1,0 +1,21 @@
+{
+  "results": [
+    {
+      "layerBodId": "ch.are.bauzonen",
+      "layerName": "Bauzonen Schweiz (harmonisiert)",
+      "featureId": 368498,
+      "id": 368498,
+      "attributes": {
+        "name": "Zürich",
+        "ch_code_hn": "13",
+        "kt_kz": "ZH",
+        "bfs_no": "261",
+        "kt_no": "1",
+        "flaeche": 590692.0,
+        "ch_bez_f": "Zones mixtes",
+        "ch_bez_d": "Mischzonen",
+        "label": "Zürich"
+      }
+    }
+  ]
+}

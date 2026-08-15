@@ -1,7 +1,7 @@
 {
   "GetExtractByIdResponse": {
     "Extract": {
-      "CreationDate": "2026-08-15T17:11:27",
+      "CreationDate": "2026-08-15T19:17:56",
       "ConcernedTheme": [
         {
           "code": "ch.Nutzungsplanung",
@@ -101,7 +101,7 @@
         }
       ],
       "ThemeWithoutData": [],
-      "ExtractIdentifier": "20260815171127117",
+      "ExtractIdentifier": "20260815191756546",
       "GeneralInformation": [
         {
           "Language": "de",
@@ -2155,7 +2155,7 @@
         "PostalCode": "8090",
         "City": "Zürich"
       },
-      "UpdateDateCS": "2026-08-15T17:11:27",
+      "UpdateDateCS": "2026-08-15T19:17:57",
       "LogoPLRCadastreRef": "http://maps.zh.ch/images/custom/oerebkatasterzh/logos/oereb_logo.jpg",
       "FederalLogoRef": "http://maps.zh.ch/images/custom/oerebkatasterzh/logos/bundeslogo.png",
       "CantonalLogoRef": "http://maps.zh.ch/images/custom/oerebkatasterzh/logos/zh_logo.png",

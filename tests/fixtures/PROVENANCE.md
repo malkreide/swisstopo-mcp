@@ -30,7 +30,7 @@ Sie lassen sich nicht auf Zuruf aufzeichnen und sind als Erfindung in Ordnung.
 
 - **Werkzeuge:** `swisstopo_elevation_profile`
 - **Schluessel:** `https://api3.geo.admin.ch/rest/services/profile.json?geom=%7B%22type%22%3A%22LineString%22%2C%22coordinates%22%3A%5B%5B2683304.0346262627%2C1247925.5974930264%5D%2C%5B2683925.9269017293%2C1248279.0709856586%5D%5D%7D&nb_points=200&sr=2056`
-- **Auswahl:** ungekuerzt
+- **Auswahl:** 5 von 200 Listeneintraegen (je Liste die ersten 5), aus 21717 Bytes Rohantwort
 - **Groesse:** 830 Bytes
 - **SHA-256:** `54fbfc0170c3e019d3531bd56a2eed55463c73b1dad79649459f154bcc66c6ac`
 
@@ -38,7 +38,7 @@ Sie lassen sich nicht auf Zuruf aufzeichnen und sind als Erfindung in Ordnung.
 
 - **Werkzeuge:** `find_commune_tool`
 - **Schluessel:** `https://openplzapi.org/ch/Localities?name=Z%C3%BCrich`
-- **Auswahl:** ungekuerzt
+- **Auswahl:** 5 von 10 Listeneintraegen (je Liste die ersten 5), aus 2281 Bytes Rohantwort
 - **Groesse:** 1758 Bytes
 - **SHA-256:** `89de04fc0ad8d3e775555acff3a8998ba9f67c8d5d0af282fcc98303a80e4e70`
 
@@ -54,7 +54,7 @@ Sie lassen sich nicht auf Zuruf aufzeichnen und sind als Erfindung in Ordnung.
 
 - **Werkzeuge:** `swisstopo_get_collection`
 - **Schluessel:** `https://data.geo.admin.ch/api/stac/v0.9/collections/ch.swisstopo.swissalti3d`
-- **Auswahl:** ungekuerzt
+- **Auswahl:** 20 von 22 Listeneintraegen (je Liste die ersten 5), aus 1624 Bytes Rohantwort
 - **Groesse:** 1837 Bytes
 - **SHA-256:** `e8a45f6848c1e9282a62d2e3456c07e0a9cbf17bf8d689ea407995215b9de178`
 
@@ -78,9 +78,9 @@ Sie lassen sich nicht auf Zuruf aufzeichnen und sind als Erfindung in Ordnung.
 
 - **Werkzeuge:** `list_available_layers_tool`
 - **Schluessel:** `https://geodienste.ch/info/services.json`
-- **Auswahl:** ungekuerzt
+- **Auswahl:** 130 von 1327 Listeneintraegen (je Liste die ersten 5), aus 3469919 Bytes Rohantwort
 - **Groesse:** 26072 Bytes
-- **SHA-256:** `a41c1c1cab2b773cb27b962ca9c000ac2b061493b38724e9d182aa83cd95159c`
+- **SHA-256:** `c9f408843e96ea69ff16ca05235ab72307ed7295b5cf2516634607eca2ef6fd5`
 
 ## `lookup_postal_code_1.json`
 
@@ -94,7 +94,7 @@ Sie lassen sich nicht auf Zuruf aufzeichnen und sind als Erfindung in Ordnung.
 
 - **Werkzeuge:** `swisstopo_map_query`
 - **Schluessel:** `https://api3.geo.admin.ch/rest/services/ech/MapServer/identify?geometry=8.5417%2C47.3769&geometryType=esriGeometryPoint&layers=all%3Ach.bfs.gebaeude_wohnungs_register&tolerance=10&sr=4326&returnGeometry=false&mapExtent=8.5317%2C47.3669%2C8.5517%2C47.3869&imageDisplay=100%2C100%2C96`
-- **Auswahl:** ungekuerzt
+- **Auswahl:** 25 von 164 Listeneintraegen (je Liste die ersten 5), aus 235575 Bytes Rohantwort
 - **Groesse:** 11724 Bytes
 - **SHA-256:** `6ef1fa86e00ef3d87797b59871386c345c49c529c54a9397a875b9c29b37413a`
 
@@ -102,9 +102,9 @@ Sie lassen sich nicht auf Zuruf aufzeichnen und sind als Erfindung in Ordnung.
 
 - **Werkzeuge:** `swisstopo_map_query`
 - **Schluessel:** `https://api3.geo.admin.ch/rest/services/api/MapServer/ch.bfs.gebaeude_wohnungs_register`
-- **Auswahl:** ungekuerzt
-- **Groesse:** 1074 Bytes
-- **SHA-256:** `4b6f1035ad46b883fdd45e4ab9d6f1aaf5c1ca58c6e8da9128af379742ddcafa`
+- **Auswahl:** 45 von 140 Listeneintraegen (je Liste die ersten 5), aus 10981 Bytes Rohantwort
+- **Groesse:** 1429 Bytes
+- **SHA-256:** `98935ad2bb492770ac392d644b0a995fb15777780687b158f57c501308796d41`
 
 ## `map_query_layer_info_2.txt`
 
@@ -118,7 +118,7 @@ Sie lassen sich nicht auf Zuruf aufzeichnen und sind als Erfindung in Ordnung.
 
 - **Werkzeuge:** `swisstopo_map_query`
 - **Schluessel:** `https://api3.geo.admin.ch/rest/services/ech/SearchServer?type=layers&searchText=Geb%C3%A4ude&lang=de&limit=10`
-- **Auswahl:** ungekuerzt
+- **Auswahl:** 5 von 10 Listeneintraegen (je Liste die ersten 5), aus 13384 Bytes Rohantwort
 - **Groesse:** 6939 Bytes
 - **SHA-256:** `afd11399f76c65307dd560e71e441d3b9bd915a1bbfc575b3092bec86a2fb9f1`
 
@@ -134,9 +134,9 @@ Sie lassen sich nicht auf Zuruf aufzeichnen und sind als Erfindung in Ordnung.
 
 - **Werkzeuge:** `swisstopo_oereb_at`
 - **Schluessel:** `https://maps.zh.ch/oereb/v2/extract/json/?EGRID=CH119192997709&GEOMETRY=false&LANG=de`
-- **Auswahl:** ungekuerzt
+- **Auswahl:** 285 von 340 Listeneintraegen (je Liste die ersten 5), aus 81862 Bytes Rohantwort
 - **Groesse:** 75611 Bytes
-- **SHA-256:** `33a5a85fc7a1bebd2b783f49c8e02554174499d03c1224cf41867ed23bc27530`
+- **SHA-256:** `9e8f98d23c3b22a4174f177c80c1fde82454ef1adfde6f16c8e53127cc7dceb3`
 
 ## `query_geodata_oereb_1.json`
 
@@ -150,7 +150,7 @@ Sie lassen sich nicht auf Zuruf aufzeichnen und sind als Erfindung in Ordnung.
 
 - **Werkzeuge:** `query_geodata_tool`
 - **Schluessel:** `https://api3.geo.admin.ch/rest/services/api/MapServer/identify?geometryType=esriGeometryPoint&geometry=2683304.0%2C1247925.6&sr=2056&tolerance=15&layers=all%3Ach.swisstopo.amtliches-strassenverzeichnis&mapExtent=2682304.0%2C1246925.6%2C2684304.0%2C1248925.6&imageDisplay=200%2C200%2C96&returnGeometry=false&lang=de`
-- **Auswahl:** ungekuerzt
+- **Auswahl:** 5 von 13 Listeneintraegen (je Liste die ersten 5), aus 6037 Bytes Rohantwort
 - **Groesse:** 3016 Bytes
 - **SHA-256:** `3db0737df228a0f534223f248cf4f2d5f94d635a43ec2a7cbf19220f380ecdd7`
 
@@ -159,9 +159,9 @@ Sie lassen sich nicht auf Zuruf aufzeichnen und sind als Erfindung in Ordnung.
 - **Werkzeuge:** `query_osm_features_tool`
 - **Schluessel:** `https://overpass.osm.ch/api/interpreter#97a61bbc7858`
 - **Rumpf:** `data=[out:json][timeout:25];(node["amenity"="pharmacy"](around:500,47.3769,8.5417);way["amenity"="pharmacy"](around:500,47.3769,8.5417);relation["amenity"="pharmacy"](around:500,47.3769,8.5417););out center tags 50;`
-- **Auswahl:** ungekuerzt
+- **Auswahl:** 5 von 11 Listeneintraegen (je Liste die ersten 5), aus 7357 Bytes Rohantwort
 - **Groesse:** 4124 Bytes
-- **SHA-256:** `ca8386e90f321f7eae94a9033e51e798e7f426450f7ddf597de197208dbc2661`
+- **SHA-256:** `403a2638aca1c36b4b763ac47b3adff7f956590b69af1f81fd5cf7a7b8c98354`
 
 ## `reverse_geocode_1.json`
 
@@ -183,7 +183,7 @@ Sie lassen sich nicht auf Zuruf aufzeichnen und sind als Erfindung in Ordnung.
 
 - **Werkzeuge:** `swisstopo_search_geodata`
 - **Schluessel:** `https://data.geo.admin.ch/api/stac/v0.9/collections`
-- **Auswahl:** ungekuerzt
+- **Auswahl:** 100 von 205 Listeneintraegen (je Liste die ersten 5), aus 240323 Bytes Rohantwort
 - **Groesse:** 21782 Bytes
 - **SHA-256:** `8ad37f8dcb6b906f95f0d553f2e5177a4e6d2e23b6ff348e4c2f1c87817ceb07`
 

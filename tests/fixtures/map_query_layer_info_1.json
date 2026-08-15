@@ -3,59 +3,82 @@
   "name": "GWR: Gebäudestatus",
   "fields": [
     {
-      "name": "stroffiziel",
-      "type": "VARCHAR",
-      "alias": "Strassenbezeichnung offiziell",
-      "values": [
-        "",
-        "1"
-      ]
-    },
-    {
-      "name": "ggdename",
-      "type": "VARCHAR",
-      "alias": "Gemeindename",
-      "values": [
-        "Birmenstorf (AG)",
-        "Ferden",
-        "Fully",
-        "Laténa",
-        "Schlierbach"
-      ]
-    },
-    {
-      "name": "gvolsce",
+      "name": "gbaum",
       "type": "SMALLINT",
-      "alias": "Informationsquelle zum Gebäudevolumen",
+      "alias": "Baumonat des Gebäudes",
       "values": [
         null,
-        859,
-        852,
-        869,
-        853
+        9,
+        1,
+        8,
+        7
       ]
     },
     {
-      "name": "gklas",
+      "name": "gwaerzh2",
       "type": "SMALLINT",
-      "alias": "Gebäudeklasse",
-      "values": [
-        1110,
-        1122,
-        1252,
-        1271,
-        1274
-      ]
-    },
-    {
-      "name": "gvolnorm",
-      "type": "SMALLINT",
-      "alias": "Gebäudevolumen: Norm",
+      "alias": "Wärmeerzeuger Heizung 2",
       "values": [
         null,
-        969,
-        961,
-        962
+        7400,
+        7436,
+        7499
+      ]
+    },
+    {
+      "name": "wstwk",
+      "type": "SMALLINT",
+      "alias": "Stockwerk",
+      "values": [
+        null,
+        [
+          3100,
+          3107,
+          3102,
+          3106,
+          3106
+        ],
+        [
+          3100
+        ],
+        [
+          3100,
+          3100,
+          3101,
+          3101,
+          3102
+        ],
+        [
+          3101,
+          3101,
+          3101,
+          3101,
+          3102
+        ]
+      ]
+    },
+    {
+      "name": "gwaerdatw1",
+      "type": "DATETIME",
+      "alias": "Aktualisierungsdatum Warmwasser 1",
+      "values": [
+        "-",
+        "12.03.2020",
+        "23.11.2018",
+        "25.08.2023",
+        "29.11.2001"
+      ]
+    },
+    {
+      "name": "gwaerdatw2",
+      "type": "DATETIME",
+      "alias": "Aktualisierungsdatum Warmwasser 2",
+      "values": [
+        "-",
+        "02.08.2021",
+        "21.12.2017",
+        "25.08.2023",
+        "29.11.2001"
       ]
     }
   ]

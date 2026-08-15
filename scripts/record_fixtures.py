@@ -386,7 +386,11 @@ def _kuerze(daten: Any) -> tuple[int, int, Any]:
             return [geh(v) for v in gekuerzt]
         return knoten
 
-    return vorher, nachher, geh(daten)  # type: ignore[return-value]
+    # Erst laufen lassen, dann die Zaehler lesen. `return vorher, nachher,
+    # geh(daten)` wertet von links nach rechts aus und lieferte deshalb immer
+    # (0, 0) — der Nachweis schrieb «ungekuerzt» ueber jede gekuerzte Datei.
+    ergebnis = geh(daten)
+    return vorher, nachher, ergebnis
 
 
 async def main() -> int:

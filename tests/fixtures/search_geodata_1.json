@@ -1,0 +1,429 @@
+{
+  "collections": [
+    {
+      "stac_version": "0.9.0",
+      "id": "ch.agroscope.abschaetzung-organische_boeden",
+      "title": "Distribution of organic soils in Switzerland (Agroscope 2025)",
+      "description": "The map of organic soils in Switzerland is an update of the first map published in 2015. It provides an estimate of the distribution of (former) moorland soils that still exist today and are sufficiently humus-rich and deep to meet the criteria for organic soil.<br> The map was produced in four steps: First, soil maps, geological maps, national inventories of fens, raised bogs and transition mires, forest site maps, historical maps and documents were evaluated. Data newly available since 2015 were also included in this update. In a second step, all data sets were harmonised and incorporated into a data model allowing the various data sets to be combined. In a third step, the spatial data sets were overlaid and a rule-based method was used to identify the resulting surfaces as organic soil or not organic soil. In the final step, reliable information on the occurrence of mineral soils was used to delete surfaces for which the evidence of organic soil was considered less reliable. The total area of organic soils (including the ‘certain' and ‘less certain' estimates) is 32,702 ha. For many applications, this is the best estimate of the current occurrence of organic soils. The category ‘only documented in historical sources' refers to areas for which no current relevant information was found – neither in relation to mineral nor organic soils. The category ‘ambiguously documented' covers areas for which the evidence of organic soils is unclear; it is shown here solely for reasons of consistency with the previous surface estimate from 2015. <br> Due to the heterogeneous nature of the information sources used to create the map, it is not possible to define the scale for which this map is suitable. However, the following recommendation can be made: The map is suitable for use at national and regional levels (e.g. canton or district); it is not suitable for use at parcel level. <br> Two publications describe the methods and updated data sets in detail. It is recommended to read both publications before using the map. Parts of the data are subject to a licence; please refer to the ‘readme.txt' file in the download folder. <br><br> Literature <ul> <li> Wüst-Galley, C. and J. Leifeld (2025) ‘The distribution and (future) use of Switzerland's organic soils' Mires and Peat 32(4): 1-17, DOI: 10.19189/001c.130819</li> <li> Wüst-Galley, C., A. Grünig and J. Leifeld (2015) ‘Locating organic soils for the greenhouse gas inventory' Agroscope Science 26, 100 pp.</li> <ul>",
+      "summaries": {
+        "proj:epsg": [
+          2056
+        ]
+      },
+      "extent": {
+        "spatial": {
+          "bbox": [
+            [
+              5.96,
+              45.82,
+              10.49,
+              47.81
+            ]
+          ]
+        },
+        "temporal": {
+          "interval": [
+            [
+              "2024-10-31T00:00:00Z",
+              "2024-10-31T00:00:00Z"
+            ]
+          ]
+        }
+      },
+      "providers": [
+        {
+          "name": "Agroscope",
+          "roles": [
+            "producer",
+            "licensor"
+          ],
+          "url": "https://www.agroscope.admin.ch/agroscope/en/home.html"
+        }
+      ],
+      "license": "CC-BY",
+      "created": "2025-05-22T15:30:58.190278Z",
+      "updated": "2026-03-04T14:03:13.017136Z",
+      "links": [
+        {
+          "rel": "self",
+          "href": "https://data.geo.admin.ch/api/stac/v0.9/collections/ch.agroscope.abschaetzung-organische_boeden"
+        },
+        {
+          "rel": "root",
+          "href": "https://data.geo.admin.ch/api/stac/v0.9/"
+        },
+        {
+          "rel": "parent",
+          "href": "https://data.geo.admin.ch/api/stac/v0.9/"
+        },
+        {
+          "rel": "items",
+          "href": "https://data.geo.admin.ch/api/stac/v0.9/collections/ch.agroscope.abschaetzung-organische_boeden/items"
+        },
+        {
+          "rel": "alternate",
+          "title": "STAC Browser",
+          "type": "text/html",
+          "href": "https://data.geo.admin.ch/browser/index.html#/collections/ch.agroscope.abschaetzung-organische_boeden"
+        }
+      ],
+      "crs": [
+        "http://www.opengis.net/def/crs/OGC/1.3/CRS84"
+      ],
+      "itemType": "Feature",
+      "assets": {
+        "abschaetzung-organische_boeden.zip": {
+          "title": "Additional files",
+          "type": "application/zip",
+          "href": "https://data.geo.admin.ch/ch.agroscope.abschaetzung-organische_boeden/abschaetzung-organische_boeden.zip",
+          "created": "2025-05-22T15:32:28.414781Z",
+          "updated": "2025-05-28T14:41:40.105023Z",
+          "checksum:multihash": "1220d9f7215a457ef462ec0cb48b4fa9bbdf693ef62fa1954318557e4478901e14f6"
+        }
+      }
+    },
+    {
+      "stac_version": "0.9.0",
+      "id": "ch.agroscope.amphibien-ausbreitungskarten",
+      "title": "Amphibian dispersal maps",
+      "description": "Swiss-wide map depicting the dispersal probability of the Smooth newt (Lissotriton vulgaris). Each grid cell indicates the relative probability that dispersing individuals will pass through that hectare on their way between known amphibian breeding sites. The map shows dispersal probability increasing along a scale from blue to yellow to red. These maps should be thought of as heatmaps for dispersal activity of existing populations. In practical terms, these maps also show locations where potential new amphibian breeding sites have the highest chances of being colonized. Areas with many populations in close proximity appear a darker red, reflecting the higher probability of dispersal as multiple dispersal routes between populations intersect. This feature of the maps deserves special attention. Lighter shades at the edges of the species' range do not necessarily indicate a weaker connection between populations, but rather a consequence of the lower density of breeding sites at the edges of the range. The color scale should be considered in the context of the immediate surroundings. The dispersal map was calculated using Circuitscape and is based on a landscape resistance matrix derived from the best-ranked dispersal model for each species. For details, see the attached data description. Literature: Churko G., Szerencsits E., Aldrich A., Schmidt B. R. (2024). Spatial analysis of the potential exposure of amphibians to plant protection products at the landscape scale. Basic and Applied Ecology, 76, 14-24. https://doi.org/10.1016/j.baae.2024.02.004",
+      "summaries": {
+        "proj:epsg": [
+          2056
+        ]
+      },
+      "extent": {
+        "spatial": {
+          "bbox": [
+            [
+              5.96,
+              45.82,
+              10.49,
+              47.81
+            ]
+          ]
+        },
+        "temporal": {
+          "interval": [
+            [
+              "2024-02-23T00:00:00Z",
+              "2024-02-23T00:00:00Z"
+            ]
+          ]
+        }
+      },
+      "providers": [
+        {
+          "name": "Agroscope",
+          "roles": [
+            "producer",
+            "licensor"
+          ],
+          "url": "https://www.agroscope.admin.ch/agroscope/en/home.html"
+        }
+      ],
+      "license": "proprietary",
+      "created": "2025-05-22T14:39:07.159700Z",
+      "updated": "2026-05-11T20:00:02.195398Z",
+      "links": [
+        {
+          "rel": "self",
+          "href": "https://data.geo.admin.ch/api/stac/v0.9/collections/ch.agroscope.amphibien-ausbreitungskarten"
+        },
+        {
+          "rel": "root",
+          "href": "https://data.geo.admin.ch/api/stac/v0.9/"
+        },
+        {
+          "rel": "parent",
+          "href": "https://data.geo.admin.ch/api/stac/v0.9/"
+        },
+        {
+          "rel": "items",
+          "href": "https://data.geo.admin.ch/api/stac/v0.9/collections/ch.agroscope.amphibien-ausbreitungskarten/items"
+        },
+        {
+          "rel": "alternate",
+          "title": "STAC Browser",
+          "type": "text/html",
+          "href": "https://data.geo.admin.ch/browser/index.html#/collections/ch.agroscope.amphibien-ausbreitungskarten"
+        }
+      ],
+      "crs": [
+        "http://www.opengis.net/def/crs/OGC/1.3/CRS84"
+      ],
+      "itemType": "Feature",
+      "assets": {
+        "amphibien-ausbreitungskarten.zip": {
+          "title": "Additional files",
+          "type": "application/zip",
+          "href": "https://data.geo.admin.ch/ch.agroscope.amphibien-ausbreitungskarten/amphibien-ausbreitungskarten.zip",
+          "created": "2025-05-22T14:52:53.222219Z",
+          "updated": "2025-05-28T14:31:10.607224Z",
+          "checksum:multihash": "12209ce52dc40e77ba3fc35e4906358ee19b0175236f589d39c5ebe13024fc95987e"
+        }
+      }
+    },
+    {
+      "stac_version": "0.9.0",
+      "id": "ch.agroscope.amphibien-bedeutung_parzellen",
+      "title": "Agricultural parcels with potential importance to amphibians, surfaces",
+      "description": "Switzerland-wide map of agricultural parcels that are potentially suitable as either terrestrial habitat or as part of a dispersal route between amphibian breeding sites for up to 11 amphibian species. For each agricultural parcel, the dataset contains in its attributes information on which species (if any) are found in an amphibian breeding site near the parcel (within 200 m, 500 m or 1 km) and are likely to use the parcel as terrestrial habitat. Likewise, it is indicated which species (if any) are highly likely to have dispersal routes between breeding sites that pass through the plot.In the default view of the map, all parcels are shown that are suitable as terrestrial habitat for at least one species with a nearby spawning site (within 500 m) and/or along a dispersal route of at least one species. By selecting a parcel, you can see which species could potentially use that parcel using the columns “species_suitXXX” and “species_corridors\" (Alias: \"Terrestrial habitat XXXm\" and \"Dispersal\"), which contain a list of the Latin names of each species. 'species_suit200' is suitable habitat for a species with a breeding site within 200 m, 'species_suit500' for 500 m and 'species_suit1000' for 1000 m. The map is based on the spatial combination of the Swiss Agricultural Parcel Map of 2021 (KGK-CGC. (2022). Agricultural Landuse 2021. https://geodienste.ch/) and suitability and dispersal maps for 11 amphibian species. The map differentiates between the basic agricultural parcels and overlapping elements such as biodiversity promotion areas and small structures. Only the data set with the basic parcels is available in the Federal Geodata Infrastructure. Further details can be found in the attached data description. Literature: Churko G., Szerencsits E., Aldrich A., Schmidt B. R. (2024). Spatial analysis of the potential exposure of amphibians to plant protection products at the landscape scale. Basic and Applied Ecology, 76, 14-24. https://doi.org/10.1016/j.baae.2024.02.004",
+      "summaries": {
+        "proj:epsg": [
+          2056
+        ]
+      },
+      "extent": {
+        "spatial": {
+          "bbox": [
+            [
+              5.96,
+              45.82,
+              10.49,
+              47.81
+            ]
+          ]
+        },
+        "temporal": {
+          "interval": [
+            [
+              "2021-01-01T00:00:00Z",
+              "2021-01-01T00:00:00Z"
+            ]
+          ]
+        }
+      },
+      "providers": [
+        {
+          "name": "Agroscope",
+          "roles": [
+            "producer",
+            "licensor"
+          ],
+          "url": "https://www.agroscope.admin.ch/agroscope/en/home.html"
+        }
+      ],
+      "license": "proprietary",
+      "created": "2025-05-22T14:57:25.695200Z",
+      "updated": "2026-03-04T14:03:14.434992Z",
+      "links": [
+        {
+          "rel": "self",
+          "href": "https://data.geo.admin.ch/api/stac/v0.9/collections/ch.agroscope.amphibien-bedeutung_parzellen"
+        },
+        {
+          "rel": "root",
+          "href": "https://data.geo.admin.ch/api/stac/v0.9/"
+        },
+        {
+          "rel": "parent",
+          "href": "https://data.geo.admin.ch/api/stac/v0.9/"
+        },
+        {
+          "rel": "items",
+          "href": "https://data.geo.admin.ch/api/stac/v0.9/collections/ch.agroscope.amphibien-bedeutung_parzellen/items"
+        },
+        {
+          "rel": "alternate",
+          "title": "STAC Browser",
+          "type": "text/html",
+          "href": "https://data.geo.admin.ch/browser/index.html#/collections/ch.agroscope.amphibien-bedeutung_parzellen"
+        }
+      ],
+      "crs": [
+        "http://www.opengis.net/def/crs/OGC/1.3/CRS84"
+      ],
+      "itemType": "Feature",
+      "assets": {
+        "amphibien-bedeutung_parzellen.zip": {
+          "title": "Additional files",
+          "type": "application/zip",
+          "href": "https://data.geo.admin.ch/ch.agroscope.amphibien-bedeutung_parzellen/amphibien-bedeutung_parzellen.zip",
+          "created": "2025-05-22T15:28:30.091771Z",
+          "updated": "2025-05-28T14:28:13.084856Z",
+          "checksum:multihash": "1220ac64e9e9b278d06a91ebec197534c271de08c2954cad6e42e07b715fb985d163"
+        }
+      }
+    },
+    {
+      "stac_version": "0.9.0",
+      "id": "ch.agroscope.feuchtflaechenpotential-kulturlandschaft",
+      "title": "Wetness potential in the agricultural land, vector",
+      "description": "Das Feuchtflächenpotential wurde anhand der Prozesse Wasserakkumulation und Versickerung beurteilt. Aus dem Höhenmodell (Swissalti3d © swisstopo) wurden Reliefparameter berechnet und Ebenen und Mulden modelliert. Das Potential der Versickerung wurde von Bodenkarten abgeleitet. Wo keine detaillierten Bodenkarten vorhanden waren, wurden geologische Karten und andere Surrogate in einem Expertenmodell überlagert und gewichtet. Der Vektor-Datensatz ist auf die vorwiegend landwirtschaftlich genutzten Feldblöcke zugeschnitten.Versickerung: 4 Klassen; Wasserakkumulation: 5 Klassen. Zitat: Szerencsits, E., Prasuhn, V., Churko, G., Herzog, F., Utiger, C., Zihlmann, U. et al. (2018). Karte potenzieller Feucht-Acker-Flächen der Schweiz. Agroscope Science, 72, 67. https://www.feuchtacker.ch/",
+      "summaries": {
+        "proj:epsg": [
+          2056
+        ]
+      },
+      "extent": {
+        "spatial": {
+          "bbox": [
+            [
+              5.96,
+              45.82,
+              10.49,
+              47.81
+            ]
+          ]
+        },
+        "temporal": {
+          "interval": [
+            [
+              "2018-12-01T00:00:00Z",
+              "2018-12-01T00:00:00Z"
+            ]
+          ]
+        }
+      },
+      "providers": [
+        {
+          "name": "Agroscope",
+          "roles": [
+            "producer",
+            "licensor"
+          ],
+          "url": "https://www.agroscope.admin.ch/agroscope/en/home.html"
+        }
+      ],
+      "license": "proprietary",
+      "created": "2023-09-26T12:39:29.964574Z",
+      "updated": "2026-03-04T14:03:15.150558Z",
+      "links": [
+        {
+          "rel": "self",
+          "href": "https://data.geo.admin.ch/api/stac/v0.9/collections/ch.agroscope.feuchtflaechenpotential-kulturlandschaft"
+        },
+        {
+          "rel": "root",
+          "href": "https://data.geo.admin.ch/api/stac/v0.9/"
+        },
+        {
+          "rel": "parent",
+          "href": "https://data.geo.admin.ch/api/stac/v0.9/"
+        },
+        {
+          "rel": "items",
+          "href": "https://data.geo.admin.ch/api/stac/v0.9/collections/ch.agroscope.feuchtflaechenpotential-kulturlandschaft/items"
+        },
+        {
+          "rel": "alternate",
+          "title": "STAC Browser",
+          "type": "text/html",
+          "href": "https://data.geo.admin.ch/browser/index.html#/collections/ch.agroscope.feuchtflaechenpotential-kulturlandschaft"
+        }
+      ],
+      "crs": [
+        "http://www.opengis.net/def/crs/OGC/1.3/CRS84"
+      ],
+      "itemType": "Feature",
+      "assets": {}
+    },
+    {
+      "stac_version": "0.9.0",
+      "id": "ch.agroscope.fokuskarte-voegel",
+      "title": "Focus map agri-environmental objective birds",
+      "description": "The published data were produced in the framework of Klein et al. 2025, parts of the project and co-authors were funded by Agroscope, the Swiss Federal Office for the Environment (FOEN) // Swiss Government under the project “ValPar.CH: Values of the ecological infrastructure in Swiss parks” (grant no. A1.2) and BiodivERsA-Belmont Forum Call on “Scenarios of Biodiversity and Ecosystem services” (grant no. BiodivScen-157). The objective of the project was to combine field-level impact of agricultural activities with the potential distribution of Swiss priority birds. The impact was assessed for 2021, using the Swiss Agricultural Life Cycle Assessment for Biodiversity (SALCA-BD, Jeanneret et al. 2014). The potential was assessed by aggregating predictions from species distribution models of 27 bird priority species, modelled as part of the ValParCH project (Adde et al. 2023), using the SWECO25 database for environmental predictors (Külling et al. 2024). First, an optimized hot spot analysis using ArcGIS pro was conducted separately on estimated impact and distribution potential. Second, they were combined using a multivariate clustering with K-means statistics to identify clusters with comparable combinations between high and low impact and high and low potential. The resulting map shows 7 clusters with distinct combinations of high/low impact and potential. The spatial resolution of the raster dataset is 25 m. <br><br> References: <br> Adde, A., Rey, P. L., Brun, P., Külling, N., Fopp, F., Altermatt, F., Broennimann, O., Lehmann, A., Petitpierre, B., Zimmermann, N. E., Pellissier, L., & Guisan, A. (2023). N-SDM: A high-performance computing pipeline for nested species distribution modelling. Ecography, 2023, e06540. https://doi.org/10.1111/ecog.06540 Jeanneret, P., Baumgartner, D. U., Freiermuth Knuchel, R., Koch, B., & Gaillard, G. (2014). An expert system for integrating biodiversity into agricultural life-cycle assessment. Ecological Indicators, 46, 224–231. https://doi.org/10.1016/j.ecolind.2014.06.030 Klein N., Adde A., Grêt-Regamey A., Guisan A., Herzog F., Jeanneret P., Kay. S. Identifying focus zones for the conservation and promotion of priority birds in Swiss farmland. Conservation Science and Practice. 2025. https://doi.org/10.1111/csp2.13286 Külling, N., Adde, A., Fopp, F., Schweiger, A. K., Broennimann, O., Rey, P.-L., Giuliani, G., Goicolea, T., Petitpierre, B., Zimmermann, N. E., Pellissier, L., Altermatt, F., Lehmann, A., & Guisan, A. (2024). SWECO25: A cross-thematic raster database for ecological research in Switzerland. Scientific Data, 11, 21. https://doi.org/10.1038/s41597-023-02899-1",
+      "summaries": {
+        "proj:epsg": [
+          2056
+        ]
+      },
+      "extent": {
+        "spatial": {
+          "bbox": [
+            [
+              5.96,
+              45.82,
+              10.49,
+              47.81
+            ]
+          ]
+        },
+        "temporal": {
+          "interval": [
+            [
+              "2024-11-20T00:00:00Z",
+              "2024-11-20T00:00:00Z"
+            ]
+          ]
+        }
+      },
+      "providers": [
+        {
+          "name": "Agroscope",
+          "roles": [
+            "producer",
+            "licensor"
+          ],
+          "url": "https://www.agroscope.admin.ch/agroscope/en/home.html"
+        }
+      ],
+      "license": "proprietary",
+      "created": "2025-05-22T15:42:25.013719Z",
+      "updated": "2026-03-04T14:03:16.056750Z",
+      "links": [
+        {
+          "rel": "self",
+          "href": "https://data.geo.admin.ch/api/stac/v0.9/collections/ch.agroscope.fokuskarte-voegel"
+        },
+        {
+          "rel": "root",
+          "href": "https://data.geo.admin.ch/api/stac/v0.9/"
+        },
+        {
+          "rel": "parent",
+          "href": "https://data.geo.admin.ch/api/stac/v0.9/"
+        },
+        {
+          "rel": "items",
+          "href": "https://data.geo.admin.ch/api/stac/v0.9/collections/ch.agroscope.fokuskarte-voegel/items"
+        },
+        {
+          "rel": "alternate",
+          "title": "STAC Browser",
+          "type": "text/html",
+          "href": "https://data.geo.admin.ch/browser/index.html#/collections/ch.agroscope.fokuskarte-voegel"
+        }
+      ],
+      "crs": [
+        "http://www.opengis.net/def/crs/OGC/1.3/CRS84"
+      ],
+      "itemType": "Feature",
+      "assets": {
+        "fokuskarte-voegel.zip": {
+          "title": "Additional files",
+          "type": "application/zip",
+          "href": "https://data.geo.admin.ch/ch.agroscope.fokuskarte-voegel/fokuskarte-voegel.zip",
+          "created": "2025-05-22T15:45:02.446589Z",
+          "updated": "2025-06-27T09:07:19.280404Z",
+          "checksum:multihash": "12207c042e9f2365a5518c196700f68e92c21815c56f23647063de53827f055b7c17"
+        }
+      }
+    }
+  ],
+  "links": [
+    {
+      "rel": "self",
+      "href": "https://data.geo.admin.ch/api/stac/v0.9/collections"
+    },
+    {
+      "rel": "root",
+      "href": "https://data.geo.admin.ch/api/stac/v0.9/"
+    },
+    {
+      "rel": "parent",
+      "href": "https://data.geo.admin.ch/api/stac/v0.9/"
+    },
+    {
+      "rel": "alternate",
+      "title": "STAC Browser",
+      "type": "text/html",
+      "href": "https://data.geo.admin.ch/browser/index.html#/"
+    },
+    {
+      "rel": "next",
+      "href": "https://data.geo.admin.ch/api/stac/v0.9/collections?cursor=cD1jaC5iYWZ1Lmdlb2NoZW1pc2NoZXItYm9kZW5hdGxhc19zY2h3ZWl6X3F1ZWNrc2lsYmVy"
+    }
+  ]
+}

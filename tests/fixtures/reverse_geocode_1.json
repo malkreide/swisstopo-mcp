@@ -1,0 +1,169 @@
+{
+  "results": [
+    {
+      "attrs": {
+        "@geodist": 1884.962890625,
+        "detail": "bahnhofquai 15 8001 zuerich 261 zuerich ch zh",
+        "featureId": "2372938_3",
+        "geom_quadindex": "030003122231012321001",
+        "geom_st_box2d": "BOX(2683281.8850000016 1247917.1490000002,2683281.8850000016 1247917.1490000002)",
+        "label": "Bahnhofquai 15 <b>8001 Zürich</b>",
+        "lat": 47.376827239990234,
+        "links": [
+          {
+            "href": "/rest/services/ech/MapServer/ch.swisstopo.amtliches-gebaeudeadressverzeichnis/103464478",
+            "rel": "related",
+            "title": "ch.swisstopo.amtliches-gebaeudeadressverzeichnis"
+          },
+          {
+            "href": "/rest/services/ech/MapServer/ch.bfs.gebaeude_wohnungs_register/2372938_3",
+            "rel": "related",
+            "title": "ch.bfs.gebaeude_wohnungs_register"
+          }
+        ],
+        "lon": 8.541406631469727,
+        "num": 15,
+        "objectclass": "",
+        "origin": "address",
+        "rank": 7,
+        "x": 1247917.125,
+        "y": 2683282.0,
+        "zoomlevel": 10
+      },
+      "id": 2521134,
+      "weight": 1508
+    },
+    {
+      "attrs": {
+        "@geodist": 2347.998779296875,
+        "detail": "bahnhofquai 20 8001 zuerich 261 zuerich ch zh",
+        "featureId": "302040824_0",
+        "geom_quadindex": "030003122231011100213",
+        "geom_st_box2d": "BOX(2683308.3770000003 1247966.0390000008,2683308.3770000003 1247966.0390000008)",
+        "label": "Bahnhofquai 20 <b>8001 Zürich</b>",
+        "lat": 47.377262115478516,
+        "links": [
+          {
+            "href": "/rest/services/ech/MapServer/ch.swisstopo.amtliches-gebaeudeadressverzeichnis/101732815",
+            "rel": "related",
+            "title": "ch.swisstopo.amtliches-gebaeudeadressverzeichnis"
+          },
+          {
+            "href": "/rest/services/ech/MapServer/ch.bfs.gebaeude_wohnungs_register/302040824_0",
+            "rel": "related",
+            "title": "ch.bfs.gebaeude_wohnungs_register"
+          }
+        ],
+        "lon": 8.541767120361328,
+        "num": 20,
+        "objectclass": "",
+        "origin": "address",
+        "rank": 7,
+        "x": 1247966.0,
+        "y": 2683308.5,
+        "zoomlevel": 10
+      },
+      "id": 1845565,
+      "weight": 1508
+    },
+    {
+      "attrs": {
+        "@geodist": 2474.302734375,
+        "detail": "bahnhofpassage 52u 8001 zuerich 261 zuerich ch zh",
+        "featureId": "9046679_0",
+        "geom_quadindex": "030003122231010121331",
+        "geom_st_box2d": "BOX(2683284.2239999995 1247958.3189999983,2683284.2239999995 1247958.3189999983)",
+        "label": "Bahnhofpassage 52u <b>8001 Zürich</b>",
+        "lat": 47.377197265625,
+        "links": [
+          {
+            "href": "/rest/services/ech/MapServer/ch.swisstopo.amtliches-gebaeudeadressverzeichnis/101236615",
+            "rel": "related",
+            "title": "ch.swisstopo.amtliches-gebaeudeadressverzeichnis"
+          },
+          {
+            "href": "/rest/services/ech/MapServer/ch.bfs.gebaeude_wohnungs_register/9046679_0",
+            "rel": "related",
+            "title": "ch.bfs.gebaeude_wohnungs_register"
+          }
+        ],
+        "lon": 8.5414457321167,
+        "num": 52,
+        "objectclass": "",
+        "origin": "address",
+        "rank": 7,
+        "x": 1247958.375,
+        "y": 2683284.25,
+        "zoomlevel": 10
+      },
+      "id": 2234773,
+      "weight": 1508
+    },
+    {
+      "attrs": {
+        "@geodist": 2490.26708984375,
+        "detail": "bahnhofquai 11 8001 zuerich 261 zuerich ch zh",
+        "featureId": "2372938_1",
+        "geom_quadindex": "030003122231030313222",
+        "geom_st_box2d": "BOX(2683288.6169999987 1247888.2930000015,2683288.6169999987 1247888.2930000015)",
+        "label": "Bahnhofquai 11 <b>8001 Zürich</b>",
+        "lat": 47.37656784057617,
+        "links": [
+          {
+            "href": "/rest/services/ech/MapServer/ch.swisstopo.amtliches-gebaeudeadressverzeichnis/103464479",
+            "rel": "related",
+            "title": "ch.swisstopo.amtliches-gebaeudeadressverzeichnis"
+          },
+          {
+            "href": "/rest/services/ech/MapServer/ch.bfs.gebaeude_wohnungs_register/2372938_1",
+            "rel": "related",
+            "title": "ch.bfs.gebaeude_wohnungs_register"
+          }
+        ],
+        "lon": 8.54149055480957,
+        "num": 11,
+        "objectclass": "",
+        "origin": "address",
+        "rank": 7,
+        "x": 1247888.25,
+        "y": 2683288.5,
+        "zoomlevel": 10
+      },
+      "id": 2484640,
+      "weight": 1508
+    },
+    {
+      "attrs": {
+        "@geodist": 3135.205078125,
+        "detail": "bahnhofbruecke 1 8001 zuerich 261 zuerich ch zh",
+        "featureId": "2372833_0",
+        "geom_quadindex": "030003122231102323033",
+        "geom_st_box2d": "BOX(2683341.243999999 1247911.870000001,2683341.243999999 1247911.870000001)",
+        "label": "Bahnhofbrücke 1 <b>8001 Zürich</b>",
+        "lat": 47.37677001953125,
+        "links": [
+          {
+            "href": "/rest/services/ech/MapServer/ch.swisstopo.amtliches-gebaeudeadressverzeichnis/101168958",
+            "rel": "related",
+            "title": "ch.swisstopo.amtliches-gebaeudeadressverzeichnis"
+          },
+          {
+            "href": "/rest/services/ech/MapServer/ch.bfs.gebaeude_wohnungs_register/2372833_0",
+            "rel": "related",
+            "title": "ch.bfs.gebaeude_wohnungs_register"
+          }
+        ],
+        "lon": 8.542191505432129,
+        "num": 1,
+        "objectclass": "",
+        "origin": "address",
+        "rank": 7,
+        "x": 1247911.875,
+        "y": 2683341.25,
+        "zoomlevel": 10
+      },
+      "id": 2271033,
+      "weight": 1508
+    }
+  ]
+}

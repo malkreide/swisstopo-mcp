@@ -1,0 +1,68 @@
+{
+  "results": [
+    {
+      "layerBodId": "ch.swisstopo-vd.stand-oerebkataster",
+      "layerName": "Verfügbarkeit des ÖREB-Katasters",
+      "featureId": 635347,
+      "id": 635347,
+      "attributes": {
+        "fid": "261",
+        "number": "AA8048",
+        "gemeindename": "Zürich",
+        "kanton": "Zürich",
+        "oereb_status_de": "ÖREB-Kataster eingeführt",
+        "oereb_status_fr": "Cadastre RDPPF introduit",
+        "oereb_status_it": "Catasto RDPP introdotto",
+        "oereb_status_rm": "ÖREB-Kataster eingeführt",
+        "oereb_status_en": "ÖREB-Kataster eingeführt",
+        "bfs_nr": 261,
+        "firmenname": "Baudirektion des Kantons Zürich, Amt für Raumentwicklung ARE",
+        "adresszeile": "Stampfenbachstrasse 12",
+        "plz": 8090,
+        "ort": "Zürich",
+        "telefon": "043 259 30 22",
+        "email": "kataster@bd.zh.ch",
+        "url_oereb": "http://maps.zh.ch/?topic=OerebKatasterZH&locate=gemeinden&locations=261",
+        "oereb_webservice": "https://maps.zh.ch/oereb/v2",
+        "bgdi_status": 0,
+        "egris_egrid": "CH119192997709",
+        "oereb_extract_pdf": "https://maps.zh.ch/oereb/v2/extract/pdf/?EGRID=CH119192997709",
+        "oereb_extract_url": "https://maps.zh.ch/oereb/v2/extract/url/?EGRID=CH119192997709",
+        "realestate_type": "Liegenschaft",
+        "label": "Zürich"
+      }
+    },
+    {
+      "layerBodId": "ch.swisstopo-vd.stand-oerebkataster",
+      "layerName": "Verfügbarkeit des ÖREB-Katasters",
+      "featureId": 635348,
+      "id": 635348,
+      "attributes": {
+        "fid": "261",
+        "number": "AA8048",
+        "gemeindename": "Zürich",
+        "kanton": "Zürich",
+        "oereb_status_de": "ÖREB-Kataster eingeführt",
+        "oereb_status_fr": "Cadastre RDPPF introduit",
+        "oereb_status_it": "Catasto RDPP introdotto",
+        "oereb_status_rm": "ÖREB-Kataster eingeführt",
+        "oereb_status_en": "ÖREB-Kataster eingeführt",
+        "bfs_nr": 261,
+        "firmenname": "Stadt Zürich, Geomatik + Vermessung",
+        "adresszeile": "Weberstrasse 5",
+        "plz": 8004,
+        "ort": "Zürich",
+        "telefon": "044 412 42 56",
+        "email": "vermessung@zuerich.ch",
+        "url_oereb": "http://maps.zh.ch/?topic=OerebKatasterZH&locate=gemeinden&locations=261",
+        "oereb_webservice": "https://maps.zh.ch/oereb/v2",
+        "bgdi_status": 0,
+        "egris_egrid": "CH119192997709",
+        "oereb_extract_pdf": "https://maps.zh.ch/oereb/v2/extract/pdf/?EGRID=CH119192997709",
+        "oereb_extract_url": "https://maps.zh.ch/oereb/v2/extract/url/?EGRID=CH119192997709",
+        "realestate_type": "Liegenschaft",
+        "label": "Zürich"
+      }
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "GetEGRIDResponse": [
+    {
+      "egrid": "CH119192997709",
+      "number": "AA8048",
+      "identDN": "ZH0200000261",
+      "type": {
+        "Code": "RealEstate",
+        "Text": [
+          {
+            "Language": "de",
+            "Text": "Liegenschaft"
+          }
+        ]
+      }
+    }
+  ]
+}

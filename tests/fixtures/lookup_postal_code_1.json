@@ -1,0 +1,21 @@
+[
+  {
+    "postalCode": "8001",
+    "name": "Zürich",
+    "commune": {
+      "key": "261",
+      "name": "Zürich",
+      "shortName": "Zürich"
+    },
+    "district": {
+      "key": "112",
+      "name": "Bezirk Zürich",
+      "shortName": "Zürich"
+    },
+    "canton": {
+      "key": "1",
+      "name": "Zürich",
+      "shortName": "ZH"
+    }
+  }
+]

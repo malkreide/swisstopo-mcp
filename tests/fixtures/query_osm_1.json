@@ -1,0 +1,132 @@
+{
+  "version": 0.6,
+  "generator": "Overpass API 0.7.59.1 2a9d9642",
+  "osm3s": {
+    "timestamp_osm_base": "116416",
+    "copyright": "The data included in this document is from www.openstreetmap.org. The data is made available under ODbL."
+  },
+  "elements": [
+    {
+      "type": "node",
+      "id": 693318441,
+      "lat": 47.3742811,
+      "lon": 8.5383036,
+      "tags": {
+        "addr:city": "Zürich",
+        "addr:country": "CH",
+        "addr:housenumber": "71",
+        "addr:postcode": "8001",
+        "addr:street": "Bahnhofstrasse",
+        "amenity": "pharmacy",
+        "brand": "Rotpunkt Apotheke",
+        "check_date": "2026-04-14",
+        "check_date:opening_hours": "2026-04-14",
+        "healthcare": "pharmacy",
+        "name": "Victoria Apotheke",
+        "opening_hours": "Mo-Fr 08:00-19:00; Sa 09:00-18:00",
+        "operator": "Rotpunkt Pharma",
+        "website": "https://www.pharmaworld.com/",
+        "wheelchair": "yes"
+      }
+    },
+    {
+      "type": "node",
+      "id": 693318592,
+      "lat": 47.3758718,
+      "lon": 8.5391041,
+      "tags": {
+        "addr:city": "Zürich",
+        "addr:country": "CH",
+        "addr:housenumber": "81",
+        "addr:postcode": "8001",
+        "addr:street": "Bahnhofstrasse",
+        "alt_name": "Coop Vitality Bahnhofstrasse",
+        "amenity": "pharmacy",
+        "branch": "Zürich Bahnhofstrasse",
+        "brand": "Coop Vitality",
+        "brand:wikidata": "Q111725297",
+        "check_date": "2025-10-29",
+        "healthcare": "pharmacy",
+        "level": "0",
+        "name": "Coop Vitality",
+        "opening_hours": "Mo-Fr 09:00-20:00; Sa 09:00-19:00",
+        "operator": "Coop Vitality & GaleniCare",
+        "website": "https://www.coopvitality.ch/de/coop-vitality-zurich",
+        "wheelchair": "yes"
+      }
+    },
+    {
+      "type": "node",
+      "id": 693318670,
+      "lat": 47.37669,
+      "lon": 8.5399521,
+      "tags": {
+        "addr:city": "Zürich",
+        "addr:country": "CH",
+        "addr:housenumber": "108",
+        "addr:postcode": "8001",
+        "addr:street": "Bahnhofstrasse",
+        "amenity": "pharmacy",
+        "branch": "Zürich City",
+        "brand": "Amavita",
+        "brand:wikidata": "Q93733901",
+        "brand:wikipedia": "de:Amavita",
+        "check_date": "2025-09-03",
+        "check_date:opening_hours": "2025-08-28",
+        "healthcare": "pharmacy",
+        "name": "Amavita",
+        "old_name": "Apotheke Sammet",
+        "opening_hours": "Mo-Fr 07:00-20:00; Sa 08:00-20:00; Su 11:00-18:00",
+        "operator": "GaleniCare",
+        "website": "https://www.amavita.ch/de/amavita-apotheke-bahnhofplatz-zurich",
+        "wheelchair": "yes"
+      }
+    },
+    {
+      "type": "node",
+      "id": 703216769,
+      "lat": 47.3776379,
+      "lon": 8.5435927,
+      "tags": {
+        "addr:city": "Zürich",
+        "addr:country": "CH",
+        "addr:housenumber": "7",
+        "addr:postcode": "8001",
+        "addr:street": "Stampfenbachstrasse",
+        "amenity": "pharmacy",
+        "branch": "Zürich Central",
+        "brand": "TopPharm",
+        "brand:wikidata": "Q110277794",
+        "check_date": "2026-04-20",
+        "check_date:opening_hours": "2026-04-20",
+        "healthcare": "pharmacy",
+        "name": "TopPharm",
+        "opening_hours": "Mo-Fr 07:45-18:45; Sa 09:00-16:00",
+        "operator": "TopPharm Genossenschaft",
+        "website": "https://www.apotheke.ch/leonhards",
+        "wheelchair": "no"
+      }
+    },
+    {
+      "type": "node",
+      "id": 1110775501,
+      "lat": 47.373314,
+      "lon": 8.5384614,
+      "tags": {
+        "addr:city": "Zürich",
+        "addr:country": "CH",
+        "addr:housenumber": "58",
+        "addr:postcode": "8001",
+        "addr:street": "Bahnhofstrasse",
+        "amenity": "pharmacy",
+        "check_date": "2025-11-07",
+        "check_date:opening_hours": "2025-11-07",
+        "healthcare": "pharmacy",
+        "name": "Löwen Apotheke",
+        "opening_hours": "Mo-Fr 09:30-19:00; Sa 10:00-18:00",
+        "website": "http://www.loewen-apotheke-zuerich.ch/",
+        "wheelchair": "limited"
+      }
+    }
+  ]
+}

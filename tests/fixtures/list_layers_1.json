@@ -1,0 +1,479 @@
+{
+  "services": [
+    {
+      "topic_title": "Amtliche Vermessung",
+      "base_topic": "av",
+      "topic": "av",
+      "version": "24.0",
+      "abstract": "Die amtliche Vermessung – ein nationales Produkt – liefert geometrische Daten zum Grundeigentum und ist die Grundlage für viele weitere geografische Informationen und Anwendungen in Wirtschaft, Verwaltung und Privatleben. Die Daten basieren auf dem MGDM DM.01-AV-CH (ID 51.1, ID 52.1, ID 53.1, ID 53.2, ID 54.1, ID 54.2, ID 55.1, ID 56.1, ID 57.1, ID 58.1, ID 59.1, ID 60.1, ID 61.1, ID 62.1, ID 63.1, ID 64.1).",
+      "keywords": "av, MOpublic, DM.01, Vermessung, amtlich, Bodenbedeckung, Liegenschaft, Parzelle, Grundbuch, Basisplan, Fixpunkt, Einzelobjekt, Gebäudeadresse, Adresse, Hoheitsgrenze, Grenze, Grundbuchplan, Situationsplan, Plan, IFC, ID 51.1, ID 52.1, ID 53.1, ID 53.2, ID 54.1, ID 54.2, ID 54.2, ID 55.1, ID 56.1, ID 57.1, ID 58.1, ID 59.1, ID 60.1, ID 61.1, ID 62.1, ID 63.1, ID 64.1, ID 228",
+      "keywords_gemet": "Bundesrecht",
+      "keywords_geocat": "Minimales Geodatenmodel MGDM, geodienste.ch, Kanton, Geobasisdaten",
+      "categories": [
+        "A – Basiskarten, Bodenbedeckung, Bilddaten",
+        "B – Ortsangaben, Referenzsysteme",
+        "C – Höhen",
+        "D – Politische und administrative Grenzen",
+        "E – Raumplanung, Grundstückskataster"
+      ],
+      "website": "https://geodienste.ch/services/av",
+      "terms": "https://geodienste.ch/terms-of-use",
+      "image": "https://geodienste.ch/images/topics/av.png",
+      "canton": "AG",
+      "broker": null,
+      "ilivalidator_version": "1.11.6",
+      "updated_at": "2026-08-14T10:49:54",
+      "cantonal_coverage": true,
+      "data_update_cycle": "Täglich",
+      "contact_geo": "Kanton Aargau\r\nDepartement Finanzen und Ressourcen, Informatik Aargau\r\nAGIS Service Center\r\nSuhrenmattstrasse 48\r\n5035 Unterentfelden\r\n\r\nhttp://www.ag.ch/geoportal \r\n",
+      "contact_specialist_department": "KANTON AARGAU\r\nDepartement Volkswirtschaft und Inneres\r\nVermessungsamt\r\nBahnhofplatz 3c, 5001 Aarau\r\nTel. 062 835 15 00\r\nvermessungsamt@ag.ch\r\nwww.ag.ch/vermessungsamt",
+      "notes": null,
+      "contextual_information": [],
+      "publication_data": "Frei erhältlich",
+      "dxf_geobau_supported": true,
+      "monthly_price_data": null,
+      "contract_required_data": false,
+      "terms_of_use_data": "https://www.ag.ch/geoportal/geodatenshop/Nutzungsbedingungen.aspx?Typ=NutzungsbedingungenAGIS1",
+      "opendata_terms_data": "Freie Nutzung. Quellenangabe ist Pflicht.",
+      "publication_wms": "Frei erhältlich",
+      "monthly_price_wms": null,
+      "contract_required_wms": false,
+      "terms_of_use_wms": "https://www.ag.ch/geoportal/geodatenshop/Nutzungsbedingungen.aspx?Typ=NutzungsbedingungenAGIS1",
+      "opendata_terms_wms": "Freie Nutzung. Quellenangabe ist Pflicht.",
+      "planning_contact": "marco.campomori@ag.ch",
+      "planning_notes": null,
+      "planning_release": null,
+      "getcapabilities_wfs": [
+        "https://geodienste.ch/db/av_0/deu?SERVICE=WFS&REQUEST=GetCapabilities",
+        "https://geodienste.ch/db/av_situationsplan_0/deu?SERVICE=WFS&REQUEST=GetCapabilities",
+        "https://geodienste.ch/db/av_situationsplan_oereb_0/deu?SERVICE=WFS&REQUEST=GetCapabilities",
+        "https://geodienste.ch/db/avc_0/deu?SERVICE=WFS&REQUEST=GetCapabilities"
+      ],
+      "getcapabilities_wms": [
+        "https://geodienste.ch/db/av_0/deu?SERVICE=WMS&REQUEST=GetCapabilities",
+        "https://geodienste.ch/db/av_situationsplan_0/deu?SERVICE=WMS&REQUEST=GetCapabilities",
+        "https://geodienste.ch/db/av_situationsplan_oereb_0/deu?SERVICE=WMS&REQUEST=GetCapabilities",
+        "https://geodienste.ch/db/avc_0/deu?SERVICE=WMS&REQUEST=GetCapabilities"
+      ],
+      "ogc_api_features": [
+        "https://geodienste.ch/db/av_0/deu/ogcapi",
+        "https://geodienste.ch/db/av_situationsplan_0/deu/ogcapi",
+        "https://geodienste.ch/db/av_situationsplan_oereb_0/deu/ogcapi",
+        "https://geodienste.ch/db/avc_0/deu/ogcapi"
+      ],
+      "stac_item_url": "https://geodienste.ch/stac/collections/av/items/av-AG",
+      "geobasisdaten": [
+        {
+          "id": 51.1,
+          "url": "https://geobasisdaten.ch/detail?identifier=51.1&corp=CH&lang=de"
+        },
+        {
+          "id": 52.1,
+          "url": "https://geobasisdaten.ch/detail?identifier=52.1&corp=CH&lang=de"
+        },
+        {
+          "id": 53.1,
+          "url": "https://geobasisdaten.ch/detail?identifier=53.1&corp=CH&lang=de"
+        },
+        {
+          "id": 53.2,
+          "url": "https://geobasisdaten.ch/detail?identifier=53.2&corp=CH&lang=de"
+        },
+        {
+          "id": 54.1,
+          "url": "https://geobasisdaten.ch/detail?identifier=54.1&corp=CH&lang=de"
+        }
+      ],
+      "dataset_url": "https://geodienste.ch/downloads/interlis/av/AG/av_AG_lv95.zip",
+      "meta_data": {
+        "dataset_url": "https://www.geocat.ch/geonetwork/srv/ger/catalog.search#/metadata/d929eef4-791d-4728-9d56-226b6952cf1f"
+      },
+      "model_names": [
+        "MD01MOCH24MN95F",
+        "DM01AVCH24LV95D",
+        "MD01MUCH24MN95I"
+      ],
+      "catalog_names": null
+    },
+    {
+      "topic_title": "Amtliche Vermessung",
+      "base_topic": "av",
+      "topic": "av",
+      "version": "24.0",
+      "abstract": "Die amtliche Vermessung – ein nationales Produkt – liefert geometrische Daten zum Grundeigentum und ist die Grundlage für viele weitere geografische Informationen und Anwendungen in Wirtschaft, Verwaltung und Privatleben. Die Daten basieren auf dem MGDM DM.01-AV-CH (ID 51.1, ID 52.1, ID 53.1, ID 53.2, ID 54.1, ID 54.2, ID 55.1, ID 56.1, ID 57.1, ID 58.1, ID 59.1, ID 60.1, ID 61.1, ID 62.1, ID 63.1, ID 64.1).",
+      "keywords": "av, MOpublic, DM.01, Vermessung, amtlich, Bodenbedeckung, Liegenschaft, Parzelle, Grundbuch, Basisplan, Fixpunkt, Einzelobjekt, Gebäudeadresse, Adresse, Hoheitsgrenze, Grenze, Grundbuchplan, Situationsplan, Plan, IFC, ID 51.1, ID 52.1, ID 53.1, ID 53.2, ID 54.1, ID 54.2, ID 54.2, ID 55.1, ID 56.1, ID 57.1, ID 58.1, ID 59.1, ID 60.1, ID 61.1, ID 62.1, ID 63.1, ID 64.1, ID 228",
+      "keywords_gemet": "Bundesrecht",
+      "keywords_geocat": "Minimales Geodatenmodel MGDM, geodienste.ch, Kanton, Geobasisdaten",
+      "categories": [
+        "A – Basiskarten, Bodenbedeckung, Bilddaten",
+        "B – Ortsangaben, Referenzsysteme",
+        "C – Höhen",
+        "D – Politische und administrative Grenzen",
+        "E – Raumplanung, Grundstückskataster"
+      ],
+      "website": "https://geodienste.ch/services/av",
+      "terms": "https://geodienste.ch/terms-of-use",
+      "image": "https://geodienste.ch/images/topics/av.png",
+      "canton": "AI",
+      "broker": null,
+      "ilivalidator_version": "1.14.3",
+      "updated_at": "2026-08-15T06:20:10",
+      "cantonal_coverage": true,
+      "data_update_cycle": "Täglich",
+      "contact_geo": "Kantonale Verwaltung \r\nAppenzell Innerrhoden \r\nAmt für Geoinformation\r\nGaiserstrasse 8 \r\n9050 Appenzell",
+      "contact_specialist_department": "Kantonale Verwaltung\r\nAppenzell Innerrhoden\r\nAmt für Geoinformation\r\nGaiserstrasse 8\r\n9050 Appenzell",
+      "notes": null,
+      "contextual_information": [],
+      "publication_data": "Frei erhältlich",
+      "dxf_geobau_supported": true,
+      "monthly_price_data": null,
+      "contract_required_data": false,
+      "terms_of_use_data": "https://geodienste.ch/pdfs/AI/av/data/Nutzungsbedingungen_AI_annex-123-2.pdf",
+      "opendata_terms_data": "Freie Nutzung. Quellenangabe ist Pflicht.",
+      "publication_wms": "Frei erhältlich",
+      "monthly_price_wms": null,
+      "contract_required_wms": false,
+      "terms_of_use_wms": "https://geodienste.ch/pdfs/AI/av/portrayal/Nutzungsbedingungen_AI_annex-123-2.pdf",
+      "opendata_terms_wms": "Freie Nutzung. Quellenangabe ist Pflicht.",
+      "planning_contact": "pascal.megert@lfd.ai.ch",
+      "planning_notes": null,
+      "planning_release": null,
+      "getcapabilities_wfs": [
+        "https://geodienste.ch/db/av_0/deu?SERVICE=WFS&REQUEST=GetCapabilities",
+        "https://geodienste.ch/db/av_situationsplan_0/deu?SERVICE=WFS&REQUEST=GetCapabilities",
+        "https://geodienste.ch/db/av_situationsplan_oereb_0/deu?SERVICE=WFS&REQUEST=GetCapabilities",
+        "https://geodienste.ch/db/avc_0/deu?SERVICE=WFS&REQUEST=GetCapabilities"
+      ],
+      "getcapabilities_wms": [
+        "https://geodienste.ch/db/av_0/deu?SERVICE=WMS&REQUEST=GetCapabilities",
+        "https://geodienste.ch/db/av_situationsplan_0/deu?SERVICE=WMS&REQUEST=GetCapabilities",
+        "https://geodienste.ch/db/av_situationsplan_oereb_0/deu?SERVICE=WMS&REQUEST=GetCapabilities",
+        "https://geodienste.ch/db/avc_0/deu?SERVICE=WMS&REQUEST=GetCapabilities"
+      ],
+      "ogc_api_features": [
+        "https://geodienste.ch/db/av_0/deu/ogcapi",
+        "https://geodienste.ch/db/av_situationsplan_0/deu/ogcapi",
+        "https://geodienste.ch/db/av_situationsplan_oereb_0/deu/ogcapi",
+        "https://geodienste.ch/db/avc_0/deu/ogcapi"
+      ],
+      "stac_item_url": "https://geodienste.ch/stac/collections/av/items/av-AI",
+      "geobasisdaten": [
+        {
+          "id": 51.1,
+          "url": "https://geobasisdaten.ch/detail?identifier=51.1&corp=CH&lang=de"
+        },
+        {
+          "id": 52.1,
+          "url": "https://geobasisdaten.ch/detail?identifier=52.1&corp=CH&lang=de"
+        },
+        {
+          "id": 53.1,
+          "url": "https://geobasisdaten.ch/detail?identifier=53.1&corp=CH&lang=de"
+        },
+        {
+          "id": 53.2,
+          "url": "https://geobasisdaten.ch/detail?identifier=53.2&corp=CH&lang=de"
+        },
+        {
+          "id": 54.1,
+          "url": "https://geobasisdaten.ch/detail?identifier=54.1&corp=CH&lang=de"
+        }
+      ],
+      "dataset_url": "https://geodienste.ch/downloads/interlis/av/AI/av_AI_lv95.zip",
+      "meta_data": {
+        "dataset_url": "https://www.geocat.ch/geonetwork/srv/ger/catalog.search#/metadata/d929eef4-791d-4728-9d56-226b6952cf1f"
+      },
+      "model_names": [
+        "MD01MOCH24MN95F",
+        "DM01AVCH24LV95D",
+        "MD01MUCH24MN95I"
+      ],
+      "catalog_names": null
+    },
+    {
+      "topic_title": "Amtliche Vermessung",
+      "base_topic": "av",
+      "topic": "av",
+      "version": "24.0",
+      "abstract": "Die amtliche Vermessung – ein nationales Produkt – liefert geometrische Daten zum Grundeigentum und ist die Grundlage für viele weitere geografische Informationen und Anwendungen in Wirtschaft, Verwaltung und Privatleben. Die Daten basieren auf dem MGDM DM.01-AV-CH (ID 51.1, ID 52.1, ID 53.1, ID 53.2, ID 54.1, ID 54.2, ID 55.1, ID 56.1, ID 57.1, ID 58.1, ID 59.1, ID 60.1, ID 61.1, ID 62.1, ID 63.1, ID 64.1).",
+      "keywords": "av, MOpublic, DM.01, Vermessung, amtlich, Bodenbedeckung, Liegenschaft, Parzelle, Grundbuch, Basisplan, Fixpunkt, Einzelobjekt, Gebäudeadresse, Adresse, Hoheitsgrenze, Grenze, Grundbuchplan, Situationsplan, Plan, IFC, ID 51.1, ID 52.1, ID 53.1, ID 53.2, ID 54.1, ID 54.2, ID 54.2, ID 55.1, ID 56.1, ID 57.1, ID 58.1, ID 59.1, ID 60.1, ID 61.1, ID 62.1, ID 63.1, ID 64.1, ID 228",
+      "keywords_gemet": "Bundesrecht",
+      "keywords_geocat": "Minimales Geodatenmodel MGDM, geodienste.ch, Kanton, Geobasisdaten",
+      "categories": [
+        "A – Basiskarten, Bodenbedeckung, Bilddaten",
+        "B – Ortsangaben, Referenzsysteme",
+        "C – Höhen",
+        "D – Politische und administrative Grenzen",
+        "E – Raumplanung, Grundstückskataster"
+      ],
+      "website": "https://geodienste.ch/services/av",
+      "terms": "https://geodienste.ch/terms-of-use",
+      "image": "https://geodienste.ch/images/topics/av.png",
+      "canton": "AR",
+      "broker": null,
+      "ilivalidator_version": "1.11.9",
+      "updated_at": "2026-08-15T07:22:09",
+      "cantonal_coverage": true,
+      "data_update_cycle": "Täglich",
+      "contact_geo": "Amt für Raum und Wald \r\nGeoinformation \r\nKasernenstrasse 17A \r\n9102 Herisau\r\nTel.: +41 71 353 67 74\r\ngisfachstelle@ar.ch",
+      "contact_specialist_department": "https://www.ar.ch/verwaltung/departement-bau-und-volkswirtschaft/amt-fuer-raum-und-wald/geoinformation-und-vermessung/",
+      "notes": null,
+      "contextual_information": [],
+      "publication_data": "Frei erhältlich",
+      "dxf_geobau_supported": true,
+      "monthly_price_data": null,
+      "contract_required_data": false,
+      "terms_of_use_data": "https://ar.ch/fileadmin/user_upload/Departement_Bau_Volkswirtschaft/Amt_fuer_Raum_Wald/Geoinformation_und_Vermessung/AR_Nutzungsbedingungen_Geodaten.pdf",
+      "opendata_terms_data": "Freie Nutzung",
+      "publication_wms": "Frei erhältlich",
+      "monthly_price_wms": null,
+      "contract_required_wms": false,
+      "terms_of_use_wms": "https://ar.ch/fileadmin/user_upload/Departement_Bau_Volkswirtschaft/Amt_fuer_Raum_Wald/Geoinformation_und_Vermessung/AR_Nutzungsbedingungen_Geodaten.pdf",
+      "opendata_terms_wms": "Freie Nutzung",
+      "planning_contact": "gisfachstelle@ar.ch",
+      "planning_notes": null,
+      "planning_release": null,
+      "getcapabilities_wfs": [
+        "https://geodienste.ch/db/av_0/deu?SERVICE=WFS&REQUEST=GetCapabilities",
+        "https://geodienste.ch/db/av_situationsplan_0/deu?SERVICE=WFS&REQUEST=GetCapabilities",
+        "https://geodienste.ch/db/av_situationsplan_oereb_0/deu?SERVICE=WFS&REQUEST=GetCapabilities",
+        "https://geodienste.ch/db/avc_0/deu?SERVICE=WFS&REQUEST=GetCapabilities"
+      ],
+      "getcapabilities_wms": [
+        "https://geodienste.ch/db/av_0/deu?SERVICE=WMS&REQUEST=GetCapabilities",
+        "https://geodienste.ch/db/av_situationsplan_0/deu?SERVICE=WMS&REQUEST=GetCapabilities",
+        "https://geodienste.ch/db/av_situationsplan_oereb_0/deu?SERVICE=WMS&REQUEST=GetCapabilities",
+        "https://geodienste.ch/db/avc_0/deu?SERVICE=WMS&REQUEST=GetCapabilities"
+      ],
+      "ogc_api_features": [
+        "https://geodienste.ch/db/av_0/deu/ogcapi",
+        "https://geodienste.ch/db/av_situationsplan_0/deu/ogcapi",
+        "https://geodienste.ch/db/av_situationsplan_oereb_0/deu/ogcapi",
+        "https://geodienste.ch/db/avc_0/deu/ogcapi"
+      ],
+      "stac_item_url": "https://geodienste.ch/stac/collections/av/items/av-AR",
+      "geobasisdaten": [
+        {
+          "id": 51.1,
+          "url": "https://geobasisdaten.ch/detail?identifier=51.1&corp=CH&lang=de"
+        },
+        {
+          "id": 52.1,
+          "url": "https://geobasisdaten.ch/detail?identifier=52.1&corp=CH&lang=de"
+        },
+        {
+          "id": 53.1,
+          "url": "https://geobasisdaten.ch/detail?identifier=53.1&corp=CH&lang=de"
+        },
+        {
+          "id": 53.2,
+          "url": "https://geobasisdaten.ch/detail?identifier=53.2&corp=CH&lang=de"
+        },
+        {
+          "id": 54.1,
+          "url": "https://geobasisdaten.ch/detail?identifier=54.1&corp=CH&lang=de"
+        }
+      ],
+      "dataset_url": "https://geodienste.ch/downloads/interlis/av/AR/av_AR_lv95.zip",
+      "meta_data": {
+        "dataset_url": "https://www.geocat.ch/geonetwork/srv/ger/catalog.search#/metadata/d929eef4-791d-4728-9d56-226b6952cf1f"
+      },
+      "model_names": [
+        "MD01MOCH24MN95F",
+        "DM01AVCH24LV95D",
+        "MD01MUCH24MN95I"
+      ],
+      "catalog_names": null
+    },
+    {
+      "topic_title": "Amtliche Vermessung",
+      "base_topic": "av",
+      "topic": "av",
+      "version": "24.0",
+      "abstract": "Die amtliche Vermessung – ein nationales Produkt – liefert geometrische Daten zum Grundeigentum und ist die Grundlage für viele weitere geografische Informationen und Anwendungen in Wirtschaft, Verwaltung und Privatleben. Die Daten basieren auf dem MGDM DM.01-AV-CH (ID 51.1, ID 52.1, ID 53.1, ID 53.2, ID 54.1, ID 54.2, ID 55.1, ID 56.1, ID 57.1, ID 58.1, ID 59.1, ID 60.1, ID 61.1, ID 62.1, ID 63.1, ID 64.1).",
+      "keywords": "av, MOpublic, DM.01, Vermessung, amtlich, Bodenbedeckung, Liegenschaft, Parzelle, Grundbuch, Basisplan, Fixpunkt, Einzelobjekt, Gebäudeadresse, Adresse, Hoheitsgrenze, Grenze, Grundbuchplan, Situationsplan, Plan, IFC, ID 51.1, ID 52.1, ID 53.1, ID 53.2, ID 54.1, ID 54.2, ID 54.2, ID 55.1, ID 56.1, ID 57.1, ID 58.1, ID 59.1, ID 60.1, ID 61.1, ID 62.1, ID 63.1, ID 64.1, ID 228",
+      "keywords_gemet": "Bundesrecht",
+      "keywords_geocat": "Minimales Geodatenmodel MGDM, geodienste.ch, Kanton, Geobasisdaten",
+      "categories": [
+        "A – Basiskarten, Bodenbedeckung, Bilddaten",
+        "B – Ortsangaben, Referenzsysteme",
+        "C – Höhen",
+        "D – Politische und administrative Grenzen",
+        "E – Raumplanung, Grundstückskataster"
+      ],
+      "website": "https://geodienste.ch/services/av",
+      "terms": "https://geodienste.ch/terms-of-use",
+      "image": "https://geodienste.ch/images/topics/av.png",
+      "canton": "BE",
+      "broker": null,
+      "ilivalidator_version": "1.11.6",
+      "updated_at": "2026-08-13T05:49:46",
+      "cantonal_coverage": true,
+      "data_update_cycle": "Benutzerdefiniert",
+      "contact_geo": "Geoportal des Kantons Bern / Géoportail du canton de Berne\r\n\r\nDirektion für Inneres und Justiz / Direction de l'intérieur et de la justice\r\nAmt für Geoinformation / Office de l'information géographique\r\nReiterstrasse 11\r\n3013 Bern\r\n\r\nnormierung.agi@be.ch",
+      "contact_specialist_department": "\r\n",
+      "notes": "Bitte informieren Sie sich auf dem Geoportal des Kantons Bern (https://www.topo.apps.be.ch/pub/map/?lang=de&gpk=AMO_GPK) und beim lokalen Geometer über den aktuellen Datenstand und die Rechtsgültigkeit (Kontaktdaten via Infoabfrage in der Geoportalkarte einsehbar). Dies gilt insbesondere für Gemeinden in denen die amtliche Vermessung «in Arbeit» oder «provisorisch» ist.\r\n",
+      "contextual_information": [],
+      "publication_data": "Frei erhältlich",
+      "dxf_geobau_supported": true,
+      "monthly_price_data": null,
+      "contract_required_data": false,
+      "terms_of_use_data": "https://geofiles.be.ch/internet/geo/geodaten/agi-dv-nutzungsbedingungen-de.pdf",
+      "opendata_terms_data": "Freie Nutzung. Quellenangabe ist Pflicht.",
+      "publication_wms": "Frei erhältlich",
+      "monthly_price_wms": null,
+      "contract_required_wms": false,
+      "terms_of_use_wms": "https://geofiles.be.ch/internet/geo/geodaten/agi-dv-nutzungsbedingungen-de.pdf",
+      "opendata_terms_wms": "Freie Nutzung. Quellenangabe ist Pflicht.",
+      "planning_contact": "",
+      "planning_notes": null,
+      "planning_release": null,
+      "getcapabilities_wfs": [
+        "https://geodienste.ch/db/av_0/deu?SERVICE=WFS&REQUEST=GetCapabilities",
+        "https://geodienste.ch/db/av_situationsplan_0/deu?SERVICE=WFS&REQUEST=GetCapabilities",
+        "https://geodienste.ch/db/av_situationsplan_oereb_0/deu?SERVICE=WFS&REQUEST=GetCapabilities",
+        "https://geodienste.ch/db/avc_0/deu?SERVICE=WFS&REQUEST=GetCapabilities"
+      ],
+      "getcapabilities_wms": [
+        "https://geodienste.ch/db/av_0/deu?SERVICE=WMS&REQUEST=GetCapabilities",
+        "https://geodienste.ch/db/av_situationsplan_0/deu?SERVICE=WMS&REQUEST=GetCapabilities",
+        "https://geodienste.ch/db/av_situationsplan_oereb_0/deu?SERVICE=WMS&REQUEST=GetCapabilities",
+        "https://geodienste.ch/db/avc_0/deu?SERVICE=WMS&REQUEST=GetCapabilities"
+      ],
+      "ogc_api_features": [
+        "https://geodienste.ch/db/av_0/deu/ogcapi",
+        "https://geodienste.ch/db/av_situationsplan_0/deu/ogcapi",
+        "https://geodienste.ch/db/av_situationsplan_oereb_0/deu/ogcapi",
+        "https://geodienste.ch/db/avc_0/deu/ogcapi"
+      ],
+      "stac_item_url": "https://geodienste.ch/stac/collections/av/items/av-BE",
+      "geobasisdaten": [
+        {
+          "id": 51.1,
+          "url": "https://geobasisdaten.ch/detail?identifier=51.1&corp=CH&lang=de"
+        },
+        {
+          "id": 52.1,
+          "url": "https://geobasisdaten.ch/detail?identifier=52.1&corp=CH&lang=de"
+        },
+        {
+          "id": 53.1,
+          "url": "https://geobasisdaten.ch/detail?identifier=53.1&corp=CH&lang=de"
+        },
+        {
+          "id": 53.2,
+          "url": "https://geobasisdaten.ch/detail?identifier=53.2&corp=CH&lang=de"
+        },
+        {
+          "id": 54.1,
+          "url": "https://geobasisdaten.ch/detail?identifier=54.1&corp=CH&lang=de"
+        }
+      ],
+      "dataset_url": "https://geodienste.ch/downloads/interlis/av/BE/av_BE_lv95.zip",
+      "meta_data": {
+        "dataset_url": "https://www.geocat.ch/geonetwork/srv/ger/catalog.search#/metadata/d929eef4-791d-4728-9d56-226b6952cf1f"
+      },
+      "model_names": [
+        "MD01MOCH24MN95F",
+        "DM01AVCH24LV95D",
+        "MD01MUCH24MN95I"
+      ],
+      "catalog_names": null
+    },
+    {
+      "topic_title": "Amtliche Vermessung",
+      "base_topic": "av",
+      "topic": "av",
+      "version": "24.0",
+      "abstract": "Die amtliche Vermessung – ein nationales Produkt – liefert geometrische Daten zum Grundeigentum und ist die Grundlage für viele weitere geografische Informationen und Anwendungen in Wirtschaft, Verwaltung und Privatleben. Die Daten basieren auf dem MGDM DM.01-AV-CH (ID 51.1, ID 52.1, ID 53.1, ID 53.2, ID 54.1, ID 54.2, ID 55.1, ID 56.1, ID 57.1, ID 58.1, ID 59.1, ID 60.1, ID 61.1, ID 62.1, ID 63.1, ID 64.1).",
+      "keywords": "av, MOpublic, DM.01, Vermessung, amtlich, Bodenbedeckung, Liegenschaft, Parzelle, Grundbuch, Basisplan, Fixpunkt, Einzelobjekt, Gebäudeadresse, Adresse, Hoheitsgrenze, Grenze, Grundbuchplan, Situationsplan, Plan, IFC, ID 51.1, ID 52.1, ID 53.1, ID 53.2, ID 54.1, ID 54.2, ID 54.2, ID 55.1, ID 56.1, ID 57.1, ID 58.1, ID 59.1, ID 60.1, ID 61.1, ID 62.1, ID 63.1, ID 64.1, ID 228",
+      "keywords_gemet": "Bundesrecht",
+      "keywords_geocat": "Minimales Geodatenmodel MGDM, geodienste.ch, Kanton, Geobasisdaten",
+      "categories": [
+        "A – Basiskarten, Bodenbedeckung, Bilddaten",
+        "B – Ortsangaben, Referenzsysteme",
+        "C – Höhen",
+        "D – Politische und administrative Grenzen",
+        "E – Raumplanung, Grundstückskataster"
+      ],
+      "website": "https://geodienste.ch/services/av",
+      "terms": "https://geodienste.ch/terms-of-use",
+      "image": "https://geodienste.ch/images/topics/av.png",
+      "canton": "BL",
+      "broker": null,
+      "ilivalidator_version": "1.11.6",
+      "updated_at": "2026-08-13T02:04:07",
+      "cantonal_coverage": true,
+      "data_update_cycle": "Wöchentlich",
+      "contact_geo": "Kanton Basel-Landschaft\r\nVolkswirtschafts- und Gesundheitsdirektion\r\nAmt für Geoinformation\r\nGIS-Fachstelle\r\nMühlemattstrasse 36\r\n4410 Liestal\r\nTel. 061 552 56 73\r\n support.gis@bl.ch \r\n",
+      "contact_specialist_department": "support.gis@bl.ch",
+      "notes": null,
+      "contextual_information": [],
+      "publication_data": "Frei erhältlich",
+      "dxf_geobau_supported": true,
+      "monthly_price_data": "keine",
+      "contract_required_data": false,
+      "terms_of_use_data": "https://www.baselland.ch/politik-und-behorden/direktionen/volkswirtschafts-und-gesundheitsdirektion/amt-fur-geoinformation/geoportal/geodaten/nutzung-von-geodaten",
+      "opendata_terms_data": "Freie Nutzung. Quellenangabe ist Pflicht.",
+      "publication_wms": "Frei erhältlich",
+      "monthly_price_wms": "keine",
+      "contract_required_wms": false,
+      "terms_of_use_wms": "https://www.baselland.ch/politik-und-behorden/direktionen/volkswirtschafts-und-gesundheitsdirektion/amt-fur-geoinformation/geoportal/geodaten/nutzung-von-geodaten",
+      "opendata_terms_wms": "Freie Nutzung. Quellenangabe ist Pflicht.",
+      "planning_contact": "support.gis@bl.ch",
+      "planning_notes": null,
+      "planning_release": null,
+      "getcapabilities_wfs": [
+        "https://geodienste.ch/db/av_0/deu?SERVICE=WFS&REQUEST=GetCapabilities",
+        "https://geodienste.ch/db/av_situationsplan_0/deu?SERVICE=WFS&REQUEST=GetCapabilities",
+        "https://geodienste.ch/db/av_situationsplan_oereb_0/deu?SERVICE=WFS&REQUEST=GetCapabilities",
+        "https://geodienste.ch/db/avc_0/deu?SERVICE=WFS&REQUEST=GetCapabilities"
+      ],
+      "getcapabilities_wms": [
+        "https://geodienste.ch/db/av_0/deu?SERVICE=WMS&REQUEST=GetCapabilities",
+        "https://geodienste.ch/db/av_situationsplan_0/deu?SERVICE=WMS&REQUEST=GetCapabilities",
+        "https://geodienste.ch/db/av_situationsplan_oereb_0/deu?SERVICE=WMS&REQUEST=GetCapabilities",
+        "https://geodienste.ch/db/avc_0/deu?SERVICE=WMS&REQUEST=GetCapabilities"
+      ],
+      "ogc_api_features": [
+        "https://geodienste.ch/db/av_0/deu/ogcapi",
+        "https://geodienste.ch/db/av_situationsplan_0/deu/ogcapi",
+        "https://geodienste.ch/db/av_situationsplan_oereb_0/deu/ogcapi",
+        "https://geodienste.ch/db/avc_0/deu/ogcapi"
+      ],
+      "stac_item_url": "https://geodienste.ch/stac/collections/av/items/av-BL",
+      "geobasisdaten": [
+        {
+          "id": 51.1,
+          "url": "https://geobasisdaten.ch/detail?identifier=51.1&corp=CH&lang=de"
+        },
+        {
+          "id": 52.1,
+          "url": "https://geobasisdaten.ch/detail?identifier=52.1&corp=CH&lang=de"
+        },
+        {
+          "id": 53.1,
+          "url": "https://geobasisdaten.ch/detail?identifier=53.1&corp=CH&lang=de"
+        },
+        {
+          "id": 53.2,
+          "url": "https://geobasisdaten.ch/detail?identifier=53.2&corp=CH&lang=de"
+        },
+        {
+          "id": 54.1,
+          "url": "https://geobasisdaten.ch/detail?identifier=54.1&corp=CH&lang=de"
+        }
+      ],
+      "dataset_url": "https://geodienste.ch/downloads/interlis/av/BL/av_BL_lv95.zip",
+      "meta_data": {
+        "dataset_url": "https://www.geocat.ch/geonetwork/srv/ger/catalog.search#/metadata/d929eef4-791d-4728-9d56-226b6952cf1f"
+      },
+      "model_names": [
+        "MD01MOCH24MN95F",
+        "DM01AVCH24LV95D",
+        "MD01MUCH24MN95I"
+      ],
+      "catalog_names": null
+    }
+  ]
+}

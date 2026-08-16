@@ -4,7 +4,21 @@
 
 ### Vor der Arbeit
 
-Klon-Aktualität prüfen: `git fetch origin master && git rev-list --count HEAD..origin/master`
+Klon-Aktualität prüfen — Standard-Branch ermitteln, nicht `main` annehmen:
+
+```bash
+B=$(git ls-remote --symref origin HEAD | sed -n 's|^ref: refs/heads/\([^[:space:]]*\).*|\1|p')
+git fetch origin "${B:?Standard-Branch nicht ermittelbar}" &&
+  git rev-list --count HEAD..FETCH_HEAD
+```
+
+Drei Server im Portfolio heissen ihren Standard-Branch `master`
+(`openlex-mcp`, `swiss-courts-mcp`, `swisstopo-mcp`); dort scheitert ein fest
+verdrahtetes `origin/main` mit «couldn't find remote ref main». Wer das für ein
+Netzproblem hält, arbeitet weiter auf genau dem veralteten Klon, vor dem dieser
+Absatz warnt. Den `:?`-Schutz nicht weglassen: Bei leerem `B` fetcht git still
+den Remote-HEAD und endet mit 0.
+
 Ein veralteter Klon erzeugt eine rote CI, deren Ursache nicht im Diff steht.
 Am 3.8.2026 zweimal passiert — beide Male fehlten genau die Commits, die
 das Gate einführten, an dem der Branch scheiterte.

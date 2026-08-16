@@ -76,6 +76,14 @@ Gate-Befehl selbst. Wer ihn prüfen will, zählt nach statt hier abzulesen:
 dabei eine Datei mehr als `ruff check`, weil 0.16 auch Markdown formatiert und
 damit `tests/fixtures/PROVENANCE.md` mitnimmt — zwei Zahlen, kein Fehler.
 
+**Ein achtes Gate hängt an jedem PR, ausserhalb von `ci.yml`:**
+`security.yml` fährt gitleaks. Sein Trigger nennt `branches: [master, main]` —
+beide, damit er eine Umbenennung des Default-Branchs überlebt. Lokal braucht
+er gitleaks und läuft deshalb nicht nebenbei mit.
+
+Die Matrix setzt kein `fail-fast: false`: Eine rote 3.11 bricht 3.12 und 3.13
+ab, bevor sie etwas sagen.
+
 **Live-Tests:** `.github/workflows/live-test.yml`, nächtlich per Cron
 (`0 4 * * *`). Sie sind hier also nicht bloss per `-m "not live"`
 ausgeschlossen; DRIFT-005 ist erfüllt.

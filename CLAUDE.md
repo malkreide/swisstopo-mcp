@@ -70,8 +70,10 @@ python scripts/render_egress_acl.py --check
 python scripts/check_version_sync.py
 ```
 
-Kein `include` unter `[tool.ruff]` setzen — der Umfang stimmt (59 Dateien über
-alle drei Verzeichnisse, nachgemessen).
+Kein `include` unter `[tool.ruff]` setzen — der Umfang stimmt: `ruff check`
+sieht 60 Dateien über alle drei Verzeichnisse, `ruff format` 61, weil 0.16
+auch Markdown formatiert und damit `tests/fixtures/PROVENANCE.md` mitnimmt.
+Zwei Zahlen, kein Fehler.
 
 **Live-Tests:** `.github/workflows/live-test.yml`, nächtlich per Cron
 (`0 4 * * *`). Sie sind hier also nicht bloss per `-m "not live"`

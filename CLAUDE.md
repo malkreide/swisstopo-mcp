@@ -47,18 +47,16 @@ Ein Codex-Review auf einem PR wird beantwortet oder behoben, nie ignoriert.
 
 **Der Default-Branch heisst `master`, nicht `main`.** PRs gehen dorthin.
 
-**Werkzeug-Versionen — zwei ungleich behandelte Fälle.** `ci.yml` pinnt
-`ruff==0.16.1`, das `[dev]`-Extra deklariert `ruff>=0.4.0,<0.17`; ein frisches
-`pip install -e ".[dev]"` liefert 0.16.3, also nicht die Version des Gates.
-**mypy ist gar nicht gepinnt** (`mypy>=1.10.0`), und `mypy src/` läuft mit dem,
-was gerade auflöst — am 16.08.2026 war das 2.3.1. Die Begründung, mit der ruff
-gepinnt ist, gilt hier genauso: ein Upstream-Release kann Regeln ändern und
-unberührten Code rot machen.
+**Werkzeug-Versionen:** `ruff==0.16.1` und `mypy==2.3.1`, beide exakt und beide
+nur im `[dev]`-Extra von `pyproject.toml`. Ein Install des Extras reicht also,
+lokal wie in der CI. Keine zweite Version in die Workflows schreiben: ein
+solcher Schritt läuft nach dem Install und überstimmt den Pin still — für ruff
+stand er dort (`test_werkzeug_versionen.py` hält beides fest).
 
-Beides zusammen heisst: Lokale Läufe nur mit den Versionen aus einem frischen
-`[dev]`-Install bewerten. Ein mypy aus der Umgebung meldet Fehler, die das
-Projekt nicht hat — gemessen: das ambiente 1.19.1 findet in `api_client.py`
-einen `no-any-return`, den 2.3.1 nicht sieht.
+Lokale Läufe trotzdem nur mit den Versionen aus einem frischen `[dev]`-Install
+bewerten. Ein Werkzeug aus der Umgebung meldet Fehler, die das Projekt nicht
+hat — gemessen: das ambiente mypy 1.19.1 findet in `api_client.py` einen
+`no-any-return`, den 2.3.1 nicht sieht.
 
 **Gates, wörtlich aus der CI:**
 

@@ -70,10 +70,11 @@ python scripts/render_egress_acl.py --check
 python scripts/check_version_sync.py
 ```
 
-Kein `include` unter `[tool.ruff]` setzen — der Umfang stimmt: `ruff check`
-sieht 60 Dateien über alle drei Verzeichnisse, `ruff format` 61, weil 0.16
-auch Markdown formatiert und damit `tests/fixtures/PROVENANCE.md` mitnimmt.
-Zwei Zahlen, kein Fehler.
+Kein `include` unter `[tool.ruff]` setzen — der Umfang sind die drei Pfade im
+Gate-Befehl selbst. Wer ihn prüfen will, zählt nach statt hier abzulesen:
+`ruff check src/ tests/ scripts/ --show-files | wc -l`. `ruff format` meldet
+dabei eine Datei mehr als `ruff check`, weil 0.16 auch Markdown formatiert und
+damit `tests/fixtures/PROVENANCE.md` mitnimmt — zwei Zahlen, kein Fehler.
 
 **Live-Tests:** `.github/workflows/live-test.yml`, nächtlich per Cron
 (`0 4 * * *`). Sie sind hier also nicht bloss per `-m "not live"`

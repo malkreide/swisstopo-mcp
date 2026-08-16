@@ -424,3 +424,33 @@ async def test_ein_abbruch_bleibt_ein_fehler():
     antwort = await _fahre("reverse_geocode")
     assert antwort.is_error, "ein Verbindungsabbruch kam als Erfolg zurueck"
     assert "Verbindung" in antwort.summary
+
+
+# --------------------------------------------------------------------------
+# Der Nachweis, nachgerechnet
+# --------------------------------------------------------------------------
+@pytest.mark.parametrize("name", sorted(n for n in recorded_names() if n != "PROVENANCE.md"))
+def test_die_pruefsumme_im_nachweis_stimmt(name):
+    """Eine Pruefsumme, die niemand nachrechnet, ist Zierde.
+
+    Sie steht im Nachweis, um genau einen Fall zu fangen: eine Aufzeichnung,
+    die nach dem Lauf von Hand nachgebessert wurde. Eine korrigierte Antwort
+    ist wieder eine erfundene — und von aussen ist ihr das nicht anzusehen.
+    Ohne diesen Test faengt die Summe nichts.
+
+    Gerechnet wird ueber die Bytes auf der Platte, nicht ueber den Loader:
+    genau die hat der Recorder gehasht, und ein Loader, der unterwegs dekodiert
+    oder normalisiert, wuerde die Pruefung gegen sich selbst fuehren.
+    """
+    import hashlib
+    import re
+    from pathlib import Path
+
+    teile = provenance().split(f"## `{name}`", 1)
+    assert len(teile) == 2, f"{name} hat keinen Block in PROVENANCE.md"
+    treffer = re.search(r"\*\*SHA-256:\*\*\s*`([0-9a-f]{64})`", teile[1].split("## ", 1)[0])
+    assert treffer, f"{name} steht ohne Pruefsumme im Nachweis"
+    roh = (Path(__file__).resolve().parent / "fixtures" / name).read_bytes()
+    assert hashlib.sha256(roh).hexdigest() == treffer.group(1), (
+        f"{name} weicht vom Nachweis ab — von Hand nachgebessert? Neu aufzeichnen."
+    )

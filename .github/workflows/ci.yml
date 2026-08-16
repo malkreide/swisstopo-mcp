@@ -22,17 +22,17 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Install dependencies
+        # Bringt die ruff- und mypy-Pins aus dem [dev]-Extra mit. Weiter unten
+        # stand ein zweiter `pip install ruff==<version>`-Schritt, der nach
+        # diesem lief und gegen pyproject gewann: den Pin dort zu aendern haette
+        # in der CI nichts bewirkt. Die Versionen stehen nur noch in pyproject,
+        # damit lokaler Lauf und Gate sich nicht ueber sie uneinig sein koennen.
         run: |
           pip install -e ".[dev]"
 
       - name: Run tests
         run: |
           pytest tests/ -m "not live"
-
-      # Pin ruff so an upstream release cannot change the default rule set or
-      # formatter and break CI on unrelated, untouched code.
-      - name: Install pinned ruff
-        run: pip install ruff==0.16.1
 
       - name: Lint
         run: ruff check src/ tests/ scripts/

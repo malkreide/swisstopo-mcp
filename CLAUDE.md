@@ -76,6 +76,7 @@ hat — gemessen: das ambiente mypy 1.19.1 findet in `api_client.py` einen
 
 ```bash
 pytest tests/ -m "not live"
+python scripts/check_ruff_pin.py
 ruff check src/ tests/ scripts/
 ruff format --check src/ tests/ scripts/
 mypy src/

@@ -66,6 +66,9 @@ nur im `[dev]`-Extra von `pyproject.toml`. Ein Install des Extras reicht also,
 lokal wie in der CI. Keine zweite Version in die Workflows schreiben: ein
 solcher Schritt läuft nach dem Install und überstimmt den Pin still — für ruff
 stand er dort (`test_werkzeug_versionen.py` hält beides fest).
+Eine `.pre-commit-config.yaml` gibt es nicht — die andere Stelle, an der ein
+abweichender ruff-Pin schlummern kann. Wer eine anlegt, nimmt die Version aus
+`pyproject.toml`.
 
 Lokale Läufe trotzdem nur mit den Versionen aus einem frischen `[dev]`-Install
 bewerten. Ein Werkzeug aus der Umgebung meldet Fehler, die das Projekt nicht

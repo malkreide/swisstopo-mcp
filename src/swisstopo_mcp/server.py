@@ -15,6 +15,7 @@ from contextlib import asynccontextmanager
 from typing import Any
 
 from mcp import types
+from mcp.server.caching import CacheHint
 from mcp.server.mcpserver import Context, MCPServer
 from mcp.server.transport_security import TransportSecuritySettings
 from mcp.types import ToolAnnotations
@@ -153,8 +154,35 @@ def _transport_security() -> TransportSecuritySettings:
     )
 
 
+# SEP-2549, Spec 2026-07-28: die auflistenden Methoden tragen `ttlMs` und
+# `cacheScope`. Das SDK setzt beides auf «sofort veraltet, nie geteilt» — ein
+# Server ohne `cache_hints` verhaelt sich also nicht neutral, sondern laesst
+# jeden Client bei jeder Verbindung neu auflisten, fuer Listen, die beim Import
+# feststehen und sich zur Laufzeit des Prozesses nicht aendern koennen.
+#
+# `public` folgt aus der Sache, nicht aus Bequemlichkeit: die 20 Tools werden
+# per Dekorator beim Import registriert, es gibt keine Filterung nach Aufrufer.
+# Sobald eine Liste vom Aufrufer abhaengt, muss der Scope im selben Commit auf
+# `private` wechseln.
+#
+# `resources/read` und `prompts/get` stehen bewusst nicht dabei: das waere eine
+# Zusicherung ueber den INHALT statt ueber das Verzeichnis. Der Layer-Katalog
+# unter `swisstopo://catalogue/layers` zaehlt die Kantone mit, die ein Thema
+# frei anbieten — eine Zahl, die sich aendert, ohne dass der Prozess neu
+# startet.
+LIST_CACHE_TTL_MS = 300_000
+
+CACHE_HINTS = {
+    "tools/list": CacheHint(ttl_ms=LIST_CACHE_TTL_MS, scope="public"),
+    "resources/list": CacheHint(ttl_ms=LIST_CACHE_TTL_MS, scope="public"),
+    "resources/templates/list": CacheHint(ttl_ms=LIST_CACHE_TTL_MS, scope="public"),
+    "prompts/list": CacheHint(ttl_ms=LIST_CACHE_TTL_MS, scope="public"),
+    "server/discover": CacheHint(ttl_ms=LIST_CACHE_TTL_MS, scope="public"),
+}
+
 mcp = _SwisstopoMCP(
     "swisstopo_mcp",
+    cache_hints=CACHE_HINTS,
     lifespan=lifespan,
     instructions=(
         "Swiss federal geodata server with 20 tools. "
@@ -909,6 +937,18 @@ def _install_session_manager(app, security: TransportSecuritySettings) -> None:
     app.router.lifespan_context = lambda _scoped_app: manager.run()
 
 
+# Die Header, nach denen Spec 2026-07-28 eine Streamable-HTTP-Anfrage routet —
+# in der Schreibweise des SDK (`mcp.shared.inbound`). Ein Browser darf einen
+# nicht safelisteten Header gar nicht erst senden, wenn der Server ihn nicht in
+# `Access-Control-Allow-Headers` nennt: ohne sie stirbt jede Cross-Origin-
+# Anfrage am Preflight, vor dem ersten MCP-Byte. stdio- und Python-Clients
+# kennen keinen Preflight und merken davon nichts — deshalb fiel es nicht auf.
+#
+# `Mcp-Param-*` fehlt bewusst: CORS kennt keinen Praefix-Wildcard, und kein
+# Tool-Schema dieses Servers traegt eine `x-mcp-header`-Annotation.
+CORS_ROUTING_HEADERS = ["Mcp-Method", "Mcp-Name", "Mcp-Protocol-Version"]
+
+
 def build_http_app(allowed_origins: list[str] | None = None):
     """Build the Streamable-HTTP ASGI app with CORS configured (SDK-004).
 
@@ -952,7 +992,7 @@ def build_http_app(allowed_origins: list[str] | None = None):
         CORSMiddleware,
         allow_origins=allowed_origins or [],
         allow_methods=["GET", "POST", "OPTIONS"],
-        allow_headers=["Content-Type", "Authorization", "Mcp-Session-Id"],
+        allow_headers=["Content-Type", "Authorization", *CORS_ROUTING_HEADERS, "Mcp-Session-Id"],
         expose_headers=["Mcp-Session-Id"],
     )
     return app

@@ -140,7 +140,7 @@ wie der Code: Nichts ist rot, weil nichts geprüft wird, worauf es ankommt.
 
 **Der Default-Branch heisst `master`, nicht `main`.** PRs gehen dorthin.
 
-**Werkzeug-Versionen:** `ruff==0.16.1` und `mypy==2.3.1`, beide exakt und beide
+**Werkzeug-Versionen:** `ruff==0.16.3` und `mypy==2.3.1`, beide exakt und beide
 nur im `[dev]`-Extra von `pyproject.toml`. Ein Install des Extras reicht also,
 lokal wie in der CI. Keine zweite Version in die Workflows schreiben: ein
 solcher Schritt läuft nach dem Install und überstimmt den Pin still — für ruff

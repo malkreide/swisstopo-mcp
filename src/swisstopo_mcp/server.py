@@ -15,7 +15,7 @@ from contextlib import asynccontextmanager
 from typing import Any
 
 from mcp import types
-from mcp.server.caching import CacheHint
+from mcp.server.caching import CacheableMethod, CacheHint
 from mcp.server.mcpserver import Context, MCPServer
 from mcp.server.transport_security import TransportSecuritySettings
 from mcp.types import ToolAnnotations
@@ -172,7 +172,11 @@ def _transport_security() -> TransportSecuritySettings:
 # startet.
 LIST_CACHE_TTL_MS = 300_000
 
-CACHE_HINTS = {
+# Annotiert, nicht inferiert: `MCPServer` nimmt
+# `Mapping[CacheableMethod, CacheHint]`, und ein Literal ohne Annotation
+# inferiert mypy als `str`. Der Gate `mypy src/` meldet das, die Tests nicht —
+# die laufen zur Laufzeit einwandfrei.
+CACHE_HINTS: dict[CacheableMethod, CacheHint] = {
     "tools/list": CacheHint(ttl_ms=LIST_CACHE_TTL_MS, scope="public"),
     "resources/list": CacheHint(ttl_ms=LIST_CACHE_TTL_MS, scope="public"),
     "resources/templates/list": CacheHint(ttl_ms=LIST_CACHE_TTL_MS, scope="public"),

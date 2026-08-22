@@ -65,9 +65,9 @@ dev = [
     # driftet.
     #
     # Die Spanne liess `pip install -e ".[dev]"` auf 0.16.3 aufloesen, waehrend
-    # ci.yml `ruff==0.16.1` darueber installierte: lokaler Lauf und Gate waren
+    # ci.yml `ruff==0.16.3` darueber installierte: lokaler Lauf und Gate waren
     # sich also ueber die Version uneinig. Der CI-Schritt ist entfallen.
-    "ruff==0.16.1",
+    "ruff==0.16.3",
     # Ebenfalls exakt, aus demselben Grund. `mypy src/` ist ein Gate, mypy war
     # aber als `mypy>=1.10.0` voellig offen — das Argument ueber dem ruff-Pin
     # galt hier genauso und wurde nicht angewandt. 2.3.1 ist die Version, unter

@@ -3,8 +3,7 @@
 Seit `2026-07-28` traegt jede Streamable-HTTP-Anfrage `Mcp-Method`, `Mcp-Name`
 und `Mcp-Protocol-Version`; das SDK liest sie in `mcp.shared.inbound`. Die
 Freigabeliste hier war fuer die aeltere Form geschrieben: sie nannte
-`Mcp-Session-Id`, den Header genau der Session-Mechanik, die dieselbe Revision
-abgeschafft hat.
+`Mcp-Session-Id`, den Session-Header, der fuer sich genommen keine Anfrage routet.
 
 Ein Browser darf einen nicht safelisteten Header gar nicht erst senden, wenn der
 Server ihn nicht in `Access-Control-Allow-Headers` nennt. Der Preflight endete
@@ -15,6 +14,18 @@ waehrend jeder Browser-Client ausgesperrt war.
 Geprueft mit echten Anfragen gegen die zusammengebaute App. Ein Blick in
 `CORS_ROUTING_HEADERS` waere kein Test: die Liste kann vollstaendig sein und
 trotzdem nie an der Middleware ankommen.
+`Mcp-Session-Id` gehoert dabei weiterhin auf die Liste. Eine fruehere Fassung
+dieses Docstrings nannte ihn den Header einer Mechanik, die `2026-07-28`
+abgeschafft habe — das stimmt nicht, und der Code hier hat es nie behauptet:
+derselbe Server gibt den Header in `expose_headers` frei, damit ein
+Browser-Client ihn lesen kann.
+
+Nachgemessen statt aus Spec-Text geschlossen: `MCP_SESSION_ID_HEADER` steht
+unveraendert in `mcp/server/streamable_http.py`, und ein echter `initialize`
+durch den zusammengebauten ASGI-Stack bekommt eine Session-ID im
+Antwort-Header zurueck. `mcp` 2.x bedient beide Protokoll-Aeren; die Session
+gehoert zur Handshake-Aera, und die ist es, in der heutige Clients sprechen.
+Die Freigabeliste war also nicht falsch besetzt, sondern unvollstaendig.
 """
 
 from __future__ import annotations
@@ -98,3 +109,24 @@ async def test_kein_tool_schema_verlangt_einen_mcp_param_header() -> None:
     Erinnerung an dem Tag, an dem sich das aendert."""
     offenders = [t.name for t in await mcp.list_tools() if "x-mcp-header" in str(t.input_schema)]
     assert not offenders, f"{offenders} brauchen einen Mcp-Param-*-Eintrag in der Freigabeliste"
+
+
+def test_der_session_header_ist_weiterhin_freigegeben(client: TestClient) -> None:
+    """Haelt die Aussage im Docstring oben, statt sie nur zu behaupten.
+
+    Eine fruehere Fassung nannte `Mcp-Session-Id` den Header einer Mechanik,
+    die `2026-07-28` abgeschafft habe. Das SDK sagt etwas anderes, und dieser
+    Test sagt es mit: die Konstante existiert, und der Preflight laesst den
+    Header durch.
+
+    Faellt er, ist eines von beidem passiert — die Mechanik ist tatsaechlich
+    weg, oder jemand hat den Header aus der Freigabeliste genommen. Beides ist
+    eine bewusste Entscheidung und keine, die still passieren darf.
+    """
+    from mcp.server.streamable_http import MCP_SESSION_ID_HEADER
+
+    assert MCP_SESSION_ID_HEADER == "mcp-session-id"
+
+    resp = preflight(client, MCP_SESSION_ID_HEADER)
+    assert resp.status_code == 200, "der Session-Header wird am Preflight abgewiesen"
+    assert MCP_SESSION_ID_HEADER in resp.headers["access-control-allow-headers"].lower()

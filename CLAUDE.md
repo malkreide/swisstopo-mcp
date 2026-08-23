@@ -69,22 +69,71 @@ aufgebraucht — davor echte Reviews, danach in 30 Repos nur noch:
 You have reached your Codex usage limits for code reviews.
 ```
 
-Bis mindestens zum 22.8. um 08:30, also 23 Stunden später, blieb es dabei. In
-der Zwischenzeit sind 32 PRs mit formal erfülltem Häkchen gemergt worden, ohne
-dass jemand hineingesehen hat.
+Wie lange die Sperre dauerte, geben die Beobachtungen nur als Spanne her. Vier
+Zeitpunkte sind belegt: letzter gelungener Review am 21.8. um 08:41, erste
+Limit-Meldung um 09:48, letzte beobachtete Limit-Meldung am 22.8. um 11:03,
+erste *andere* Meldung am 23.8. um 08:22.
 
-Drei Gründe, warum Codex schweigt, und nur einer davon ist harmlos:
+Daraus folgt eine Untergrenze von gut **25 Stunden** — so weit liegen erste und
+letzte Limit-Meldung auseinander. Die längste mit den Beobachtungen verträgliche
+Sperre reicht dagegen vom letzten Erfolg um 08:41 bis zur abweichenden Meldung
+um 08:22, also **47 h 41 min**. Wer stattdessen ab der ersten Limit-Meldung
+rechnet, unterschlägt die 67 Minuten, in denen das Kontingent schon weg gewesen
+sein kann, und nennt die Spanne zwischen zwei Beobachtungen eine Obergrenze.
+
+Und die Untergrenze belegt keine *ununterbrochene* Sperre. Zwischen zwei
+Limit-Meldungen kann sich ein Fenster geöffnet und durch neue Auslöser wieder
+geschlossen haben. Beobachtungspunkte sind keine Messreihe — die 21 Stunden vor
+der abweichenden Meldung liefen ganz ohne Codex-Auslöser, dort hat niemand
+gemessen.
+
+In der Zwischenzeit sind 32 PRs mit formal erfülltem Häkchen gemergt worden,
+ohne dass jemand hineingesehen hat, und am 22.8. noch einmal 43.
+
+**Vier** Gründe, warum Codex schweigt, und nur einer davon ist harmlos:
 
 - **Kein Befund** — dann reagiert er mit 👍 und schreibt nichts.
 - **Der PR ist ein Draft** — darauf läuft Codex nicht an.
 - **Das Kontingent ist weg** — dann schreibt er die Meldung oben.
+- **Für das Repo fehlt eine Environment** — dann schreibt er:
+
+  ```
+  To use Codex here, create an environment for this repo.
+  ```
+
+Der vierte kam erst zum Vorschein, als der dritte wegfiel, und das ist kein
+Zufall: Die Prüfungen liegen hintereinander. Dass es diese Reihenfolge ist und
+nicht die umgekehrte, lässt sich an einem einzigen Repo ablesen — in
+`swiss-public-data-mcp` bekam PR #54 am 22.8. um 10:56:55 die Kontingent-Meldung
+und PR #56 am 23.8. um 08:22:20 die Environment-Meldung. Läge die
+Environment-Prüfung vorn, hätte #54 sie schon am Vortag gesehen; die Environment
+fehlte ja bereits. Zwei Meldungen aus demselben Repo schlagen hier jede
+Vermutung über die Reihenfolge.
+
+Praktisch heisst das: **Eine verschwundene Limit-Meldung ist keine Entwarnung.**
+Sie kann bedeuten, dass das Kontingent wieder da ist — und dass jetzt etwas
+anderes den Review verhindert. Belegt ist eine Prüfung erst durch ein
+Review-Objekt **oder** die 👍-Reaktion. Wer nur das Objekt gelten lässt, zählt
+jeden befundlosen Review als ungeprüft — und baut sich denselben Fehlalarm ein,
+den dieser Abschnitt verhindern soll, nur in die andere Richtung.
 
 «Kein Kommentar» heisst also nicht «geprüft und sauber». Unterscheiden lässt es
-sich an der Form: Ein echter Review ist ein Review-Objekt («💡 Codex Review»,
-mit Commit-Angabe), die Limit-Meldung ein gewöhnlicher Issue-Kommentar. Das
-sind zwei verschiedene Abfragen — `get_reviews` gegen `get_comments`; wer nur
-eine davon nimmt, übersieht die andere Hälfte. Genau so ist die Limit-Meldung
-zuerst durchgerutscht.
+sich an der Form: Ein Review **mit** Befund ist ein Review-Objekt
+(«💡 Codex Review», mit Commit-Angabe), ein Review **ohne** Befund eine
+👍-Reaktion, und die beiden Ausfallmeldungen — Kontingent wie Environment —
+sind gewöhnliche Issue-Kommentare. Beim Draft gibt es überhaupt nichts, weil
+Codex nicht anläuft; ein kommentarloser Draft ist deshalb kein Beleg, sondern
+ein nicht durchgeführter Test.
+
+Das sind verschiedene Abfragen — `get_reviews` gegen `get_comments`, und für
+die Reaktion keine von beiden; wer nur eine nimmt, übersieht den Rest. Genau so
+ist die Limit-Meldung zuerst durchgerutscht.
+
+Der Kommentarzähler allein reicht ohnehin nicht: `comments: 1` kann die
+Kontingent- **oder** die Environment-Meldung sein. Den Text lesen, nicht die
+Zahl. Und einen unbekannten dritten Text wörtlich zitieren, statt ihn in eine
+der bekannten Schubladen zu zwingen — dieser Abschnitt musste schon einmal von
+drei auf vier Gründe wachsen.
 
 Portfolio-weit nachsehen:
 
@@ -104,9 +153,23 @@ nicht abgewartet.
 Das Kontingent hängt am Konto, nicht am Repo, und Code-Reviews haben einen
 eigenen Topf — nur GitHub-getriggerte Reviews zählen hinein. ChatGPT-Pläne
 fahren ein rollendes Fünf-Stunden-Fenster plus Wochenlimits; welches greift,
-steht im Codex-Dashboard. Zeigt das freies Kontingent, während Reviews weiter
-scheitern, ist das ein bekannter Fehler bei mehreren verbundenen Konten — dann
-den GitHub-Connector in den Codex-Einstellungen trennen und neu verbinden.
+steht im Codex-Dashboard. Welches hier griff, ist **offen**. Die 25 Stunden
+oben schliessen das Fünf-Stunden-Fenster nicht aus: Es kann sich
+zwischendurch geöffnet und durch neue Auslöser wieder erschöpft haben. Das
+auszuschliessen bräuchte den Nachweis, dass in der ganzen Spanne kein einziger
+Review durchlief — den gibt es nicht, weil nur Fehlschläge beobachtet wurden.
+Eine lange Sperre belegt eine lange Sperre, nicht ihre Ursache.
+
+Zeigt das Dashboard freies Kontingent, während Reviews weiter scheitern, ist
+das ein bekannter Fehler bei mehreren verbundenen Konten — dann den
+GitHub-Connector in den Codex-Einstellungen trennen und neu verbinden.
+
+Die Environment legt man unter `chatgpt.com/codex/cloud/settings/environments`
+an, und zwar **je Repo**. Die Meldung sagt es selbst («for this repo»), und am
+23.8. war es genau so: In `swiss-public-data-mcp` fehlte sie, dort kam kein
+Review; in den übrigen Repos lief Codex am selben Morgen durch. Eine
+Environment fürs Konto genügt also nicht — wer eine anlegt und den Rest für
+erledigt hält, mergt weiter Ungeprüftes.
 
 ### Wenn zwei Agenten dasselbe tun
 

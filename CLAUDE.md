@@ -69,22 +69,52 @@ aufgebraucht — davor echte Reviews, danach in 30 Repos nur noch:
 You have reached your Codex usage limits for code reviews.
 ```
 
-Bis mindestens zum 22.8. um 08:30, also 23 Stunden später, blieb es dabei. In
-der Zwischenzeit sind 32 PRs mit formal erfülltem Häkchen gemergt worden, ohne
-dass jemand hineingesehen hat.
+Belegt gesperrt war es dann **mindestens 25 Stunden** — von 21.8. 09:48 bis zur
+letzten beobachteten Limit-Meldung am 22.8. um 11:03. Die Obergrenze liegt bei
+46½ Stunden: Am 23.8. um 08:22 kam eine *andere* Meldung, dazwischen liegen 21
+Stunden ohne einen einzigen Codex-Auslöser, in denen schlicht niemand gemessen
+hat. Wer die Sperre auf «gut einen Tag» rundet, verwechselt die belegte
+Untergrenze mit der Dauer. In der Zwischenzeit sind 32 PRs mit formal erfülltem
+Häkchen gemergt worden, ohne dass jemand hineingesehen hat, und am 22.8. noch
+einmal 43.
 
-Drei Gründe, warum Codex schweigt, und nur einer davon ist harmlos:
+**Vier** Gründe, warum Codex schweigt, und nur einer davon ist harmlos:
 
 - **Kein Befund** — dann reagiert er mit 👍 und schreibt nichts.
 - **Der PR ist ein Draft** — darauf läuft Codex nicht an.
 - **Das Kontingent ist weg** — dann schreibt er die Meldung oben.
+- **Für das Repo fehlt eine Environment** — dann schreibt er:
+
+  ```
+  To use Codex here, create an environment for this repo.
+  ```
+
+Der vierte kam erst zum Vorschein, als der dritte wegfiel, und das ist kein
+Zufall: Die Prüfungen liegen hintereinander. Dass es diese Reihenfolge ist und
+nicht die umgekehrte, lässt sich an einem einzigen Repo ablesen — in
+`swiss-public-data-mcp` bekam PR #54 am 22.8. um 10:56:55 die Kontingent-Meldung
+und PR #56 am 23.8. um 08:22:20 die Environment-Meldung. Läge die
+Environment-Prüfung vorn, hätte #54 sie schon am Vortag gesehen; die Environment
+fehlte ja bereits. Zwei Meldungen aus demselben Repo schlagen hier jede
+Vermutung über die Reihenfolge.
+
+Praktisch heisst das: **Eine verschwundene Limit-Meldung ist keine Entwarnung.**
+Sie kann bedeuten, dass das Kontingent wieder da ist — und dass jetzt etwas
+anderes den Review verhindert. Erst ein Review-Objekt belegt, dass geprüft
+wurde.
 
 «Kein Kommentar» heisst also nicht «geprüft und sauber». Unterscheiden lässt es
 sich an der Form: Ein echter Review ist ein Review-Objekt («💡 Codex Review»,
-mit Commit-Angabe), die Limit-Meldung ein gewöhnlicher Issue-Kommentar. Das
+mit Commit-Angabe), jede Ausrede dagegen ein gewöhnlicher Issue-Kommentar. Das
 sind zwei verschiedene Abfragen — `get_reviews` gegen `get_comments`; wer nur
 eine davon nimmt, übersieht die andere Hälfte. Genau so ist die Limit-Meldung
 zuerst durchgerutscht.
+
+Der Kommentarzähler allein reicht nicht mehr: `comments: 1` kann die
+Kontingent- **oder** die Environment-Meldung sein. Den Text lesen, nicht die
+Zahl. Und einen unbekannten dritten Text wörtlich zitieren, statt ihn in eine
+der bekannten Schubladen zu zwingen — dieser Abschnitt musste schon einmal von
+drei auf vier Gründe wachsen.
 
 Portfolio-weit nachsehen:
 
@@ -104,9 +134,17 @@ nicht abgewartet.
 Das Kontingent hängt am Konto, nicht am Repo, und Code-Reviews haben einen
 eigenen Topf — nur GitHub-getriggerte Reviews zählen hinein. ChatGPT-Pläne
 fahren ein rollendes Fünf-Stunden-Fenster plus Wochenlimits; welches greift,
-steht im Codex-Dashboard. Zeigt das freies Kontingent, während Reviews weiter
-scheitern, ist das ein bekannter Fehler bei mehreren verbundenen Konten — dann
-den GitHub-Connector in den Codex-Einstellungen trennen und neu verbinden.
+steht im Codex-Dashboard. Die 25 belegten Stunden oben schliessen das
+Fünf-Stunden-Fenster als bindende Grenze aus; ob das Wochenlimit griff oder
+etwas anderes, ist damit *nicht* geklärt — eine Sperre, die länger dauert als
+das kürzeste Fenster, sagt nur, dass es dieses nicht war.
+
+Zeigt das Dashboard freies Kontingent, während Reviews weiter scheitern, ist
+das ein bekannter Fehler bei mehreren verbundenen Konten — dann den
+GitHub-Connector in den Codex-Einstellungen trennen und neu verbinden. Die
+Environment legt man unter `chatgpt.com/codex/cloud/settings/environments` an;
+ob eine je Repo nötig ist oder eine fürs Konto genügt, ist offen und zeigt sich
+erst am nächsten PR nach dem Anlegen.
 
 ### Wenn zwei Agenten dasselbe tun
 

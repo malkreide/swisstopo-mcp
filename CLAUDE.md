@@ -73,11 +73,14 @@ Bis mindestens zum 22.8. um 08:30, also 23 Stunden später, blieb es dabei. In
 der Zwischenzeit sind 32 PRs mit formal erfülltem Häkchen gemergt worden, ohne
 dass jemand hineingesehen hat.
 
-Drei Gründe, warum Codex schweigt, und nur einer davon ist harmlos:
+Vier Gründe, warum Codex schweigt, und nur einer davon ist harmlos:
 
 - **Kein Befund** — dann reagiert er mit 👍 und schreibt nichts.
 - **Der PR ist ein Draft** — darauf läuft Codex nicht an.
 - **Das Kontingent ist weg** — dann schreibt er die Meldung oben.
+- **Für das Repo ist keine Codex-Umgebung eingerichtet** — dann schreibt er
+  stattdessen «To use Codex here, create an environment for this repo», und
+  daran ändert kein Wartefenster etwas.
 
 «Kein Kommentar» heisst also nicht «geprüft und sauber». Unterscheiden lässt es
 sich an der Form: Ein echter Review ist ein Review-Objekt («💡 Codex Review»,
@@ -94,6 +97,24 @@ search_pull_requests: user:malkreide commenter:chatgpt-codex-connector[bot] upda
 
 Findet nur, wo er *kommentiert* hat. Repos ohne PR-Aktivität tauchen nicht auf
 — das ist kein Beleg, dass dort geprüft wurde.
+
+Eine Absage taugt umgekehrt nicht als Beleg fürs Gegenteil, denn die vier
+Fälle kommen in einer Reihenfolge: Ist das Kontingent leer, meldet Codex das
+— ob überhaupt eine Umgebung besteht, prüft er dann womöglich gar nicht. In
+`swiss-public-data-mcp` kam am 22.8. die Limit-Meldung und am 23.8., nach
+Rückkehr des Kontingents, die Umgebungs-Meldung; erst als der erste Engpass
+weg war, wurde der zweite sichtbar. Eine Limit-Meldung belegt also, dass die
+App reagiert, nicht dass sie hier arbeiten könnte.
+
+Belastbar ist nur ein Review-Objekt, und dafür gibt es eine eigene Abfrage:
+
+```
+search_pull_requests: user:malkreide type:pr reviewed-by:chatgpt-codex-connector[bot]
+```
+
+Am 23.8.2026 über die 41 Server-Repos: 25 mit mindestens einem echten Review,
+16 nur mit Absagen. «Belegt» heisst dabei «damals», nicht «heute» — ein Review
+vom 16.8. sagt über den aktuellen Stand nichts.
 
 Zweiter Weg, den Prüfer zu verlieren, ganz ohne Kontingentproblem: zu schnell
 mergen. Am 21./22.8. lagen zwischen «ready for review» und Merge mehrfach drei

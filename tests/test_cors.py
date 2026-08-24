@@ -130,3 +130,53 @@ def test_der_session_header_ist_weiterhin_freigegeben(client: TestClient) -> Non
     resp = preflight(client, MCP_SESSION_ID_HEADER)
     assert resp.status_code == 200, "der Session-Header wird am Preflight abgewiesen"
     assert MCP_SESSION_ID_HEADER in resp.headers["access-control-allow-headers"].lower()
+
+
+# ── Methoden ───────────────────────────────────────────────────────────────
+#
+# `DELETE` fehlte in `allow_methods`, und der Preflight wies es mit 400 ab. Ein
+# Browser-Client konnte damit Sessions oeffnen, aber nie schliessen; sie liefen
+# erst am Timeout aus. Das SDK bedient die Methode sehr wohl —
+# `_handle_delete_request` in `mcp.server.streamable_http`, und dessen eigene
+# 405-Antwort wirbt mit `Allow: GET, POST, DELETE`. Die Freigabeliste war
+# schmaler als der Server.
+
+
+def _methoden_preflight(client, methode: str):
+    """Wie `preflight`, aber die *Methode* ist der Prueffall.
+
+    Der bestehende Helfer verdrahtet `POST` fest — er wurde fuer die Header
+    geschrieben. Fuer die Methodenliste muss sie variabel sein.
+    """
+    return client.options(
+        ENDPOINT,
+        headers={
+            "Origin": ORIGIN,
+            "Access-Control-Request-Method": methode,
+            "Access-Control-Request-Headers": "content-type",
+        },
+    )
+
+
+@pytest.mark.parametrize("methode", ["GET", "POST", "DELETE"])
+def test_jede_freigegebene_methode_passiert_den_preflight(client, methode: str) -> None:
+    """Einzeln parametrisiert, damit im Fehlerfall die Methode im Testnamen
+    steht und nicht erst aus einer Sammelmeldung herausgelesen werden muss."""
+    resp = _methoden_preflight(client, methode)
+    assert resp.status_code == 200, f"Preflight fuer {methode} abgewiesen"
+    assert methode.lower() in resp.headers["access-control-allow-methods"].lower()
+
+
+def test_eine_nicht_freigegebene_methode_wird_abgewiesen(client) -> None:
+    """Die Gegenkontrolle. Ohne sie waere der Test darueber auch gegen eine
+    Methoden-Wildcard gruen — was eine andere Luecke waere, keine Behebung."""
+    assert _methoden_preflight(client, "PATCH").status_code == 400
+
+
+def test_die_methodenliste_nennt_die_sessionbeendigung() -> None:
+    """`DELETE` ist der Grund fuer diese Liste; die Zusicherung haelt ihn fest,
+    auch wenn jemand die Liste spaeter umbaut."""
+    from swisstopo_mcp.server import CORS_ALLOW_METHODS
+
+    assert "DELETE" in CORS_ALLOW_METHODS
+    assert "*" not in CORS_ALLOW_METHODS

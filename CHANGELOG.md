@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Behoben
+
+- **`DELETE` fehlte in `allow_methods`.** Auf streamable-http beendet die
+  Methode eine Session ausdrücklich; der Preflight wies sie mit 400 ab. Ein
+  Browser-Client konnte damit Sessions öffnen, aber nie schliessen — sie liefen
+  erst am Timeout aus. Das SDK bedient sie sehr wohl: `_handle_delete_request`
+  in `mcp.server.streamable_http`, und dessen eigene 405-Antwort wirbt mit
+  `Allow: GET, POST, DELETE`. Die Freigabeliste war schmaler als der Server.
+
+  Gemessen vorher: `Preflight DELETE -> 400` bei
+  `Access-Control-Allow-Methods: GET, POST, OPTIONS`. Danach `200` und
+  `GET, POST, DELETE, OPTIONS`.
+
 ### Fixed
 
 - **Browser-Clients scheiterten am Preflight.** Spec `2026-07-28` routet eine

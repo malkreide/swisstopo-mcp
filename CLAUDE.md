@@ -74,25 +74,40 @@ Zeitpunkte sind belegt: letzter gelungener Review am 21.8. um 08:41, erste
 Limit-Meldung um 09:48, letzte beobachtete Limit-Meldung am 22.8. um 11:03,
 erste *andere* Meldung am 23.8. um 08:22.
 
-Daraus folgt eine Untergrenze von gut **25 Stunden** — so weit liegen erste und
-letzte Limit-Meldung auseinander. Die längste mit den Beobachtungen verträgliche
-Sperre reicht dagegen vom letzten Erfolg um 08:41 bis zur abweichenden Meldung
-um 08:22, also **47 h 41 min**. Wer stattdessen ab der ersten Limit-Meldung
-rechnet, unterschlägt die 67 Minuten, in denen das Kontingent schon weg gewesen
-sein kann, und nennt die Spanne zwischen zwei Beobachtungen eine Obergrenze.
+Zwischen erster und letzter Limit-Meldung liegen **25 h 15 min**. Das ist der
+Abstand zweier Fehlschläge, nicht die Dauer einer Sperre. Wer ihn Untergrenze
+nennt, hat die durchgehende Erschöpfung schon vorausgesetzt, die er belegen
+soll: Öffnete sich das Fenster zwischendurch und schloss es sich durch neue
+Auslöser wieder, waren es zwei kurze Sperren und nie eine von 25 Stunden.
+Untergrenze einer *einzelnen* Sperre sind die 25 h 15 min nur unter genau dieser
+Annahme — und die ist unbelegt.
 
-Und die Untergrenze belegt keine *ununterbrochene* Sperre. Zwischen zwei
-Limit-Meldungen kann sich ein Fenster geöffnet und durch neue Auslöser wieder
-geschlossen haben. Beobachtungspunkte sind keine Messreihe — die 21 Stunden vor
-der abweichenden Meldung liefen ganz ohne Codex-Auslöser, dort hat niemand
-gemessen.
+Nach oben trägt die Rechnung dagegen. Die längste mit den Beobachtungen
+verträgliche Sperre reicht vom letzten Erfolg um 08:41 bis zur abweichenden
+Meldung um 08:22, also **47 h 41 min**; länger kann keine einzelne gewesen sein.
+Wer stattdessen ab der ersten Limit-Meldung rechnet, unterschlägt die 67
+Minuten, in denen das Kontingent schon weg gewesen sein kann, und nennt die
+Spanne zwischen zwei Beobachtungen eine Obergrenze.
+
+Beobachtungspunkte sind keine Messreihe — die 21 Stunden vor der abweichenden
+Meldung liefen ganz ohne Codex-Auslöser, dort hat niemand gemessen.
 
 In der Zwischenzeit sind 32 PRs mit formal erfülltem Häkchen gemergt worden,
 ohne dass jemand hineingesehen hat, und am 22.8. noch einmal 43.
 
 **Vier** Gründe, warum Codex schweigt, und nur einer davon ist harmlos:
 
-- **Kein Befund** — dann reagiert er mit 👍 und schreibt nichts.
+- **Kein Befund** — dann schreibt er einen gewöhnlichen Issue-Kommentar:
+
+  ```
+  Codex Review: Didn't find any major issues. Swish!
+  ```
+
+  Der Schlusssatz wechselt bei jedem Lauf («Delightful!», «Keep it up!»,
+  «More of your lovely PRs please.»); stabil ist nur der Satz davor. Der
+  Infokasten, den Codex unter jeden Review setzt, behauptet weiterhin eine
+  Reaktion («otherwise it will react with 👍») — am 23.8. kam in sechs Repos
+  die Meldung und in keinem die Reaktion. Der Kasten ist keine Quelle.
 - **Der PR ist ein Draft** — darauf läuft Codex nicht an.
 - **Das Kontingent ist weg** — dann schreibt er die Meldung oben.
 - **Für das Repo fehlt eine Environment** — dann schreibt er:
@@ -113,27 +128,35 @@ Vermutung über die Reihenfolge.
 Praktisch heisst das: **Eine verschwundene Limit-Meldung ist keine Entwarnung.**
 Sie kann bedeuten, dass das Kontingent wieder da ist — und dass jetzt etwas
 anderes den Review verhindert. Belegt ist eine Prüfung erst durch ein
-Review-Objekt **oder** die 👍-Reaktion. Wer nur das Objekt gelten lässt, zählt
-jeden befundlosen Review als ungeprüft — und baut sich denselben Fehlalarm ein,
-den dieser Abschnitt verhindern soll, nur in die andere Richtung.
+Review-Objekt **oder** eine Befundlos-Meldung. Wer nur das Objekt gelten lässt,
+zählt jeden befundlosen Review als ungeprüft — und baut sich denselben Fehlalarm
+ein, den dieser Abschnitt verhindern soll, nur in die andere Richtung.
 
 «Kein Kommentar» heisst also nicht «geprüft und sauber». Unterscheiden lässt es
 sich an der Form: Ein Review **mit** Befund ist ein Review-Objekt
-(«💡 Codex Review», mit Commit-Angabe), ein Review **ohne** Befund eine
-👍-Reaktion, und die beiden Ausfallmeldungen — Kontingent wie Environment —
-sind gewöhnliche Issue-Kommentare. Beim Draft gibt es überhaupt nichts, weil
-Codex nicht anläuft; ein kommentarloser Draft ist deshalb kein Beleg, sondern
-ein nicht durchgeführter Test.
+(«💡 Codex Review», mit Commit-Angabe); ein Review **ohne** Befund und die
+beiden Ausfallmeldungen — Kontingent wie Environment — sind gewöhnliche
+Issue-Kommentare und trennen sich nur im Text. Beim Draft gibt es überhaupt
+nichts, weil Codex nicht anläuft; ein kommentarloser Draft ist deshalb kein
+Beleg, sondern ein nicht durchgeführter Test.
 
-Das sind verschiedene Abfragen — `get_reviews` gegen `get_comments`, und für
-die Reaktion keine von beiden; wer nur eine nimmt, übersieht den Rest. Genau so
-ist die Limit-Meldung zuerst durchgerutscht.
+Das sind verschiedene Abfragen — `get_reviews` fürs Objekt, `get_comments` für
+alles andere; wer nur eine nimmt, übersieht den Rest. Genau so ist die
+Limit-Meldung zuerst durchgerutscht.
 
 Der Kommentarzähler allein reicht ohnehin nicht: `comments: 1` kann die
-Kontingent- **oder** die Environment-Meldung sein. Den Text lesen, nicht die
-Zahl. Und einen unbekannten dritten Text wörtlich zitieren, statt ihn in eine
-der bekannten Schubladen zu zwingen — dieser Abschnitt musste schon einmal von
-drei auf vier Gründe wachsen.
+Befundlos-, die Kontingent- **oder** die Environment-Meldung sein — drei
+gegensätzliche Bedeutungen unter derselben Zahl. Den Text lesen, nicht die Zahl.
+Und einen unbekannten vierten Text wörtlich zitieren, statt ihn in eine der
+bekannten Schubladen zu zwingen: Dieser Abschnitt musste schon einmal von drei
+auf vier Gründe wachsen, und die 👍-Reaktion stand hier zwei Fassungen lang als
+Tatsache.
+
+Und ein befundloser Lauf ist kein Freispruch. Am 23.8. lief derselbe Text durch
+42 Reviews: 36 meldeten denselben P2-Befund, 6 die Befundlos-Meldung — gleiche
+Eingabe, gegenteiliges Urteil, alles in denselben neun Minuten. Ein sauberer
+Lauf sagt damit etwas über den Lauf, nicht über den Text. Wer sein Häkchen
+daran hängt, hängt es an einen Münzwurf.
 
 Portfolio-weit nachsehen:
 
@@ -153,12 +176,12 @@ nicht abgewartet.
 Das Kontingent hängt am Konto, nicht am Repo, und Code-Reviews haben einen
 eigenen Topf — nur GitHub-getriggerte Reviews zählen hinein. ChatGPT-Pläne
 fahren ein rollendes Fünf-Stunden-Fenster plus Wochenlimits; welches greift,
-steht im Codex-Dashboard. Welches hier griff, ist **offen**. Die 25 Stunden
-oben schliessen das Fünf-Stunden-Fenster nicht aus: Es kann sich
-zwischendurch geöffnet und durch neue Auslöser wieder erschöpft haben. Das
-auszuschliessen bräuchte den Nachweis, dass in der ganzen Spanne kein einziger
-Review durchlief — den gibt es nicht, weil nur Fehlschläge beobachtet wurden.
-Eine lange Sperre belegt eine lange Sperre, nicht ihre Ursache.
+steht im Codex-Dashboard. Welches hier griff, ist **offen**. Die Lücke oben
+schliesst das Fünf-Stunden-Fenster nicht aus: Es kann sich zwischendurch
+geöffnet und durch neue Auslöser wieder erschöpft haben. Das auszuschliessen
+bräuchte den Nachweis, dass in der ganzen Spanne kein einziger Review durchlief
+— den gibt es nicht, weil nur Fehlschläge beobachtet wurden. Eine lange Reihe
+von Fehlschlägen belegt eine lange Reihe von Fehlschlägen, nicht ihre Ursache.
 
 Zeigt das Dashboard freies Kontingent, während Reviews weiter scheitern, ist
 das ein bekannter Fehler bei mehreren verbundenen Konten — dann den

@@ -33,8 +33,37 @@ jobs:
       - name: Install dependencies
         run: pip install -e ".[dev]"
 
+      # `continue-on-error` so the verdict step runs either way. The job turns
+      # red further down, out of the classified result.
       - name: Run live tests
-        run: pytest tests/ -m live -v
+        id: suite
+        continue-on-error: true
+        run: |
+          set +e
+          pytest tests/ -m live -v \
+            --junitxml=live-report.xml 2>&1 | tee live-output.txt
+          echo "pytest_exit=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
+
+      # `if: failure()` knows red and not-red. A live run has three answers, and
+      # the third is the one that matters: a failed `pip install`, a timeout or
+      # a renamed marker are NOT the same as an upstream contract change — but
+      # under `failure()` they look identical, and the issue below then names
+      # three specific causes ("renamed attribute, dropped field, deviation
+      # over one metre") for a run that never reached an upstream at all.
+      #
+      # The other direction is worse because it is silent: skip every test and
+      # pytest exits 0, so a night on which nothing was measured looked exactly
+      # like a night on which everything passed.
+      - name: Classify the run
+        id: verdict
+        env:
+          PYTEST_EXIT: ${{ steps.suite.outputs.pytest_exit }}
+        run: |
+          args=(live-report.xml)
+          if [ -n "$PYTEST_EXIT" ]; then
+            args+=(--pytest-exit "$PYTEST_EXIT")
+          fi
+          python scripts/classify_live_run.py "${args[@]}"
 
       # The failure path only executes when something is already broken, so it
       # must not itself depend on anything that could be broken. It previously
@@ -43,7 +72,7 @@ jobs:
       # silently for exactly the reader who needed the report (audit OPS-001).
       # `gh` ships on the runner and needs no pin.
       - name: Report failure
-        if: failure()
+        if: steps.verdict.outputs.state == 'finding'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
@@ -76,3 +105,20 @@ jobs:
           Run: ${RUN_URL}
           EOF
           )"
+
+      # Only here does the job turn red. `clear` is green; `finding` and
+      # `unknown` are both red, but only `finding` filed an issue above — the
+      # difference is in the log, not in the exit code.
+      #
+      # Through `env`, not `${{ }}` inside the script: the reason can carry a
+      # parser message about someone else's file, and `${{ }}` substitutes it
+      # into the shell verbatim before the shell starts.
+      - name: Surface the verdict
+        if: steps.verdict.outputs.state != 'clear'
+        env:
+          LIVE_STATE: ${{ steps.verdict.outputs.state }}
+          LIVE_REASON: ${{ steps.verdict.outputs.reason }}
+        run: |
+          echo "Live suite: $LIVE_STATE"
+          echo "$LIVE_REASON"
+          exit 1

@@ -74,6 +74,69 @@ Drei Handgriffe daraus:
   dass nur der 400er aufgezeichnet war, ist der Grund, warum der falsche
   Befund nicht auffiel.
 
+**Und ein 403 ist gar keine Auskunft.** Am 29.8.2026 sollten für 42 Repos die
+Dependabot-Labels nachgemessen werden. Alle 13 Abfragen des ersten Stapels
+kamen zurück als:
+
+```
+Failed to find label: API rate limit already exceeded for user ID 8864492.
+```
+
+Der gefährliche Teil steht vorn: Das Werkzeug verpackt eine Sperre als
+Fund-Fehlschlag. Wer die Zeile überfliegt oder nur auf ein leeres Ergebnis
+prüft, zählt 39 Repos als «Label fehlt» und hat seine eigene Erschöpfung
+gemessen. Das Limit hängt am Konto, nicht am Repo — derselbe Vormittag hatte
+es mit 42 eröffneten und 42 gemergten PRs verbraucht.
+
+Das ist der Absatz darüber, andersherum gelesen: dort war ein 400 eine echte,
+wiederholbare Antwort und galt als Störung; hier ist eine Störung als Antwort
+verpackt. Entscheidend ist nie der Statuscode, sondern ob die Quelle überhaupt
+geantwortet hat.
+
+- **Positivkontrolle im selben Repo.** Ein «nicht gefunden» wird erst dadurch
+  zur Messung, dass eine gleichzeitige Abfrage etwas findet.
+- **Die Messung entlang der Sperre teilen.** `raw.githubusercontent.com` ist
+  ein CDN und nicht die REST-API. Um 11:19:27 UTC lieferte es für
+  `register-mcp` HTTP 200, während die Label-Abfrage desselben Repos in
+  derselben Minute die Sperre meldete. Alle 42 `dependabot.yml` kamen so
+  durch, während die Label-Hälfte stand.
+- **Am Token vorbei geht es nicht.** Beide Umwege enden am Agent-Proxy, und
+  jeder mit einer eigenen irreführenden Begründung. `api.github.com` ohne
+  Zugangsdaten:
+
+  ```
+  GitHub access is not enabled for this session. An org admin must connect
+  the Claude GitHub App for this organization.
+  ```
+
+  Das ist keine Aussage über die Organisation, sondern das, was ohne Token
+  kommt. Wer ihr folgt, sucht einen Admin für ein Problem, das keiner hat.
+  Die HTML-Seite `github.com/<owner>/<repo>/labels` fällt ebenfalls, aber
+  anders:
+
+  ```
+  This GitHub API path is not available: sessions are bound to their
+  configured repositories. Use repository-scoped endpoints
+  (repos/{owner}/{repo}/...).
+  ```
+
+  Der Proxy behandelt also auch `github.com` als API-Pfad; die zweite Meldung
+  klingt nach einem Scope-Problem und ist doch nur dieselbe Sackgasse. Den
+  Token aus der Umgebung in einen curl-Header zu setzen, blockiert der
+  Klassifikator. Ob es überhaupt hülfe, ist offen: die Sperre nennt ein
+  Nutzerkonto, und ob der Token zu diesem gehört, wurde nie geprüft.
+- **Die Sperre gilt nicht dem Dienst, sondern dem Zugangspfad.** Unmittelbar
+  nachdem eine Abfrage der Checks eines PR sauber durchlief, meldete die
+  Label-Abfrage weiter die Sperre. Von einem blockierten Werkzeug also nicht
+  auf «GitHub ist zu» schliessen — und umgekehrt eine gelungene Abfrage nicht
+  als Entwarnung für die gesperrte nehmen. Das ist dieselbe Asymmetrie wie
+  bei der verschwundenen Codex-Meldung weiter unten.
+
+Wann die Sperre fällt, geben diese Beobachtungen nicht her. Die Meldung nennt
+keinen Zeitpunkt, und die `X-RateLimit`-Kopfzeilen sind hinter dem Proxy nicht
+zu sehen. Belegt sind drei gesperrte Zeitpunkte — 11:14, 11:16 und 11:19 UTC.
+Wer daraus eine Dauer macht, hat sie erfunden.
+
 **`results[0]` ist nur so verlässlich wie die Zusicherung danach.** Pinnt die
 Abfrage einen bekannten Datensatz, ist der erste Treffer eine Drift-Wache und
 in Ordnung. Hängt die Zusicherung dagegen davon ab, *welche* Variante die

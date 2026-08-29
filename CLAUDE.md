@@ -137,6 +137,51 @@ keinen Zeitpunkt, und die `X-RateLimit`-Kopfzeilen sind hinter dem Proxy nicht
 zu sehen. Belegt sind drei gesperrte Zeitpunkte — 11:14, 11:16 und 11:19 UTC.
 Wer daraus eine Dauer macht, hat sie erfunden.
 
+**Dieselbe Falle bei einer Konfigurationsoption: die Vorgabe lesen, bevor man
+einen Schlüssel für wirkungslos hält.** Am 29.8.2026 fielen die
+`labels:`-Zeilen aus den `dependabot.yml` des Portfolios, begründet mit
+«Dependabot legt Labels nicht an». Eine Messung danach zeigte, dass
+`dependencies` in 36 von 42 Repos sehr wohl existiert, 35 davon mit GitHubs
+Standardbeschreibung. Das las sich zuerst wie ein Beleg, dass die Aktion
+falsch war.
+
+Die Optionsreferenz kehrt es um:
+
+```
+Dependabot creates these default labels automatically, as necessary in
+your repository.
+
+The labels specified are used instead of the default labels.
+```
+
+Ohne `labels:` vergibt Dependabot also `dependencies` plus ein Ökosystem-Label
+und legt beide selbst an; eine eigene Liste **ersetzt** diesen Satz, und «if
+any of these labels is not defined in the repository, it is ignored». Die
+Zeile war nicht wirkungslos — sie tauschte einen sich selbst pflegenden
+Vorgabesatz gegen eine starre Liste.
+
+Was das kostet, ist an `openlex-mcp` gemessen: zwei Ökosysteme deklariert,
+also stünden `dependencies` **und** ein Ökosystem-Label zu; vorhanden ist nur
+das erste, `github-actions` und `github_actions` fehlen beide (Kontrolle `bug`
+vorhanden). `register-mcp` ist die Gegenprobe: dort existieren alle vier
+deklarierten Namen mit handgeschriebener Beschreibung, die Liste ist gewollt
+und vollständig.
+
+**Dreimal falsch eingeordnet, in drei Richtungen.** Erst die Zeile für bloss
+wirkungslos gehalten. Dann die gefundenen Labels für einen Widerspruch. Dann,
+auf denselben Fund gestützt, einen richtigen PR geschlossen mit dem Argument,
+das Label existiere ja — obwohl es existiert, *weil* die Vorgabe es anlegt.
+Der dritte Fehler ist der teuerste, weil er wie eine Messung aussah.
+
+Was die Messung **nicht** hergibt: wer die 36 Labels angelegt hat. Die
+Referenz sagt, Dependabot tue es; die Objekt-IDs liegen aber so dicht
+beieinander, dass sie eher aus einem Stapellauf stammen. Beides passt zum
+Befund, keines ist belegt — die Herkunft blieb ungemessen.
+
+Beim Aufräumen gilt deshalb dieselbe Frage wie bei `lotId`: Was ist die
+*Vorgabe*, wenn man das Ding weglässt — nicht bloss, ob der aktuelle Wert
+etwas bewirkt.
+
 **`results[0]` ist nur so verlässlich wie die Zusicherung danach.** Pinnt die
 Abfrage einen bekannten Datensatz, ist der erste Treffer eine Drift-Wache und
 in Ordnung. Hängt die Zusicherung dagegen davon ab, *welche* Variante die

@@ -52,6 +52,35 @@ Datensatz weg war, sondern dass die Quelle die Schreibweise ihrer Kopfzeile
 gewechselt hatte — vier von sechs Datensätzen produktiv kaputt, alle
 Unit-Tests grün.
 
+**Ein 4xx ist kein Nein.** Am 29.8.2026 antwortete `past-publications` in
+`swiss-procurement-mcp` auf jede Publikation mit Losen mit HTTP 400. Daraus war
+geschlossen worden, die Quelle verweigere diese Auskunft; der Befund stand
+datiert im Fixture-Nachweis, ein Test bestätigte ihn, alles blieb grün. Die
+Spec desselben Endpunkts führt einen als *optional* deklarierten Parameter
+`lotId` — für Publikationen mit Losen ist er Pflicht. Mit ihm antwortet
+dieselbe Publikation mit 200. Ein Projekt trug sieben Vorgängerpublikationen,
+die der Server als «Quelle nicht erreichbar» wegwarf.
+
+Drei Handgriffe daraus:
+
+- **Die Parameterliste der Spec durchgehen, bevor ein Statuscode eingeordnet
+  wird.** «Optional» heisst dort oft «optional für die Mehrheit».
+- **Einer deterministischen Absage keinen Wiederholungsrat geben.** «Nicht
+  erreichbar, bitte später erneut» ist bei einem 400 falsch und liest sich für
+  das Modell wie eine Störung. Den Status mitführen und den fehlenden
+  Parameter benennen — den Status, nicht den Antwortkörper.
+- **Beide Antworten aufzeichnen, mit und ohne den Parameter.** Eine
+  Aufzeichnung nur des Fehlschlags kann nicht zeigen, dass er vermeidbar war;
+  dass nur der 400er aufgezeichnet war, ist der Grund, warum der falsche
+  Befund nicht auffiel.
+
+**`results[0]` ist nur so verlässlich wie die Zusicherung danach.** Pinnt die
+Abfrage einen bekannten Datensatz, ist der erste Treffer eine Drift-Wache und
+in Ordnung. Hängt die Zusicherung dagegen davon ab, *welche* Variante die
+Quelle heute zuoberst hat, prüft der Test den Tag: am 25.8.2026 rot, weil die
+neueste Zürcher Publikation zufällig Lose hatte, am 26.8. grün, ohne dass sich
+etwas geändert hätte. Den Fall gezielt wählen und beide Zweige fahren.
+
 PR ohne jeden Check ist selten ein Repo ohne CI, meistens ein
 Merge-Konflikt: GitHub berechnet dafür keinen Merge-Commit und startet nichts.
 

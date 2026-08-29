@@ -153,10 +153,20 @@ class TestLiveTestsAreExcludedFromPrCi:
 
 
 class TestTheFailureReportingPathIsRobust:
-    """It only runs `if: failure()` — i.e. when something is already broken —
-    so it must not itself depend on anything a green run never exercises. It
-    previously used a pinned third-party action whose tag resolution was never
-    tested on a passing night (audit OPS-001)."""
+    """It only runs when something is already broken — i.e. never on a green
+    night — so it must not itself depend on anything a green run never
+    exercises. It previously used a pinned third-party action whose tag
+    resolution was never tested on a passing night (audit OPS-001).
+
+    The condition it runs on used to be `failure()`. That covered two different
+    nights with one word: a suite that ran and hit a changed upstream, and a
+    suite that never reached an upstream at all — a failed install, a timeout, a
+    renamed marker. The issue body names three specific causes, so filing it for
+    the second kind sends the reader after a contract change nobody measured.
+    The step now runs on the classified verdict `finding`; everything this class
+    guarantees about it is unchanged."""
+
+    REPORT_IF = "steps.verdict.outputs.state == 'finding'"
 
     @staticmethod
     def _workflow() -> dict:
@@ -168,9 +178,27 @@ class TestTheFailureReportingPathIsRobust:
 
     def _report_step(self) -> dict:
         steps = self._workflow()["jobs"]["live-tests"]["steps"]
-        matches = [s for s in steps if s.get("if") == "failure()"]
+        matches = [s for s in steps if s.get("if") == self.REPORT_IF]
         assert matches, "no failure-reporting step"
         return matches[0]
+
+    def test_a_night_that_measured_nothing_still_turns_the_job_red(self):
+        """`unknown` files no issue, so without this step it would be silent.
+
+        That is the trade the classification makes: the reporting step stops
+        firing on nights that never reached an upstream, and the price is that
+        those nights would otherwise leave no trace. Skip every test and pytest
+        exits 0 — a night on which nothing was measured has to stay
+        distinguishable from a night on which everything passed, and a red job
+        is where that difference lives.
+        """
+        steps = self._workflow()["jobs"]["live-tests"]["steps"]
+        red = [s for s in steps if s.get("if") == "steps.verdict.outputs.state != 'clear'"]
+        assert red, (
+            "nothing turns the job red on a non-clear verdict — a night that "
+            "skipped every test would pass green while checking nothing"
+        )
+        assert "exit 1" in red[0].get("run", "")
 
     def test_the_reporting_step_uses_no_third_party_action(self):
         step = self._report_step()

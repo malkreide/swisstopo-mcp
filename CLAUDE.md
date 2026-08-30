@@ -151,14 +151,28 @@ Die Optionsreferenz kehrt es um:
 Dependabot creates these default labels automatically, as necessary in
 your repository.
 
+If you define more than one package manager, an additional label for the
+ecosystem or language is added to each pull request.
+
 The labels specified are used instead of the default labels.
 ```
 
-Ohne `labels:` vergibt Dependabot also `dependencies` plus ein Ökosystem-Label
-und legt beide selbst an; eine eigene Liste **ersetzt** diesen Satz, und «if
-any of these labels is not defined in the repository, it is ignored». Die
-Zeile war nicht wirkungslos — sie tauschte einen sich selbst pflegenden
-Vorgabesatz gegen eine starre Liste.
+Ohne `labels:` vergibt Dependabot also `dependencies` — und, sobald mehr als
+ein Paketmanager deklariert ist, zusätzlich ein Ökosystem-Label — und legt sie
+selbst an; eine eigene Liste **ersetzt** diesen Satz, und «if any of these
+labels is not defined in the repository, it is ignored». Die Zeile war nicht
+wirkungslos — sie tauschte einen sich selbst pflegenden Vorgabesatz gegen eine
+starre Liste.
+
+**Die Bedingung nicht weglassen.** Bei nur einem Paketmanager steht das
+Ökosystem-Label gar nicht zu; wer es dort trotzdem erwartet, schreibt genau
+den Fehlbefund auf, gegen den dieser Abschnitt geschrieben ist — der Abschnitt
+liefe an sich selbst vorbei. Im Portfolio deklariert jede `dependabot.yml`
+zwei (`pip` und `github-actions`), die Bedingung ist hier also überall
+erfüllt; anderswo nicht unbedingt. Aufgefallen ist die fehlende Bedingung
+nicht beim Schreiben, sondern durch einen Codex-Review auf
+`swiss-environment-mcp` PR #113 — vierzehn Sekunden vor dem Merge desselben
+PR.
 
 Was das kostet, ist an `openlex-mcp` gemessen: zwei Ökosysteme deklariert,
 also stünden `dependencies` **und** ein Ökosystem-Label zu; vorhanden ist nur

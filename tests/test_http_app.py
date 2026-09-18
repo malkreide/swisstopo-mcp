@@ -185,17 +185,18 @@ class TestTransportSecurityRequests:
 
 
 class TestSessionIdleTimeout:
-    """mcp 2.x changed how this mitigation gets installed.
+    """Der Idle-Timeout (SEC-009) kommt aus der SDK-Option, nicht aus einem Nachbau.
 
-    1.x built the session manager lazily (`if self._session_manager is None`),
-    so pre-populating the attribute before `streamable_http_app()` was enough.
-    2.x builds one *unconditionally*, overwrites the attribute, hands that
-    object to the route's ASGI app and closes the app lifespan over the same
-    local variable. Pre-populating is a plain no-op there — the timeout would
-    have vanished silently.
+    Hier stand ein eigener `StreamableHTTPSessionManager`, der nach dem Bau der
+    App an zwei privaten Stellen eingewechselt wurde, begruendet mit «es gibt
+    dafuer keine Einstellung». `streamable_http_app(session_idle_timeout=...)`
+    ist die Einstellung.
 
-    So these tests read the manager that actually serves requests, off the
-    route, instead of trusting a private attribute to still be the live one.
+    Die Messung bleibt, wie sie war, und das ist der Punkt: gelesen wird der
+    Manager, der die Anfragen *tatsaechlich bedient* — von der Route her, nicht
+    ueber ein privates Attribut, das die lebende Instanz nur sein koennte. Faellt
+    der Wert kuenftig auf dem Weg zum Manager wieder heraus, faellt dieser Test,
+    egal ueber welchen Mechanismus er gesetzt wurde.
     """
 
     @staticmethod
@@ -210,7 +211,14 @@ class TestSessionIdleTimeout:
         raise AssertionError("no StreamableHTTPASGIApp route on the built app")
 
     def test_timeout_is_set_explicitly(self):
-        """The criterion is an *explicit* TTL, not whatever the SDK defaults to."""
+        """Der dokumentierte Wert, festgenagelt — und allein ohne Beweiskraft.
+
+        1800 ist inzwischen auch `DEFAULT_SESSION_IDLE_TIMEOUT` des SDK. Dieser
+        Test bleibt deshalb gruen, wenn man `session_idle_timeout=` aus
+        `build_http_app` ersatzlos streicht (gemessen). Er haelt die Zahl fest,
+        die READMEs und `.env.example` nennen; dass sie aus *unserer*
+        Einstellung stammt, zeigt erst `test_timeout_comes_from_settings`.
+        """
         manager = self._serving_manager(build_http_app([]))
         assert manager.session_idle_timeout == 1800.0
 
@@ -220,10 +228,15 @@ class TestSessionIdleTimeout:
         monkeypatch.setattr(settings, "session_idle_timeout", 900.0)
         assert self._serving_manager(build_http_app([])).session_idle_timeout == 900.0
 
-    def test_zero_restores_the_sdk_default(self, monkeypatch):
-        """An operator who wants the old unbounded behaviour can have it, but
-        has to ask for it. Then no custom manager is installed at all and the
-        SDK's own (unbounded) one stays in place."""
+    def test_zero_restores_the_unbounded_behaviour(self, monkeypatch):
+        """Wer das unbegrenzte Verhalten will, kann es haben — muss aber danach fragen.
+
+        Der Test hiess `test_zero_restores_the_sdk_default` und war rot, weil er
+        die Zusicherung an der *SDK-Vorgabe* festmachte statt an dem, was die
+        Einstellung verspricht: mcp 2.2.0 defaultet auf 1800, nicht mehr auf
+        `None`. Zugesichert war nie «was das SDK tut», sondern «unbegrenzt» —
+        `None` am Manager. Die Behauptung ist unveraendert, nur ihr Name war
+        falsch."""
         from swisstopo_mcp.config import settings
 
         monkeypatch.setattr(settings, "session_idle_timeout", 0.0)
@@ -237,18 +250,20 @@ class TestSessionIdleTimeout:
         assert manager.security_settings.enable_dns_rebinding_protection is True
 
     async def test_the_lifespan_starts_our_manager_not_the_sdks(self):
-        """The load-bearing case for the 2.x rewrite.
+        """Der tragende Fall: `build_http_app` legt eine eigene Lifespan darueber.
 
-        The SDK sets `lifespan=lambda app: session_manager.run()` over the
-        manager *it* built. Re-pointing only the route would leave requests
-        served by our manager while the lifespan started the SDK's — so the
-        reaper would never run on the sessions actually being served, and every
-        other assertion in this class would still pass.
+        Das SDK setzt `lifespan=lambda app: session_manager.run()`. `build_http_app`
+        ersetzt diese Lifespan durch `_process_lifespan`, damit der Prozess eine
+        Referenz auf den geteilten httpx-Client haelt (SDK-001). Wickelt die
+        Ersetzung die SDK-Lifespan nicht ein, sondern verdeckt sie, liefe der
+        Reaper nie auf den Sessions, die tatsaechlich bedient werden — und jede
+        andere Zusicherung dieser Klasse bliebe gruen.
 
-        `run()` is what flips `_has_started`, so entering the real lifespan and
-        checking that flag on the *serving* manager is the only assertion that
-        distinguishes the two. Verified by mutation: dropping the lifespan
-        re-point makes this test — and only this test — fail.
+        `run()` ist es, was `_has_started` umlegt; die echte Lifespan zu betreten
+        und die Flagge am *bedienenden* Manager zu pruefen, ist die einzige
+        Zusicherung, die die beiden Faelle trennt. Gegenprobe: wird in
+        `_process_lifespan` der `sdk_lifespan`-Block entfernt, faellt genau
+        dieser Test.
         """
         from swisstopo_mcp import server
 

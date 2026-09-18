@@ -879,66 +879,32 @@ Für kantonale Datensätze statt Bundesdaten zeigt
 anbietet."""
 
 
-def _install_session_manager(app, security: TransportSecuritySettings) -> None:
-    """Give the Streamable-HTTP session manager an explicit idle timeout.
+def _session_idle_timeout() -> float | None:
+    """Der Idle-Timeout fuer Streamable-HTTP-Sessions (Audit SEC-009).
 
-    The SDK's default is `session_idle_timeout=None`: a session lives until the
-    process restarts. Every client that disconnects without sending
-    `DELETE /mcp` — a crash, a closed laptop, a killed container — therefore
-    leaks one for the lifetime of the pod. Nothing about that is a
-    confidentiality problem here (all 20 tools are stateless reads over public
-    data), but unbounded growth is still unbounded (audit SEC-009).
+    Jeder Client, der ohne `DELETE /mcp` verschwindet — ein Absturz, ein
+    zugeklapptes Notebook, ein getoeteter Container — hinterlaesst sonst eine
+    Session fuer die Lebensdauer des Pods. Vertraulich ist daran nichts (alle
+    20 Tools sind zustandslose Lesezugriffe auf oeffentliche Daten), aber
+    unbegrenztes Wachstum bleibt unbegrenzt.
 
-    There is still no setting for it, and mcp 2.x changed how it gets in. In
-    1.x the app built the manager lazily — `if self._session_manager is None` —
-    so pre-populating the attribute before calling `streamable_http_app()` was
-    enough. 2.x builds one *unconditionally*, overwrites the attribute, hands
-    that object to the route's ASGI app and closes the app lifespan over the
-    same local variable. Pre-populating is a plain no-op there, which would
-    have dropped this mitigation silently. So the manager is swapped in after
-    the app exists, in both places the SDK wired its own into:
+    `SWISSTOPO_SESSION_IDLE_TIMEOUT=0` gibt weiterhin das unbegrenzte
+    Verhalten zurueck: `None` heisst am SDK «nie ablaufen lassen».
 
-      1. `StreamableHTTPASGIApp.session_manager` — serves the requests.
-      2. the app lifespan — starts the manager's task group and the reaper.
-
-    Both are private SDK surface. The mismatch is loud rather than silent: if
-    the route stops being a `StreamableHTTPASGIApp`, this raises instead of
-    leaving a server that looks configured and is not.
-
-    `SWISSTOPO_SESSION_IDLE_TIMEOUT=0` restores the SDK's unbounded behaviour.
+    Hier stand bis zuletzt ein Nachbau des Session-Managers, der ihn nach dem
+    Bau der App an zwei privaten Stellen einwechselte —
+    `StreamableHTTPASGIApp.session_manager` und die App-Lifespan. Begruendet
+    war das mit «es gibt dafuer keine Einstellung». Die gibt es:
+    `streamable_http_app(session_idle_timeout=...)` reicht den Wert an genau
+    den Manager durch, der die Anfragen bedient (gemessen mit mcp 2.2.0: 900.0
+    hinein, 900.0 am bedienenden Manager, und `None` bleibt `None`). Der
+    Nachbau liess ausserdem `max_sessions`, `json_response` und
+    `max_request_body_size` fallen und traf sie nur deshalb richtig, weil die
+    Konstruktor-Vorgaben zufaellig dieselben sind — die Sorte Uebereinstimmung,
+    die ein SDK-Update still aufloest.
     """
-    from mcp.server.streamable_http_manager import (
-        StreamableHTTPASGIApp,
-        StreamableHTTPSessionManager,
-    )
-
     timeout = settings.session_idle_timeout
-    if timeout <= 0:
-        return
-
-    manager = StreamableHTTPSessionManager(
-        app=mcp._lowlevel_server,
-        security_settings=security,
-        session_idle_timeout=timeout,
-    )
-    mcp._lowlevel_server._session_manager = manager
-
-    asgi_apps = [
-        r.endpoint
-        for r in app.routes
-        if isinstance(getattr(r, "endpoint", None), StreamableHTTPASGIApp)
-    ]
-    if not asgi_apps:  # pragma: no cover - defensive
-        raise RuntimeError(
-            "No StreamableHTTPASGIApp route found; the idle-session timeout "
-            "(SEC-009) could not be installed. The SDK's app layout changed."
-        )
-    for asgi_app in asgi_apps:
-        asgi_app.session_manager = manager
-
-    # The SDK set `lifespan=lambda app: session_manager.run()` over the manager
-    # it built. Point it at ours, or the replacement never starts its reaper.
-    app.router.lifespan_context = lambda _scoped_app: manager.run()
+    return timeout if timeout > 0 else None
 
 
 # Die Header, nach denen Spec 2026-07-28 eine Streamable-HTTP-Anfrage routet —
@@ -988,11 +954,11 @@ def build_http_app(allowed_origins: list[str] | None = None):
         return JSONResponse({"status": "ok"})
 
     # mcp 2.x: transport_security is a per-app kwarg, not a constructor arg.
-    security = _transport_security()
-    app = mcp.streamable_http_app(transport_security=security, host=settings.http_host)
-    # Must run before `sdk_lifespan` is captured below: it replaces the app's
-    # lifespan, and the wrapper has to see the replacement, not the original.
-    _install_session_manager(app, security)
+    app = mcp.streamable_http_app(
+        transport_security=_transport_security(),
+        host=settings.http_host,
+        session_idle_timeout=_session_idle_timeout(),
+    )
 
     sdk_lifespan = app.router.lifespan_context
 

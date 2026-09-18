@@ -20,6 +20,7 @@ from mcp.server.mcpserver import Context, MCPServer
 from mcp.server.transport_security import TransportSecuritySettings
 from mcp.types import ToolAnnotations
 
+from swisstopo_mcp import __version__
 from swisstopo_mcp.api_client import create_shared_client, set_shared_client
 from swisstopo_mcp.config import settings
 from swisstopo_mcp.logging_config import configure_logging, get_logger
@@ -184,8 +185,35 @@ CACHE_HINTS: dict[CacheableMethod, CacheHint] = {
     "server/discover": CacheHint(ttl_ms=LIST_CACHE_TTL_MS, scope="public"),
 }
 
+# Die Identitaet des Servers — auf der 2026-07-28-Wire der einzige Kanal, ueber
+# den ein Client erfaehrt, mit wem er spricht.
+#
+# Die Handshake-Aera traegt sie im `initialize`-Resultat; `2026-07-28` hat kein
+# `initialize` mehr. Stattdessen stempelt das SDK `serverInfo` in das `_meta`
+# jeder Antwort, und `server/discover` liefert Capabilities und Instructions.
+# Gemessen vor dieser Aenderung: jede Antwort trug
+# `{"name": "swisstopo_mcp", "version": ""}` — `MCPServer` defaultet `version`
+# auf den Leerstring und erfindet nie eine. Ein Client konnte also nicht sagen,
+# welche Fassung dieses Servers ihm antwortet, und ein Bug-Report konnte es
+# nicht nennen.
+#
+# `version` kommt aus den Paket-Metadaten (`scripts/check_version_sync.py`
+# verbietet ein Literal in `src/`), die uebrigen Felder spiegeln `server.json`,
+# damit Registry-Eintrag und Wire-Identitaet dieselbe Auskunft geben.
+#
+# `name` bleibt `swisstopo_mcp`: daran haengt das Tool-Praefix
+# (`tests/test_tool_namespace.py`), nicht die Anzeige. Der Anzeigename ist
+# `title`.
+SERVER_TITLE = "Swisstopo — Schweizer Bundesgeodaten"
+SERVER_DESCRIPTION = "Swiss federal geodata: geocoding, height, STAC, WMTS, OEREB and more"
+SERVER_WEBSITE_URL = "https://github.com/malkreide/swisstopo-mcp"
+
 mcp = _SwisstopoMCP(
     "swisstopo_mcp",
+    title=SERVER_TITLE,
+    description=SERVER_DESCRIPTION,
+    website_url=SERVER_WEBSITE_URL,
+    version=__version__,
     cache_hints=CACHE_HINTS,
     lifespan=lifespan,
     instructions=(

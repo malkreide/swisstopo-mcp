@@ -103,6 +103,16 @@ pod. Raising `replicas` on the plain Deployment breaks sessions on their second
 request — intermittently, which reads like flaky clients rather than a
 misconfiguration.
 
+**This whole section is about the handshake era only.** A client on protocol
+revision `2026-07-28` sends a self-contained POST per request: no `initialize`,
+no `Mcp-Session-Id`, no per-pod state to route back to. Such a client is served
+correctly by a plain `replicas: N` Deployment behind an ordinary round-robin
+Service, and the arrangement below costs it nothing but a hop. The server serves
+both eras from one process (see the protocol section in the README), so a
+deployment that still has clients on `2025-11-25` or older needs the affinity
+below for *those* clients — a mixed fleet is the normal case today, not a
+transitional one.
+
 ### The supported multi-replica path
 
 Three artefacts, applied together:
@@ -205,7 +215,12 @@ shared session store (option C below), which is not implemented.
   works only for clients that persist cookies. MCP hosts such as Claude Desktop
   and `mcp-remote` are not browsers, so this is **not** a general substitute —
   it is listed for the browser-client case only.
-- **A shared session store** (e.g. Redis via a FastMCP `SessionManager`) removes
-  the affinity requirement entirely and would also survive pod loss. Not
+- **A shared session store** (e.g. Redis behind the SDK's session manager)
+  removes the affinity requirement entirely and would also survive pod loss. Not
   implemented here.
+- **Clients on `2026-07-28`** need none of this: their requests carry no session,
+  so any replica can answer any request and a pod that dies costs at most the
+  request in flight. This is the only option on this list that removes both the
+  affinity requirement and the failover gap, and it is already available — it
+  depends on the client, not on the deployment.
 

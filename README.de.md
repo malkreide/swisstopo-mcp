@@ -477,17 +477,67 @@ Capabilities, Egress-NetworkPolicy) — siehe
 
 ### MCP-Protokollversion
 
-Die MCP-Protokollversion wird beim `initialize` ausgehandelt; das Python-SDK
-bietet keinen vom Autor setzbaren Pin. Mit `mcp` 1.28.1 ist die ausgehandelte
-Version **2025-11-25** (`mcp.types.LATEST_PROTOCOL_VERSION`). Das SDK ist in
-`pyproject.toml` auf den `1.x`-Major gepinnt, damit ein Update sie nicht still
-verschiebt, und `tests/test_protocol_version.py` schlaegt fehl, falls doch —
-ein Dependabot-Bump kann die Protokollversion nicht unbemerkt aendern.
+Der Server spricht **2026-07-28** nativ und laesst jede aeltere Revision
+erreichbar. Welche man bekommt, entscheidet die Art der Verbindung, nicht eine
+Konfiguration — ein Prozess bedient beide Aeren gleichzeitig.
+
+| | Moderne Aera | Handshake-Aera |
+|---|---|---|
+| Revisionen | `2026-07-28` | `2024-11-05` … `2025-11-25` |
+| Eroeffnung | keine — jede Anfrage steht fuer sich | `initialize` + `notifications/initialized` |
+| Protokollversion steht in | `params._meta` **und** der Kopfzeile `MCP-Protocol-Version` | den `initialize`-Parametern |
+| Session | keine | `Mcp-Session-Id`, beendet mit `DELETE /mcp` |
+| Verzeichnis | `server/discover` | das `initialize`-Resultat |
+| Server-Identitaet | der Stempel `io.modelcontextprotocol/serverInfo` im `_meta` jeder Antwort | `serverInfo` im `initialize`-Resultat |
+| In dieser Revision gestrichen | `initialize`, `ping`, `logging/setLevel`, `resources/subscribe` | — |
+
+Eine 2026-07-28-Anfrage ist ein in sich geschlossener POST auf `/mcp`:
+
+```http
+POST /mcp
+MCP-Protocol-Version: 2026-07-28
+Mcp-Method: tools/call
+Mcp-Name: swisstopo_map_url
+Content-Type: application/json
+Accept: application/json, text/event-stream
+
+{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{
+  "name":"swisstopo_map_url",
+  "arguments":{"params":{"lat":46.9481,"lon":7.4474}},
+  "_meta":{
+    "io.modelcontextprotocol/protocolVersion":"2026-07-28",
+    "io.modelcontextprotocol/clientCapabilities":{}
+  }}}
+```
+
+Die Kopfzeile `MCP-Protocol-Version` ist es, die die Anfrage auf den modernen
+Pfad routet; ohne sie landet derselbe Rumpf im Handshake-Transport.
+`Mcp-Method` und `Mcp-Name` muessen mit dem Rumpf uebereinstimmen, sonst wird
+die Anfrage mit `-32020` abgewiesen. Alle drei stehen in der CORS-Freigabe,
+damit der Preflight eines Browser-Clients durchkommt.
+
+Was das praktisch heisst:
+
+- **Bestehende Clients merken nichts.** Wer `2025-06-18` verlangt, bekommt
+  `2025-06-18`; wer ueber `initialize` nach `2026-07-28` fragt, bekommt die
+  Decke `2025-11-25` zurueck. Gemessen, nicht angenommen —
+  `tests/test_protocol_version.py`.
+- **Beide Aeren zeigen dieselben 20 Tools.** Nichts haengt an der Revision
+  (`tests/test_modern_protocol.py`).
+- **Sticky Sessions braucht nur die Handshake-Aera.** Eine moderne Anfrage
+  traegt keine Session und kann von jeder Replik bedient werden — siehe
+  [docs/deployment.md](docs/deployment.md).
+
+Keine der beiden Revisionen ist vom Autor setzbar: das SDK handelt die
+Handshake-Aera aus und routet die moderne, und `pyproject.toml` pinnt `mcp` auf
+den `2.x`-Major, damit ein Update keine von beiden still verschiebt.
+`tests/test_protocol_version.py` nagelt beide Decken fest und schlaegt fehl,
+wenn ein Dependabot-Bump eine davon aendert.
 
 **Update-Policy**
 
 - SDK-Updates werden vor dem Merge auf einem Feature-Branch getestet.
-- Eine Aenderung der ausgehandelten Protokollversion wird in
+- Eine Aenderung einer der beiden Protokoll-Decken wird in
   [CHANGELOG.md](CHANGELOG.md) unter `### Changed` mit alter und neuer Version
   festgehalten.
 - Eine Protokolländerung, die bestehende Clients bricht, loest ein
@@ -497,11 +547,18 @@ ein Dependabot-Bump kann die Protokollversion nicht unbemerkt aendern.
 ### Sessions & Authentifizierung
 
 Der Server ist bewusst nicht authentifiziert — er liefert ausschliesslich
-öffentliche Open Data. Über HTTP werden Session-IDs vollständig vom FastMCP-
-Framework verwaltet; es gibt keinen benutzerspezifischen Zustand, also nichts,
-woran eine Session gebunden werden müsste. Würde später eine authentifizierte
-Variante eingeführt, müssen Session-IDs an die validierte Benutzeridentität
-gebunden werden (Audit-Finding SEC-009).
+öffentliche Open Data.
+
+Sessions gibt es nur in der Handshake-Aera. Dort werden die Session-IDs
+vollständig vom MCP-SDK verwaltet; es gibt keinen benutzerspezifischen Zustand,
+also nichts, woran eine Session gebunden werden müsste. Untätige Sessions
+werden nach `SWISSTOPO_SESSION_IDLE_TIMEOUT` Sekunden eingesammelt
+(Vorgabe 1800), damit ein Client, der ohne `DELETE /mcp` verschwindet, nicht
+eine für die Lebensdauer des Prozesses hinterlässt. Eine 2026-07-28-Anfrage
+öffnet gar keine Session — weder Timeout noch Reaper betreffen sie.
+
+Würde später eine authentifizierte Variante eingeführt, müssen Session-IDs an
+die validierte Benutzeridentität gebunden werden (Audit-Finding SEC-009).
 
 ### Fehlerbehandlung
 

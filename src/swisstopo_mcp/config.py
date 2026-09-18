@@ -58,11 +58,14 @@ class Settings(BaseSettings):
     # any Host it was not told about, and its default list is localhost only
     # (audit SDK-004 / SCALE-001).
     allowed_hosts: str = ""
-    # Idle timeout for Streamable-HTTP sessions, in seconds (SEC-009). The SDK
-    # default is None — sessions live until the process restarts, so every
-    # client that disconnects without sending `DELETE /mcp` leaks one for the
-    # lifetime of the pod. 1800 is the value the SDK's own docstring recommends.
-    # Set to 0 to disable, which restores the unbounded SDK behaviour.
+    # Idle timeout for Streamable-HTTP sessions, in seconds (SEC-009). Without
+    # one, every client that disconnects without sending `DELETE /mcp` leaks a
+    # session for the lifetime of the pod. 1800 is the value the SDK's own
+    # docstring recommends; it also happens to be `DEFAULT_SESSION_IDLE_TIMEOUT`
+    # in mcp 2.2.0, so this setting is explicit rather than load-bearing today.
+    # Set to 0 for unbounded sessions — that is *not* the SDK default (which is
+    # 1800), it is `session_idle_timeout=None`, which the SDK reads as "never
+    # expire".
     session_idle_timeout: float = 1800.0
     log_level: str = "INFO"
 

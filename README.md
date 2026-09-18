@@ -471,28 +471,84 @@ NetworkPolicy) are provided — see [docs/deployment.md](docs/deployment.md).
 
 ### MCP Protocol Version
 
-The MCP protocol version is negotiated during `initialize`; the Python SDK does
-not expose an author-settable pin. As of `mcp` 1.28.1 the negotiated version is
-**2025-11-25** (`mcp.types.LATEST_PROTOCOL_VERSION`). The SDK is pinned to the
-`1.x` major in `pyproject.toml` so an update cannot silently move it, and
-`tests/test_protocol_version.py` fails if it does — a Dependabot bump cannot
-change the protocol version unnoticed.
+The server speaks **2026-07-28** natively and keeps every older revision
+reachable. Which one you get is decided by how you connect, not by
+configuration — one process serves both eras at once.
+
+| | Modern era | Handshake era |
+|---|---|---|
+| Revisions | `2026-07-28` | `2024-11-05` … `2025-11-25` |
+| Opening exchange | none — every request stands alone | `initialize` + `notifications/initialized` |
+| Protocol version travels in | `params._meta` **and** the `MCP-Protocol-Version` header | the `initialize` params |
+| Session | none | `Mcp-Session-Id`, closed with `DELETE /mcp` |
+| Directory | `server/discover` | the `initialize` result |
+| Server identity | the `io.modelcontextprotocol/serverInfo` stamp in every response's `_meta` | `serverInfo` in the `initialize` result |
+| Gone in this revision | `initialize`, `ping`, `logging/setLevel`, `resources/subscribe` | — |
+
+A 2026-07-28 request is a self-contained POST to `/mcp`:
+
+```http
+POST /mcp
+MCP-Protocol-Version: 2026-07-28
+Mcp-Method: tools/call
+Mcp-Name: swisstopo_map_url
+Content-Type: application/json
+Accept: application/json, text/event-stream
+
+{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{
+  "name":"swisstopo_map_url",
+  "arguments":{"params":{"lat":46.9481,"lon":7.4474}},
+  "_meta":{
+    "io.modelcontextprotocol/protocolVersion":"2026-07-28",
+    "io.modelcontextprotocol/clientCapabilities":{}
+  }}}
+```
+
+The `MCP-Protocol-Version` header is what routes the request to the modern
+path; without it the same body lands on the handshake transport. `Mcp-Method`
+and `Mcp-Name` must agree with the body, or the request is rejected with
+`-32020`. All three are in the CORS allow-list so a browser client's preflight
+passes.
+
+What this means in practice:
+
+- **Existing clients are unaffected.** A client asking for `2025-06-18` still
+  gets `2025-06-18`; one asking over `initialize` for `2026-07-28` gets the
+  handshake ceiling `2025-11-25` back. Measured, not assumed —
+  `tests/test_protocol_version.py`.
+- **Both eras expose the same 20 tools.** Nothing is gated on the revision
+  (`tests/test_modern_protocol.py`).
+- **Sticky sessions matter only for the handshake era.** A modern request
+  carries no session, so it can be served by any replica — see
+  [docs/deployment.md](docs/deployment.md).
+
+Neither revision is author-settable: the SDK negotiates the handshake era and
+routes the modern one, and `pyproject.toml` pins `mcp` to the `2.x` major so an
+update cannot move either silently. `tests/test_protocol_version.py` pins both
+ceilings and fails if a Dependabot bump changes one.
 
 **Update policy**
 
 - SDK updates are tested on a feature branch before merge.
-- A change to the negotiated protocol version is recorded in
+- A change to either protocol ceiling is recorded in
   [CHANGELOG.md](CHANGELOG.md) under `### Changed`, naming the old and the new
   version.
 - A protocol change that breaks existing clients triggers a major release.
 
 ### Sessions & Authentication
 
-The server is unauthenticated by design — it serves only public open data. Over
-HTTP, session IDs are managed entirely by the FastMCP framework; there is no
-per-user state, so there is nothing user-specific to bind a session to. If an
-authenticated deployment is ever introduced, session IDs must be bound to the
-validated user identity (audit finding SEC-009).
+The server is unauthenticated by design — it serves only public open data.
+
+Sessions exist in the handshake era only. There, session IDs are managed
+entirely by the MCP SDK; there is no per-user state, so there is nothing
+user-specific to bind a session to. Idle sessions are reaped after
+`SWISSTOPO_SESSION_IDLE_TIMEOUT` seconds (default 1800) so a client that
+disconnects without sending `DELETE /mcp` does not leak one for the lifetime of
+the process. A 2026-07-28 request opens no session at all, so neither the
+timeout nor the reaper applies to it.
+
+If an authenticated deployment is ever introduced, session IDs must be bound to
+the validated user identity (audit finding SEC-009).
 
 ### Error handling
 

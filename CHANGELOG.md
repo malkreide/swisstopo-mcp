@@ -7,6 +7,72 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Geändert
+
+- **Der Server ist nativ auf Spec `2026-07-28`.** Die Revision war seit dem
+  Sprung auf `mcp` 2.x erreichbar, aber nirgends gemessen und nirgends
+  dokumentiert: die READMEs nannten `2025-11-25` als *die* Protokollversion,
+  und kein Test schickte je eine Anfrage in der modernen Ära. Beide Ären laufen
+  aus einem Prozess — welche ein Client bekommt, entscheidet die Kopfzeile
+  `MCP-Protocol-Version`, nicht eine Einstellung.
+
+  Für bestehende Clients ändert sich nichts: wer `2025-06-18` verlangt, bekommt
+  `2025-06-18`; wer über `initialize` nach `2026-07-28` fragt, bekommt weiterhin
+  die Handshake-Decke `2025-11-25`. `tests/test_protocol_version.py` misst das.
+
+  Beide Decken bleiben in `pyproject.toml` über den `2.x`-Pin gegen einen
+  stillen Dependabot-Bump gesichert. Protokollstände im Audit-Trail
+  (ARCH-012): Handshake-Ära `2025-11-25`, moderne Ära `2026-07-28`, beide unter
+  `mcp` 2.2.0.
+
+- **Der Idle-Timeout kommt aus der SDK-Option statt aus privatem Innenleben.**
+  `_install_session_manager` baute einen eigenen
+  `StreamableHTTPSessionManager` und wechselte ihn an zwei privaten Stellen
+  ein, begründet mit «There is still no setting for it». Die Einstellung gibt
+  es: `streamable_http_app(session_idle_timeout=...)`. Gemessen mit `mcp` 2.2.0:
+  900.0 hinein, 900.0 am bedienenden Manager; `None` bleibt `None`.
+
+  Der Nachbau liess ausserdem `max_sessions`, `json_response` und
+  `max_request_body_size` fallen und traf sie nur deshalb richtig, weil die
+  Konstruktor-Vorgaben zufällig dieselben sind.
+
+### Behoben
+
+- **Die Server-Identität war auf der `2026-07-28`-Wire leer.** Die moderne Ära
+  kennt kein `initialize`; die Identität wird nie ausgehandelt, sondern steht
+  als `io.modelcontextprotocol/serverInfo`-Stempel im `_meta` **jeder** Antwort.
+  Gemessen vorher: `{"name": "swisstopo_mcp", "version": ""}` — `MCPServer`
+  defaultet `version` auf den Leerstring und erfindet nie eine. Ein Client
+  konnte also nicht sagen, welche Fassung ihm antwortet, und ein Fehlerbericht
+  konnte sie nicht nennen.
+
+  Jetzt stehen `version` (aus den Paket-Metadaten), `title`, `description` und
+  `website_url` dort; die letzten drei spiegeln `server.json`, damit
+  Registry-Eintrag und Wire dasselbe sagen. Die Handshake-Ära profitiert mit:
+  alle vier Revisionen liefern die Felder nun auch im `initialize`-Resultat.
+
+- **`SWISSTOPO_SESSION_IDLE_TIMEOUT=0` stellte nicht die SDK-Vorgabe wieder
+  her.** `config.py`, `.env.example` und ein Test behaupteten das SDK defaulte
+  auf «kein Timeout»; `mcp` 2.2.0 defaultet auf 1800. `0` bedeutet weiterhin
+  *unbegrenzt* — das ist die ausdrückliche Einstellung, nicht die Vorgabe. Der
+  Test `test_zero_restores_the_sdk_default` war deswegen auf `master` rot; die
+  Zusicherung bleibt unverändert, nur ihr Name war falsch.
+
+### Hinzugefügt
+
+- **`tests/test_modern_protocol.py`** — die moderne Ära hatte null
+  Testabdeckung. 13 Fälle fahren echte POSTs mit Umschlag und Routing-Headern
+  gegen `build_http_app()`: `server/discover` samt Frischehinweis, ein
+  Werkzeugaufruf ohne Session, Werkzeug-Parität beider Ären, der
+  Identitätsstempel, die Kopfzeilen-Sprosse der Validierungsleiter, die benannte
+  Absage auf eine unbekannte Revision und die in `2026-07-28` gestrichenen
+  Methoden.
+
+  Der Frischehinweis auf `server/discover` war dabei die stillste Lücke:
+  `tests/test_cache_hints.py` prüft über eine `Client`-Sitzung und kann die
+  Methode gar nicht erreichen — sie existiert in der Handshake-Ära nicht.
+  Gegenprobe: den Eintrag entfernen liess `test_cache_hints.py` grün.
+
 ### Behoben
 
 - **`DELETE` fehlte in `allow_methods`.** Auf streamable-http beendet die

@@ -205,6 +205,55 @@ etwas geändert hätte. Den Fall gezielt wählen und beide Zweige fahren.
 PR ohne jeden Check ist selten ein Repo ohne CI, meistens ein
 Merge-Konflikt: GitHub berechnet dafür keinen Merge-Commit und startet nichts.
 
+**Bei einem blockierten PR nennt der Merge-Versuch den Blocker, jede Ableitung
+rät.** `mergeable_state: blocked` bei grüner CI heisst: ein required Kontext
+fehlt oder steht nicht auf grün. Welcher, sagt die Einstellung — und die sperrt
+der Agent-Proxy mit HTTP 403, ein MCP-Werkzeug dafür gibt es nicht. Der Ausweg
+ist nicht Indizienarbeit, sondern ein Merge-Versuch über die API:
+
+```
+PUT /repos/<owner>/<repo>/pulls/<n>/merge
+405 Required status check "Codex hat diesen Head geprueft" is expected.
+```
+
+Der Name steht dort wörtlich so, wie er in der Branch Protection eingetragen
+ist. Scheitert der Versuch, kostet er nichts.
+
+Am 24./25.9.2026 über drei Repos vermessen, nachdem ein Gate-Workflow entfernt
+worden war und seinen required Kontext ohne Berichterstatter zurückliess:
+
+| Repo | eingetragener Kontext | Art |
+|---|---|---|
+| `register-mcp` | `Codex hat den PR angesehen` | Check-Run |
+| `srgssr-mcp` | `review-abgeschlossen` | Check-Run |
+| `fedlex-mcp` | `Codex hat diesen Head geprueft` | Check-Run |
+
+**Warum Ableiten hier systematisch fehlgeht.** GitHub nimmt als Check-Run-Name
+den **Job**-Namen, nicht den des Workflows. Zwei der drei Kontexte enthalten die
+Zeichenfolge «codex-gate» nicht, obwohl sie aus `codex-gate.yml` stammen; wer in
+den Einstellungen danach sucht, findet nichts und hält die Regel für abwesend.
+Trug der Job kein `name:`, nimmt GitHub die Job-ID — daher `review-abgeschlossen`.
+
+Zwei Fehlschlüsse sind dabei belegt, beide aus **einer** Beobachtung gezogen:
+
+- Aus einem Commit-Status auf den required Kontext geschlossen. In `fedlex-mcp`
+  stand der Status `codex-gate` auf dem Head auf `success` und blockierte
+  nichts, während der fehlende Check-Run den Merge hielt. Am Kontroll-PR waren
+  beide rot — dort ist nicht zu unterscheiden, welcher von beiden eingetragen
+  ist. Genommen wurde der auffälligere.
+- Aus einer Check-Run-Liste auf den required Kontext geschlossen. Die Liste
+  zeigt, was **berichtet** wurde; eingetragen sein kann ein Name, der gerade
+  gar nicht erscheint. Genau das ist der Fall, um den es geht.
+
+**Ein Vorbehalt, der zur Methode gehört:** Die Absage nennt immer nur den
+**ersten** fehlenden Kontext. Ist ein zweiter eingetragen, zeigt ihn erst der
+nächste Versuch. Nach jeder Änderung an der Einstellung also erneut versuchen,
+bis der Merge durchgeht oder ein neuer Name fällt.
+
+Die Kosten der Ableitung sind gemessen: ein Arbeitstag, an dem der PR-Text den
+falschen Namen trug und in den Einstellungen nach einer Zeichenfolge gesucht
+wurde, die dort nicht steht.
+
 ### Wenn zwei Agenten dasselbe tun
 
 Vor dem Anlegen eines Branches mit vorgegebenem Namen prüfen, ob es ihn schon

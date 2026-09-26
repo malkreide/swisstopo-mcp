@@ -7,6 +7,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Wöchentlicher Bericht über die Distanz zwischen Repo und PyPI.**
+  `scripts/check_release_distance.py`, gefahren von
+  `.github/workflows/release-distance.yml` (montags 05:40 UTC). Das Skript
+  misst, wie viele Commits seit dem Tag der publizierten Version am
+  *ausgelieferten* Code liegen — `src/` und `pyproject.toml`; alles andere
+  erreicht über PyPI niemanden — und wie alt diese Publikation ist.
+  Überschreitet beides die Schwelle (Vorgabe 14 Tage), öffnet der Lauf ein
+  Issue mit dem Label `release-distance`; ist schon eines offen, bekommt es
+  einen Kommentar mit dem aktuellen Stand statt eines zweiten Issues.
+
+  Der Anlass steht eine Version weiter oben: 0.4.1 lag 55 Tage auf PyPI,
+  während im Repo unter derselben Nummer 93 Commits dazukamen — darunter die
+  Korrektur eines OEREB-Parsers, der seit dem 3.8. gegen die Quelle falsch
+  antwortete. Der Verteilweg ist `uvx`, also immer die neueste PyPI-Version;
+  die Korrektur erreichte sieben Wochen lang niemanden. Eine Messung des
+  Portfolios am 26.9.2026 fand denselben Zustand in 38 von 42 Repos.
+
+  **Bewusst kein PR-Gate.** Die Bedingung «die Version in `pyproject.toml` ist
+  auf PyPI schon vergeben und HEAD liegt hinter keinem Tag» trifft auf jeden
+  PR nach einem Release zu. Als blockierender Check wäre das dauerhaft rot und
+  innert einer Woche abgeschaltet.
+
+  Ein Lauf hat drei Ausgänge, nicht zwei: kann die Messung nicht stattfinden —
+  PyPI nicht erreichbar, der Tag im Checkout nicht vorhanden — meldet das
+  Skript `unknown`, und der Job wird rot **ohne** ein Issue anzulegen. Ein
+  nicht gelaufener Bericht ist kein Befund. Der wahrscheinlichste Fall ist der
+  flache Checkout: ohne `fetch-depth: 0` holt `actions/checkout` keine Tags,
+  und ein fehlender Tag sähe sonst aus wie «nichts unveröffentlicht».
+
+  Gegenproben, je einzeln gefahren: den `unknown`-Zweig für den fehlenden Tag
+  auf `clear` drehen → zwei Tests fallen; die Schwelle von `<` auf `<=` → der
+  Grenzfall fällt; `pyproject.toml` aus der Liste des ausgelieferten Codes →
+  ein Test fällt; `rev-list -n 1` durch `rev-parse` ersetzen → der annotierte
+  Tag fällt; den Rückgabewert bei `distance` auf 1 → zwei Tests fallen. Zwei
+  Zusicherungen hatten zunächst keine Zähne und wurden nachgeschärft: der
+  `tag_ist_head`-Zweig (der Fall fällt sonst durch den Zweig darunter und
+  bleibt `clear` — die Zusicherung liegt deshalb auf dem *Grund*, nicht auf
+  dem Zustand) und die Verdrahtung von `tag_und_head` in `main()`, die erst
+  ein End-to-End-Fall gegen ein Repo ohne Tag festhält.
+
 ### Fixed
 
 - **Der Versions-Sync war an `uv.lock` blind.** Beim Release 0.5.0 wurden vier

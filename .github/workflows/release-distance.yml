@@ -1,0 +1,123 @@
+name: Release distance
+
+# Was im Repo behoben ist, erreicht ueber `uvx` erst mit dem naechsten Release
+# jemanden. Am 26.9.2026 lagen in diesem Repo 93 Commits unter einer Nummer,
+# die seit 55 Tagen auf PyPI vergeben war — darunter die Korrektur eines
+# OEREB-Parsers, der gegen die Quelle falsch antwortete.
+#
+# Bewusst KEIN PR-Gate: «pyproject-Version ist schon publiziert und HEAD liegt
+# hinter keinem Tag» trifft auf jeden PR nach einem Release zu. Als
+# blockierender Check waere das dauerhaft rot. Also ein woechentlicher Bericht.
+on:
+  schedule:
+    # Montags 05:40 UTC. Nicht zur vollen Stunde und nicht auf 04:00, wo der
+    # naechtliche Live-Lauf sitzt — zwei Jobs desselben Repos gleichzeitig
+    # teilen sich sonst grundlos die Runner-Warteschlange.
+    - cron: "40 5 * * 1"
+  workflow_dispatch:
+    inputs:
+      min_age_days:
+        description: "Erst ab diesem Alter der letzten Publikation melden"
+        required: false
+        default: "14"
+
+permissions:
+  contents: read
+
+jobs:
+  distance:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # Fuer das Issue weiter unten. Ausdruecklich deklariert statt auf den
+      # Vorgabe-Scope des Repos zu vertrauen, der read-only sein kann — und
+      # der sonst erst an dem Montag auffiele, an dem es etwas zu melden gibt.
+      issues: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # Ohne das holt actions/checkout weder Historie noch Tags. Der Tag
+          # `v<version>` fehlte dann, und das Skript koennte die Distanz nicht
+          # messen. Es meldet diesen Fall als `unknown` statt als `clear` —
+          # aber das hilft nur, wenn jemand den Log liest. Hier ist er
+          # vermeidbar, also wird er vermieden.
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+
+      # Kein `pip install -e ".[dev]"`: Das Skript ist stdlib-only. Ein
+      # Install brauchte hier nur Zeit und brächte eine Fehlerquelle mit, die
+      # mit der Messung nichts zu tun hat.
+      - name: Messen
+        id: distance
+        env:
+          MIN_AGE_DAYS: ${{ inputs.min_age_days || '14' }}
+        run: python scripts/check_release_distance.py --min-age-days "$MIN_AGE_DAYS"
+
+      # `gh` statt einer Third-Party-Action: der Meldepfad laeuft nur, wenn
+      # ohnehin etwas offen ist, und darf nicht selbst an einer Tag-Aufloesung
+      # scheitern, die auf gruenen Laeufen nie geprueft wird (audit OPS-001).
+      - name: Bericht anlegen
+        if: steps.distance.outputs.state == 'distance'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          VERSION: ${{ steps.distance.outputs.version }}
+          PYPI_DATE: ${{ steps.distance.outputs.pypi_date }}
+          AGE_DAYS: ${{ steps.distance.outputs.age_days }}
+          COMMITS: ${{ steps.distance.outputs.commits }}
+          SHIPPED: ${{ steps.distance.outputs.shipped }}
+        run: |
+          set -euo pipefail
+          # Das Label muss existieren, bevor es benutzt wird: `gh issue create
+          # --label` auf ein unbekanntes Label laesst den ganzen Aufruf fallen.
+          # `--force` macht den Schritt idempotent.
+          gh label create release-distance --force \
+            --color FBCA04 \
+            --description "Unveroeffentlichte Aenderungen am ausgelieferten Code"
+          # Ein offenes Issue zur Zeit, nicht eines pro Woche. Statt ein neues
+          # anzulegen, bekommt das bestehende einen Kommentar mit dem
+          # aktuellen Stand — sonst veraltet der Text im Issue, waehrend die
+          # Distanz weiter waechst.
+          NUM="$(gh issue list --label release-distance --state open \
+                   --json number --jq '.[0].number // empty')"
+          BODY="$(cat <<EOF
+          \`pyproject.toml\` steht auf **${VERSION}** — dieselbe Nummer liegt seit
+          **${AGE_DAYS} Tagen** auf PyPI (publiziert ${PYPI_DATE}).
+
+          Seither **${COMMITS} Commit(s)** auf dem Default-Branch, davon
+          **${SHIPPED}** mit Aenderungen an ausgeliefertem Code (\`src/\`,
+          \`pyproject.toml\`). Wer den Server ueber \`uvx\` oder \`pip\` bezieht,
+          hat keine davon.
+
+          Das ist kein Fehler im Code, sondern eine Auslieferungsluecke. Zwei
+          Wege: ein Release schneiden, oder — falls die Aenderungen bewusst
+          warten — hier notieren, worauf.
+
+          Lauf: ${RUN_URL}
+          EOF
+          )"
+          if [ -n "$NUM" ]; then
+            echo "Offenes Issue #$NUM — Stand als Kommentar nachtragen."
+            gh issue comment "$NUM" --body "$BODY"
+          else
+            gh issue create \
+              --title "Unveroeffentlichte Aenderungen seit v${VERSION}" \
+              --label release-distance \
+              --body "$BODY"
+          fi
+
+      # `unknown` heisst: die Messung hat nicht stattgefunden. Das darf nicht
+      # aussehen wie ein sauberer Lauf — sonst meldet der Job jahrelang gruen,
+      # weil er den Tag nicht findet. Der Job wird rot, ohne ein Issue
+      # anzulegen: ein nicht gelaufener Bericht ist kein Befund.
+      - name: Nicht messbar
+        if: steps.distance.outputs.state == 'unknown'
+        env:
+          REASON: ${{ steps.distance.outputs.reason }}
+        run: |
+          echo "Distanz nicht messbar: $REASON"
+          exit 1

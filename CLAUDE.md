@@ -286,12 +286,13 @@ wie der Code: Nichts ist rot, weil nichts geprüft wird, worauf es ankommt.
 
 **Der Default-Branch heisst `master`, nicht `main`.** PRs gehen dorthin.
 
-**Werkzeug-Versionen:** `ruff==0.16.3` und `mypy==2.3.1`, beide exakt und beide
-nur im `[dev]`-Extra von `pyproject.toml`. Ein Install des Extras reicht also,
-lokal wie in der CI. Keine zweite Version in die Workflows schreiben: ein
-solcher Schritt läuft nach dem Install und überstimmt den Pin still — für ruff
-stand er dort (`test_werkzeug_versionen.py` hält beides fest).
-Eine `.pre-commit-config.yaml` gibt es nicht — die andere Stelle, an der ein
+**Werkzeug-Versionen:** ruff und mypy, beide exakt und beide nur im
+`[dev]`-Extra von `pyproject.toml`; die Versionen dort nachlesen, nicht hier.
+Ein Install des Extras reicht also, lokal wie in der CI. Keine zweite Version
+in die Workflows schreiben: ein solcher Schritt läuft nach dem Install und
+überstimmt den Pin still — für ruff stand er dort
+(`test_werkzeug_versionen.py` hält beides fest). Eine
+`.pre-commit-config.yaml` gibt es nicht — die andere Stelle, an der ein
 abweichender ruff-Pin schlummern kann. Wer eine anlegt, nimmt die Version aus
 `pyproject.toml`.
 

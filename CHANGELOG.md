@@ -7,58 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Geändert
+## [0.5.0] - 2026-09-26
 
-- **Der Server ist nativ auf Spec `2026-07-28`.** Die Revision war seit dem
-  Sprung auf `mcp` 2.x erreichbar, aber nirgends gemessen und nirgends
-  dokumentiert: die READMEs nannten `2025-11-25` als *die* Protokollversion,
-  und kein Test schickte je eine Anfrage in der modernen Ära. Beide Ären laufen
-  aus einem Prozess — welche ein Client bekommt, entscheidet die Kopfzeile
-  `MCP-Protocol-Version`, nicht eine Einstellung.
+### Breaking
 
-  Für bestehende Clients ändert sich nichts: wer `2025-06-18` verlangt, bekommt
-  `2025-06-18`; wer über `initialize` nach `2026-07-28` fragt, bekommt weiterhin
-  die Handshake-Decke `2025-11-25`. `tests/test_protocol_version.py` misst das.
+- **`swisstopo_reverse_geocode` verliert das Feld `sr`, bekommt `radius_m`.**
+  Betroffenes Tool-Schema: `swisstopo_reverse_geocode` (`tool-hashes.json`
+  aktualisiert — Clients müssen die geänderte Definition neu bestätigen). `sr`
+  liess sich nicht einhalten: der SearchServer wertet die Bounding-Box nur in
+  LV95 und nur mit `sr=2056` aus, jeder andere Wert liefert HTTP 200 mit
+  `results: []`. Ein Feld, das eine Zusage macht, die der Server nicht halten
+  kann, ist schlechter als keines. Was ein Aufrufer daraus las — `attrs.lat` /
+  `attrs.lon` — kommt ohnehin in WGS84 zurück, unabhängig von `sr`.
+  `radius_m` (50–5000, Standard 500) ersetzt die bisher fest verdrahteten
+  0.005 Grad.
 
-  Beide Decken bleiben in `pyproject.toml` über den `2.x`-Pin gegen einen
-  stillen Dependabot-Bump gesichert. Protokollstände im Audit-Trail
-  (ARCH-012): Handshake-Ära `2025-11-25`, moderne Ära `2026-07-28`, beide unter
-  `mcp` 2.2.0.
-
-- **Der Idle-Timeout kommt aus der SDK-Option statt aus privatem Innenleben.**
-  `_install_session_manager` baute einen eigenen
-  `StreamableHTTPSessionManager` und wechselte ihn an zwei privaten Stellen
-  ein, begründet mit «There is still no setting for it». Die Einstellung gibt
-  es: `streamable_http_app(session_idle_timeout=...)`. Gemessen mit `mcp` 2.2.0:
-  900.0 hinein, 900.0 am bedienenden Manager; `None` bleibt `None`.
-
-  Der Nachbau liess ausserdem `max_sessions`, `json_response` und
-  `max_request_body_size` fallen und traf sie nur deshalb richtig, weil die
-  Konstruktor-Vorgaben zufällig dieselben sind.
-
-### Behoben
-
-- **Die Server-Identität war auf der `2026-07-28`-Wire leer.** Die moderne Ära
-  kennt kein `initialize`; die Identität wird nie ausgehandelt, sondern steht
-  als `io.modelcontextprotocol/serverInfo`-Stempel im `_meta` **jeder** Antwort.
-  Gemessen vorher: `{"name": "swisstopo_mcp", "version": ""}` — `MCPServer`
-  defaultet `version` auf den Leerstring und erfindet nie eine. Ein Client
-  konnte also nicht sagen, welche Fassung ihm antwortet, und ein Fehlerbericht
-  konnte sie nicht nennen.
-
-  Jetzt stehen `version` (aus den Paket-Metadaten), `title`, `description` und
-  `website_url` dort; die letzten drei spiegeln `server.json`, damit
-  Registry-Eintrag und Wire dasselbe sagen. Die Handshake-Ära profitiert mit:
-  alle vier Revisionen liefern die Felder nun auch im `initialize`-Resultat.
-
-- **`SWISSTOPO_SESSION_IDLE_TIMEOUT=0` stellte nicht die SDK-Vorgabe wieder
-  her.** `config.py`, `.env.example` und ein Test behaupteten das SDK defaulte
-  auf «kein Timeout»; `mcp` 2.2.0 defaultet auf 1800. `0` bedeutet weiterhin
-  *unbegrenzt* — das ist die ausdrückliche Einstellung, nicht die Vorgabe. Der
-  Test `test_zero_restores_the_sdk_default` war deswegen auf `master` rot; die
-  Zusicherung bleibt unverändert, nur ihr Name war falsch.
-
-### Hinzugefügt
+### Added
 
 - **`tests/test_modern_protocol.py`** — die moderne Ära hatte null
   Testabdeckung. 13 Fälle fahren echte POSTs mit Umschlag und Routing-Headern
@@ -73,30 +37,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Methode gar nicht erreichen — sie existiert in der Handshake-Ära nicht.
   Gegenprobe: den Eintrag entfernen liess `test_cache_hints.py` grün.
 
-### Behoben
-
-- **`DELETE` fehlte in `allow_methods`.** Auf streamable-http beendet die
-  Methode eine Session ausdrücklich; der Preflight wies sie mit 400 ab. Ein
-  Browser-Client konnte damit Sessions öffnen, aber nie schliessen — sie liefen
-  erst am Timeout aus. Das SDK bedient sie sehr wohl: `_handle_delete_request`
-  in `mcp.server.streamable_http`, und dessen eigene 405-Antwort wirbt mit
-  `Allow: GET, POST, DELETE`. Die Freigabeliste war schmaler als der Server.
-
-  Gemessen vorher: `Preflight DELETE -> 400` bei
-  `Access-Control-Allow-Methods: GET, POST, OPTIONS`. Danach `200` und
-  `GET, POST, DELETE, OPTIONS`.
-
-### Fixed
-
-- **Browser-Clients scheiterten am Preflight.** Spec `2026-07-28` routet eine
-  Streamable-HTTP-Anfrage über `Mcp-Method`, `Mcp-Name` und
-  `Mcp-Protocol-Version`; die CORS-Freigabeliste nannte keinen davon, dafür mit
-  `Mcp-Session-Id` den Session-Header, der für sich genommen keine Anfrage
-  routet. Ein Browser darf einen nicht safelisteten Header nicht senden, wenn
-  der Server ihn nicht nennt: die Anfrage starb vor dem ersten MCP-Byte,
-  während stdio und Python, für die kein Preflight gilt, weiterliefen.
-
-### Added
 
 - **Frischehinweise auf den auflistenden Methoden** (SEP-2549, Spec
   `2026-07-28`): `tools/list`, `resources/list`, `resources/templates/list`,
@@ -148,20 +88,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   der Freigabeliste, faellt genau dieser eine Test, und die sieben bestehenden
   bleiben gruen.
 
-### Breaking
-
-- **`swisstopo_reverse_geocode` verliert das Feld `sr`, bekommt `radius_m`.**
-  Betroffenes Tool-Schema: `swisstopo_reverse_geocode` (`tool-hashes.json`
-  aktualisiert — Clients müssen die geänderte Definition neu bestätigen). `sr`
-  liess sich nicht einhalten: der SearchServer wertet die Bounding-Box nur in
-  LV95 und nur mit `sr=2056` aus, jeder andere Wert liefert HTTP 200 mit
-  `results: []`. Ein Feld, das eine Zusage macht, die der Server nicht halten
-  kann, ist schlechter als keines. Was ein Aufrufer daraus las — `attrs.lat` /
-  `attrs.lon` — kommt ohnehin in WGS84 zurück, unabhängig von `sr`.
-  `radius_m` (50–5000, Standard 500) ersetzt die bisher fest verdrahteten
-  0.005 Grad.
-
-### Added
 
 - **Aufgezeichnete Fixtures** in `tests/fixtures/` — 21 echte Antworten, eine je
   **Anfrage** (nicht je Endpunkt: sieben Hosts, aber weit mehr Abfrageformen —
@@ -189,7 +115,260 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `test_keine_aufzeichnung_ist_leer`: eine leere Antwort sieht aus wie eine
   gültige und prüft nichts. Genau daran fiel der Fehler unten auf.
 
+
+- **Retry policy toward the geo upstreams** (ARCH-014): `Retry-After` is read
+  and beats the backoff table, the backoff is jittered, and a total budget
+  bounds the whole call.
+
+  `Retry-After` on 429/503 in both RFC 9110 §10.2.3 forms. A malformed header
+  falls back to the table rather than crashing on the error path.
+
+  Jitter matters here more than elsewhere: Overpass and geodienste.ch are
+  community/cantonal instances, and a synchronised retry storm lands on them
+  exactly when they recover. Table delays land in [0.5x, 1.5x]; on a
+  `Retry-After` the spread is one-sided ([1.0x, 1.25x]). Capped at 20s **after**
+  jitter, so the cap is a real bound rather than a midpoint.
+
+  The retry warning sent to the client (`_notify_retry`, SDK-003) now reports
+  the *actual* jittered wait — announcing the table value would have made it a
+  small lie.
+
+  Total budget of 25s, anchored on the Python MCP SDK's
+  `MCP_DEFAULT_TIMEOUT = 30.0`. Unlike the SPARQL servers in the portfolio there
+  is no long-query case to protect here: tile, feature and geocoding endpoints
+  answer in well under a second when healthy. The request is wrapped in an
+  `asyncio.timeout` deadline — httpx applies its timeout per operation and the
+  read timeout restarts with every chunk, so it alone cannot bound the call.
+
+
+
+- **Live-Tests für echte Upstream-Fehlerpfade.** Kein Live-Test fasste bisher
+  einen an — was bei einer unbekannten Kennung passiert, stand ausschliesslich
+  in Mocks. Dabei ist auch das ein Vertrag: api3 beantwortet einen unbekannten
+  Layer mit 400 und ein unbekanntes Feature mit 404, und würde daraus je ein
+  200 mit Fehler-Body, meldeten diese Tools Erfolg auf eine gescheiterte
+  Abfrage. Fünf Tests nageln das fest, inklusive der Gegenprobe, dass ein
+  legitim leeres Ergebnis weiterhin *kein* Fehler ist.
+
+- **Die anderen kantonalen ÖREB-Implementierungen geprüft.** ZH und BE sind
+  beides Eigenbauten; die übrigen 24 Kantone fahren vier weitere Stacks. Die
+  Toleranz des Parsers darüber war nie belegt, nur erhofft.
+
+  Gegen Live-Antworten geprüft, ein Kanton pro Familie: **vier von fünf parsen
+  ohne Codeänderung** — `pyramid_oereb` (GR, SG), `crdppf` (NE) und der
+  AG-Eigenbau. Ihre echten, gekürzten Antworten liegen jetzt als Fixtures bei,
+  damit das Hinzufügen eines dieser Kantone ein Registry-Eintrag ist und keine
+  Debugging-Sitzung.
+
+  Die fünfte ist als **bekannte Lücke** festgehalten statt behoben:
+  `RdppfSVC.svc` (VD, GE, FR) antwortet auf `getegrid` mit `{"Item": [...]}`
+  statt `GetEGRIDResponse` und markiert Sprachen numerisch (`"Language": 1`)
+  statt als Code, womit `_localized_text` nie auf die angeforderte Sprache
+  trifft und still auf den ersten Eintrag zurückfällt — in einem zweisprachigen
+  Kanton eine Fehlübersetzung, kein fehlender Wert. Halbe Unterstützung, die
+  vollständig aussieht, wäre schlechter als keine; wer einen Westschweizer
+  Kanton aufnimmt, findet beide Abweichungen dokumentiert vor.
+
+
+- **Live-Abdeckung für Kanton BE.** Die ÖREB-Live-Tests liefen ausschliesslich
+  auf ZH — BE existierte nur in Fixtures, also nur in Annahmen über BE. Dabei
+  war *jeder* Formatunterschied, den dieser Server absorbieren musste, ein
+  ZH/BE-Unterschied: der Extract-Umschlag heisst `Extract` beim einen und
+  `extract` beim anderen, `SubCode` ist beim einen leer und trägt beim anderen
+  drei Werte, `TOPICS` wird vom einen respektiert und vom anderen ignoriert.
+  Alle drei wurden von Hand gefunden, nicht von den Tests.
+
+  `TestOerebLive` ist jetzt über beide Kantone parametrisiert (Bern,
+  Bundeshaus als BE-Sonde; BE wird per Fixture zugeschaltet, da nur ZH
+  standardmässig aktiv ist). Die Extract-Prüfung geht dabei über `match_type`
+  hinaus — ein leerer Auszug ist eine legitime Antwort, deshalb wird zusätzlich
+  verlangt, dass die Beschränkungs-Records die Felder tragen, die Formatter und
+  Themenfilter lesen. Ein fehlender `theme_code` etwa macht Filtern still
+  unmöglich.
+
+  **Mitgeprüft und für unbedenklich befunden:** dieselbe Frage für
+  geodienste-Layer. Deren Attribute sind über ZH/BE/AG/TG identisch — das ist
+  der Zweck von geodienste.ch, ein harmonisiertes Modell. Die
+  ÖREB-Problematik existiert dort nicht, eine Mehrkantons-Parametrisierung
+  brächte also nichts.
+
+
+- **Test, der Aggregat und Delegat auf gleiche Validierung prüft.** Zwei Tools
+  kollabieren eine mehrstufige Kette und validieren die Werte des Aufrufers ein
+  zweites Mal, indem sie das Input-Modell des darunterliegenden Tools bauen:
+  `swisstopo_oereb_at` baut ein `GetOerebExtractInput`, `swisstopo_map_query`
+  eines von fünf REST-Modellen. Jedes weitergereichte Feld wird also gegen zwei
+  getrennt geschriebene `Field()`-Definitionen geprüft.
+
+  Weichen die ab, ist der Fehler in eine Richtung still und in die andere
+  hässlich. Strengeres Aggregat: Eingabe, die das darunterliegende Tool
+  akzeptiert, wird an der Tür abgewiesen — genau der `topics`-Fall. Lockereres
+  Aggregat: der Wert passiert das äussere Modell und fliegt im Handler als
+  unerwarteter `ValidationError` auseinander, sichtbar als interner Fehler.
+
+  `TestAggregatesValidateLikeTheirDelegates` vergleicht alle sieben
+  Weiterreich-Paare feldweise. Beschreibungen bleiben absichtlich
+  unverglichen — ein Aggregat vermerkt, zu welcher Operation ein Feld gehört
+  («nur features_at_point»), und diese Abweichung ist gewollt.
+
+  **Befund der Prüfung: keine weitere Divergenz.** `lang`, `canton` und jedes
+  andere weitergereichte Feld stimmen in beiden Aggregaten überein; `topics`
+  war der Einzelfall. Gegengeprüft, dass der Test den ursprünglichen Bug fängt:
+  mit dem Vor-Fix-Muster auf `OerebAtInput` schlägt er fehl.
+
+
+- **Live-Test, der einen Kantonsumzug meldet, bevor der Endpoint stirbt.** Der
+  Bund führt in `ch.swisstopo-vd.stand-oerebkataster` pro Gemeinde die aktuelle
+  kantonale ÖREB-Service-URL im Attribut `oereb_webservice`. Beim ZH-Ausfall
+  stand die neue Adresse dort längst — nur hat sie niemand gelesen, und die
+  Tools erfuhren davon erst, als der alte Name nicht mehr auflöste.
+
+  `TestOerebEndpointRegistryLive` vergleicht `OEREB_ENDPOINTS` gegen diese
+  Registry und nennt im Fehlerfall die publizierte URL sowie die vier Stellen,
+  die beim Hostwechsel mitzuführen sind. Das ist ein anderes Signal als die
+  übrigen Live-Tests: die werden rot, wenn der alte Endpoint stirbt, dieser
+  wird rot, sobald die Registry woanders hinzeigt — früher, und mit einer
+  Handlungsanweisung statt eines Verbindungsfehlers.
+
+  Der Vergleich ist ein Prefix-Match mit Trennzeichen-Guard, kein `startswith`:
+  manche Kantone publizieren einen vollständigen Beispiel-Request
+  (`…/oereb/extract/xml?EGRID=…`) statt der Basis, `…/oereb/v20` darf aber
+  nicht als Treffer für `…/oereb/v2` durchgehen. Gegengeprüft: der Test lehnt
+  den Vor-Fix-Stand `https://oereb.geo.zh.ch` ab, ebenso einen
+  Versionssprung — hätte den Ausfall also gefangen.
+
+  Die Registry benennt Kantone in ihrer eigenen Amtssprache (`Ticino`, nicht
+  `Tessin`) und hat kein Kürzel-Feld zum Suchen, deshalb die Tabelle
+  `CANTON_REGISTRY_NAMES`. Alle 26 Namen wurden gegen den Live-Layer geprüft;
+  ein nicht-Live-Test erzwingt, dass jeder Kanton in `OEREB_ENDPOINTS` einen
+  Registry-Namen hat, damit ein neuer Kanton nicht still aus der Prüfung fällt.
+
+### Changed
+
+- **Der Server ist nativ auf Spec `2026-07-28`.** Die Revision war seit dem
+  Sprung auf `mcp` 2.x erreichbar, aber nirgends gemessen und nirgends
+  dokumentiert: die READMEs nannten `2025-11-25` als *die* Protokollversion,
+  und kein Test schickte je eine Anfrage in der modernen Ära. Beide Ären laufen
+  aus einem Prozess — welche ein Client bekommt, entscheidet die Kopfzeile
+  `MCP-Protocol-Version`, nicht eine Einstellung.
+
+  Für bestehende Clients ändert sich nichts: wer `2025-06-18` verlangt, bekommt
+  `2025-06-18`; wer über `initialize` nach `2026-07-28` fragt, bekommt weiterhin
+  die Handshake-Decke `2025-11-25`. `tests/test_protocol_version.py` misst das.
+
+  Beide Decken bleiben in `pyproject.toml` über den `2.x`-Pin gegen einen
+  stillen Dependabot-Bump gesichert. Protokollstände im Audit-Trail
+  (ARCH-012): Handshake-Ära `2025-11-25`, moderne Ära `2026-07-28`, beide unter
+  `mcp` 2.2.0.
+
+- **Der Idle-Timeout kommt aus der SDK-Option statt aus privatem Innenleben.**
+  `_install_session_manager` baute einen eigenen
+  `StreamableHTTPSessionManager` und wechselte ihn an zwei privaten Stellen
+  ein, begründet mit «There is still no setting for it». Die Einstellung gibt
+  es: `streamable_http_app(session_idle_timeout=...)`. Gemessen mit `mcp` 2.2.0:
+  900.0 hinein, 900.0 am bedienenden Manager; `None` bleibt `None`.
+
+  Der Nachbau liess ausserdem `max_sessions`, `json_response` und
+  `max_request_body_size` fallen und traf sie nur deshalb richtig, weil die
+  Konstruktor-Vorgaben zufällig dieselben sind.
+
+
+- **Zwei ÖREB-Feldbeschreibungen an den Rest des Servers angeglichen.** Betrifft
+  `swisstopo_get_oereb_extract` und `swisstopo_oereb_at`; beide
+  Tool-Definitionen ändern sich, Clients müssen sie neu bestätigen.
+
+  `lang` war in genau diesen zwei Tools als «Sprache» dokumentiert, in allen
+  fünf übrigen als «Sprache: de, fr, it, en». Da `LANG_PATTERN` nur
+  Zweibuchstaben-Codes zulässt, lädt die knappe Fassung zu `lang="deutsch"`
+  ein — was mit einem Validierungsfehler endet, ohne dass die Beschreibung je
+  gesagt hätte, was erlaubt ist. `canton` in `GetOerebExtractInput` war das
+  einzige Vorkommen ohne Beispiel («Kantonskürzel» statt «Kantonskürzel (z.B.
+  'ZH', 'BE')»).
+
+  Aufgefallen beim Divergenz-Scan oben: die Constraints stimmten, die
+  Beschreibungen nicht — und die Beschreibung ist das, was das Modell liest.
+
+- **Der Themenfilter wird clientseitig angewendet — und funktioniert erstmals
+  überhaupt.** Betrifft `swisstopo_get_oereb_extract` und `swisstopo_oereb_at`;
+  beide Tool-Definitionen ändern sich, Clients müssen sie neu bestätigen
+  (`tool-hashes.json` aktualisiert).
+
+  Der eigentliche Defekt lag nicht upstream, sondern in der Validierung: das
+  Muster `^[\w,\-]+$` liess keine Punkte zu, jeder ÖREB-Themencode trägt aber
+  einen (`ch.Nutzungsplanung`, `ch.BE.Gewaesserschutzbereiche`). Gültige
+  Eingabe wurde also abgewiesen, bevor je ein Request rausging; durch kam nur
+  ein Code ohne `ch.`-Präfix, und der trifft nichts. Der Filter war für jeden
+  Kanton unbrauchbar, nicht nur für ZH.
+
+  Dazu kam, dass `TOPICS` kantonsabhängig ist: BE respektiert den Parameter
+  (8 → 5 Beschränkungen), ZH ignoriert ihn vollständig — auch ein
+  Unsinnswert ändert nichts. Der Parameter geht deshalb gar nicht mehr auf die
+  Leitung. Gefiltert wird nach dem Parsen, was zwei Dinge gewinnt: gleiches
+  Verhalten in jedem Kanton, und die vollständige Themenliste bleibt zur Hand.
+
+  Letzteres ist der Punkt. Wo der Upstream-Filter *funktionierte*, kam bei
+  einem unbekannten Thema ein leerer Auszug zurück — nicht unterscheidbar von
+  «dieses Grundstück ist unbelastet». Genau die stille Falschantwort, die schon
+  das Envelope-Parsing produziert hat. Ein Filter ohne Treffer meldet jetzt,
+  wie viele Beschränkungen das Grundstück in anderen Themen trägt, und nennt
+  die tatsächlich vorhandenen Themencodes für den nächsten Versuch.
+
+  Verglichen wird gegen Themencode **und** Subcode, case-insensitiv: ZH setzt
+  `SubCode` gar nicht, BE führt drei verschiedene Subcodes unter dem einen Code
+  `ch.Nutzungsplanung`. Nur auf den Code zu filtern machte diese unerreichbar,
+  nur auf den Subcode hätte ZH ganz zerlegt. Gegenprobe an echten Daten: ZH
+  18 → 7, BE 8 → 5 — Letzteres deckungsgleich mit dem, was BEs eigener
+  Upstream-Filter liefert.
+
+  Die Feld-Definition stand zweimal im Code, weshalb der Charset-Fix zunächst
+  nur bei `swisstopo_get_oereb_extract` landete und `swisstopo_oereb_at` weiter
+  keinen Themencode annahm. Beide teilen jetzt eine Konstante, und ein Test
+  vergleicht die Constraints der zwei Modelle, damit sie nicht wieder
+  auseinanderlaufen.
+
 ### Fixed
+
+- **Die Server-Identität war auf der `2026-07-28`-Wire leer.** Die moderne Ära
+  kennt kein `initialize`; die Identität wird nie ausgehandelt, sondern steht
+  als `io.modelcontextprotocol/serverInfo`-Stempel im `_meta` **jeder** Antwort.
+  Gemessen vorher: `{"name": "swisstopo_mcp", "version": ""}` — `MCPServer`
+  defaultet `version` auf den Leerstring und erfindet nie eine. Ein Client
+  konnte also nicht sagen, welche Fassung ihm antwortet, und ein Fehlerbericht
+  konnte sie nicht nennen.
+
+  Jetzt stehen `version` (aus den Paket-Metadaten), `title`, `description` und
+  `website_url` dort; die letzten drei spiegeln `server.json`, damit
+  Registry-Eintrag und Wire dasselbe sagen. Die Handshake-Ära profitiert mit:
+  alle vier Revisionen liefern die Felder nun auch im `initialize`-Resultat.
+
+- **`SWISSTOPO_SESSION_IDLE_TIMEOUT=0` stellte nicht die SDK-Vorgabe wieder
+  her.** `config.py`, `.env.example` und ein Test behaupteten das SDK defaulte
+  auf «kein Timeout»; `mcp` 2.2.0 defaultet auf 1800. `0` bedeutet weiterhin
+  *unbegrenzt* — das ist die ausdrückliche Einstellung, nicht die Vorgabe. Der
+  Test `test_zero_restores_the_sdk_default` war deswegen auf `master` rot; die
+  Zusicherung bleibt unverändert, nur ihr Name war falsch.
+
+
+- **`DELETE` fehlte in `allow_methods`.** Auf streamable-http beendet die
+  Methode eine Session ausdrücklich; der Preflight wies sie mit 400 ab. Ein
+  Browser-Client konnte damit Sessions öffnen, aber nie schliessen — sie liefen
+  erst am Timeout aus. Das SDK bedient sie sehr wohl: `_handle_delete_request`
+  in `mcp.server.streamable_http`, und dessen eigene 405-Antwort wirbt mit
+  `Allow: GET, POST, DELETE`. Die Freigabeliste war schmaler als der Server.
+
+  Gemessen vorher: `Preflight DELETE -> 400` bei
+  `Access-Control-Allow-Methods: GET, POST, OPTIONS`. Danach `200` und
+  `GET, POST, DELETE, OPTIONS`.
+
+
+- **Browser-Clients scheiterten am Preflight.** Spec `2026-07-28` routet eine
+  Streamable-HTTP-Anfrage über `Mcp-Method`, `Mcp-Name` und
+  `Mcp-Protocol-Version`; die CORS-Freigabeliste nannte keinen davon, dafür mit
+  `Mcp-Session-Id` den Session-Header, der für sich genommen keine Anfrage
+  routet. Ein Browser darf einen nicht safelisteten Header nicht senden, wenn
+  der Server ihn nicht nennt: die Anfrage starb vor dem ersten MCP-Byte,
+  während stdio und Python, für die kein Preflight gilt, weiterliefen.
+
 
 - **`swisstopo_reverse_geocode` fand an keinem Punkt der Schweiz eine Adresse.**
   Die Bounding-Box ging in WGS84-Grad hinaus, obwohl der SearchServer sie nur
@@ -264,34 +443,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Kanton das Feld geschrieben hat; ein Test hält fest, dass die Normalisierung
   nicht bis in den Vertrag durchschlägt.
 
-### Added
-
-- **Retry policy toward the geo upstreams** (ARCH-014): `Retry-After` is read
-  and beats the backoff table, the backoff is jittered, and a total budget
-  bounds the whole call.
-
-  `Retry-After` on 429/503 in both RFC 9110 §10.2.3 forms. A malformed header
-  falls back to the table rather than crashing on the error path.
-
-  Jitter matters here more than elsewhere: Overpass and geodienste.ch are
-  community/cantonal instances, and a synchronised retry storm lands on them
-  exactly when they recover. Table delays land in [0.5x, 1.5x]; on a
-  `Retry-After` the spread is one-sided ([1.0x, 1.25x]). Capped at 20s **after**
-  jitter, so the cap is a real bound rather than a midpoint.
-
-  The retry warning sent to the client (`_notify_retry`, SDK-003) now reports
-  the *actual* jittered wait — announcing the table value would have made it a
-  small lie.
-
-  Total budget of 25s, anchored on the Python MCP SDK's
-  `MCP_DEFAULT_TIMEOUT = 30.0`. Unlike the SPARQL servers in the portfolio there
-  is no long-query case to protect here: tile, feature and geocoding endpoints
-  answer in well under a second when healthy. The request is wrapped in an
-  `asyncio.timeout` deadline — httpx applies its timeout per operation and the
-  read timeout restarts with every chunk, so it alone cannot bound the call.
-
-
-### Fixed
 
 - **Die ÖREB-Tools waren der einzige Upstream ohne Retry — ausgerechnet der
   wackligste.** `swisstopo_get_egrid`, `swisstopo_get_oereb_extract` und
@@ -335,36 +486,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   übrigen 39 Fehlerstellen bleiben unverändert: dort ist der nächste Schritt
   nicht offensichtlich, und ein erfundener Hinweis wäre schlechter als keiner.
 
-### Added
-
-- **Live-Tests für echte Upstream-Fehlerpfade.** Kein Live-Test fasste bisher
-  einen an — was bei einer unbekannten Kennung passiert, stand ausschliesslich
-  in Mocks. Dabei ist auch das ein Vertrag: api3 beantwortet einen unbekannten
-  Layer mit 400 und ein unbekanntes Feature mit 404, und würde daraus je ein
-  200 mit Fehler-Body, meldeten diese Tools Erfolg auf eine gescheiterte
-  Abfrage. Fünf Tests nageln das fest, inklusive der Gegenprobe, dass ein
-  legitim leeres Ergebnis weiterhin *kein* Fehler ist.
-
-- **Die anderen kantonalen ÖREB-Implementierungen geprüft.** ZH und BE sind
-  beides Eigenbauten; die übrigen 24 Kantone fahren vier weitere Stacks. Die
-  Toleranz des Parsers darüber war nie belegt, nur erhofft.
-
-  Gegen Live-Antworten geprüft, ein Kanton pro Familie: **vier von fünf parsen
-  ohne Codeänderung** — `pyramid_oereb` (GR, SG), `crdppf` (NE) und der
-  AG-Eigenbau. Ihre echten, gekürzten Antworten liegen jetzt als Fixtures bei,
-  damit das Hinzufügen eines dieser Kantone ein Registry-Eintrag ist und keine
-  Debugging-Sitzung.
-
-  Die fünfte ist als **bekannte Lücke** festgehalten statt behoben:
-  `RdppfSVC.svc` (VD, GE, FR) antwortet auf `getegrid` mit `{"Item": [...]}`
-  statt `GetEGRIDResponse` und markiert Sprachen numerisch (`"Language": 1`)
-  statt als Code, womit `_localized_text` nie auf die angeforderte Sprache
-  trifft und still auf den ersten Eintrag zurückfällt — in einem zweisprachigen
-  Kanton eine Fehlübersetzung, kein fehlender Wert. Halbe Unterstützung, die
-  vollständig aussieht, wäre schlechter als keine; wer einen Westschweizer
-  Kanton aufnimmt, findet beide Abweichungen dokumentiert vor.
-
-### Fixed
 
 - **`..` als Kennung traf still ein anderes Endpoint, statt zu scheitern.**
   Betrifft `swisstopo_map_query`, `swisstopo_get_collection`,
@@ -387,31 +508,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   keinen kennt. Gegengeprüft: 896 Layer-IDs, 100 STAC-Collections, 109
   Attributnamen und 761 Feature-IDs aus den Live-APIs gehen weiter durch.
 
-### Added
-
-- **Live-Abdeckung für Kanton BE.** Die ÖREB-Live-Tests liefen ausschliesslich
-  auf ZH — BE existierte nur in Fixtures, also nur in Annahmen über BE. Dabei
-  war *jeder* Formatunterschied, den dieser Server absorbieren musste, ein
-  ZH/BE-Unterschied: der Extract-Umschlag heisst `Extract` beim einen und
-  `extract` beim anderen, `SubCode` ist beim einen leer und trägt beim anderen
-  drei Werte, `TOPICS` wird vom einen respektiert und vom anderen ignoriert.
-  Alle drei wurden von Hand gefunden, nicht von den Tests.
-
-  `TestOerebLive` ist jetzt über beide Kantone parametrisiert (Bern,
-  Bundeshaus als BE-Sonde; BE wird per Fixture zugeschaltet, da nur ZH
-  standardmässig aktiv ist). Die Extract-Prüfung geht dabei über `match_type`
-  hinaus — ein leerer Auszug ist eine legitime Antwort, deshalb wird zusätzlich
-  verlangt, dass die Beschränkungs-Records die Felder tragen, die Formatter und
-  Themenfilter lesen. Ein fehlender `theme_code` etwa macht Filtern still
-  unmöglich.
-
-  **Mitgeprüft und für unbedenklich befunden:** dieselbe Frage für
-  geodienste-Layer. Deren Attribute sind über ZH/BE/AG/TG identisch — das ist
-  der Zweck von geodienste.ch, ein harmonisiertes Modell. Die
-  ÖREB-Problematik existiert dort nicht, eine Mehrkantons-Parametrisierung
-  brächte also nichts.
-
-### Fixed
 
 - **Der Server gab Feature-IDs aus, die er selbst nicht mehr annahm.** Betrifft
   `swisstopo_map_query`, `swisstopo_query_geodata` und `swisstopo_geocode`;
@@ -448,115 +544,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Layer-IDs, 100 STAC-Collections und 109 Attributnamen — keine Abweisung. Die
   numerischen Muster gegen 970 BFS-Keys und 176 PLZ — keine Abweisung.
 
-### Added
-
-- **Test, der Aggregat und Delegat auf gleiche Validierung prüft.** Zwei Tools
-  kollabieren eine mehrstufige Kette und validieren die Werte des Aufrufers ein
-  zweites Mal, indem sie das Input-Modell des darunterliegenden Tools bauen:
-  `swisstopo_oereb_at` baut ein `GetOerebExtractInput`, `swisstopo_map_query`
-  eines von fünf REST-Modellen. Jedes weitergereichte Feld wird also gegen zwei
-  getrennt geschriebene `Field()`-Definitionen geprüft.
-
-  Weichen die ab, ist der Fehler in eine Richtung still und in die andere
-  hässlich. Strengeres Aggregat: Eingabe, die das darunterliegende Tool
-  akzeptiert, wird an der Tür abgewiesen — genau der `topics`-Fall. Lockereres
-  Aggregat: der Wert passiert das äussere Modell und fliegt im Handler als
-  unerwarteter `ValidationError` auseinander, sichtbar als interner Fehler.
-
-  `TestAggregatesValidateLikeTheirDelegates` vergleicht alle sieben
-  Weiterreich-Paare feldweise. Beschreibungen bleiben absichtlich
-  unverglichen — ein Aggregat vermerkt, zu welcher Operation ein Feld gehört
-  («nur features_at_point»), und diese Abweichung ist gewollt.
-
-  **Befund der Prüfung: keine weitere Divergenz.** `lang`, `canton` und jedes
-  andere weitergereichte Feld stimmen in beiden Aggregaten überein; `topics`
-  war der Einzelfall. Gegengeprüft, dass der Test den ursprünglichen Bug fängt:
-  mit dem Vor-Fix-Muster auf `OerebAtInput` schlägt er fehl.
-
-### Changed
-
-- **Zwei ÖREB-Feldbeschreibungen an den Rest des Servers angeglichen.** Betrifft
-  `swisstopo_get_oereb_extract` und `swisstopo_oereb_at`; beide
-  Tool-Definitionen ändern sich, Clients müssen sie neu bestätigen.
-
-  `lang` war in genau diesen zwei Tools als «Sprache» dokumentiert, in allen
-  fünf übrigen als «Sprache: de, fr, it, en». Da `LANG_PATTERN` nur
-  Zweibuchstaben-Codes zulässt, lädt die knappe Fassung zu `lang="deutsch"`
-  ein — was mit einem Validierungsfehler endet, ohne dass die Beschreibung je
-  gesagt hätte, was erlaubt ist. `canton` in `GetOerebExtractInput` war das
-  einzige Vorkommen ohne Beispiel («Kantonskürzel» statt «Kantonskürzel (z.B.
-  'ZH', 'BE')»).
-
-  Aufgefallen beim Divergenz-Scan oben: die Constraints stimmten, die
-  Beschreibungen nicht — und die Beschreibung ist das, was das Modell liest.
-
-- **Der Themenfilter wird clientseitig angewendet — und funktioniert erstmals
-  überhaupt.** Betrifft `swisstopo_get_oereb_extract` und `swisstopo_oereb_at`;
-  beide Tool-Definitionen ändern sich, Clients müssen sie neu bestätigen
-  (`tool-hashes.json` aktualisiert).
-
-  Der eigentliche Defekt lag nicht upstream, sondern in der Validierung: das
-  Muster `^[\w,\-]+$` liess keine Punkte zu, jeder ÖREB-Themencode trägt aber
-  einen (`ch.Nutzungsplanung`, `ch.BE.Gewaesserschutzbereiche`). Gültige
-  Eingabe wurde also abgewiesen, bevor je ein Request rausging; durch kam nur
-  ein Code ohne `ch.`-Präfix, und der trifft nichts. Der Filter war für jeden
-  Kanton unbrauchbar, nicht nur für ZH.
-
-  Dazu kam, dass `TOPICS` kantonsabhängig ist: BE respektiert den Parameter
-  (8 → 5 Beschränkungen), ZH ignoriert ihn vollständig — auch ein
-  Unsinnswert ändert nichts. Der Parameter geht deshalb gar nicht mehr auf die
-  Leitung. Gefiltert wird nach dem Parsen, was zwei Dinge gewinnt: gleiches
-  Verhalten in jedem Kanton, und die vollständige Themenliste bleibt zur Hand.
-
-  Letzteres ist der Punkt. Wo der Upstream-Filter *funktionierte*, kam bei
-  einem unbekannten Thema ein leerer Auszug zurück — nicht unterscheidbar von
-  «dieses Grundstück ist unbelastet». Genau die stille Falschantwort, die schon
-  das Envelope-Parsing produziert hat. Ein Filter ohne Treffer meldet jetzt,
-  wie viele Beschränkungen das Grundstück in anderen Themen trägt, und nennt
-  die tatsächlich vorhandenen Themencodes für den nächsten Versuch.
-
-  Verglichen wird gegen Themencode **und** Subcode, case-insensitiv: ZH setzt
-  `SubCode` gar nicht, BE führt drei verschiedene Subcodes unter dem einen Code
-  `ch.Nutzungsplanung`. Nur auf den Code zu filtern machte diese unerreichbar,
-  nur auf den Subcode hätte ZH ganz zerlegt. Gegenprobe an echten Daten: ZH
-  18 → 7, BE 8 → 5 — Letzteres deckungsgleich mit dem, was BEs eigener
-  Upstream-Filter liefert.
-
-  Die Feld-Definition stand zweimal im Code, weshalb der Charset-Fix zunächst
-  nur bei `swisstopo_get_oereb_extract` landete und `swisstopo_oereb_at` weiter
-  keinen Themencode annahm. Beide teilen jetzt eine Konstante, und ein Test
-  vergleicht die Constraints der zwei Modelle, damit sie nicht wieder
-  auseinanderlaufen.
-
-### Added
-
-- **Live-Test, der einen Kantonsumzug meldet, bevor der Endpoint stirbt.** Der
-  Bund führt in `ch.swisstopo-vd.stand-oerebkataster` pro Gemeinde die aktuelle
-  kantonale ÖREB-Service-URL im Attribut `oereb_webservice`. Beim ZH-Ausfall
-  stand die neue Adresse dort längst — nur hat sie niemand gelesen, und die
-  Tools erfuhren davon erst, als der alte Name nicht mehr auflöste.
-
-  `TestOerebEndpointRegistryLive` vergleicht `OEREB_ENDPOINTS` gegen diese
-  Registry und nennt im Fehlerfall die publizierte URL sowie die vier Stellen,
-  die beim Hostwechsel mitzuführen sind. Das ist ein anderes Signal als die
-  übrigen Live-Tests: die werden rot, wenn der alte Endpoint stirbt, dieser
-  wird rot, sobald die Registry woanders hinzeigt — früher, und mit einer
-  Handlungsanweisung statt eines Verbindungsfehlers.
-
-  Der Vergleich ist ein Prefix-Match mit Trennzeichen-Guard, kein `startswith`:
-  manche Kantone publizieren einen vollständigen Beispiel-Request
-  (`…/oereb/extract/xml?EGRID=…`) statt der Basis, `…/oereb/v20` darf aber
-  nicht als Treffer für `…/oereb/v2` durchgehen. Gegengeprüft: der Test lehnt
-  den Vor-Fix-Stand `https://oereb.geo.zh.ch` ab, ebenso einen
-  Versionssprung — hätte den Ausfall also gefangen.
-
-  Die Registry benennt Kantone in ihrer eigenen Amtssprache (`Ticino`, nicht
-  `Tessin`) und hat kein Kürzel-Feld zum Suchen, deshalb die Tabelle
-  `CANTON_REGISTRY_NAMES`. Alle 26 Namen wurden gegen den Live-Layer geprüft;
-  ein nicht-Live-Test erzwingt, dass jeder Kanton in `OEREB_ENDPOINTS` einen
-  Registry-Namen hat, damit ein neuer Kanton nicht still aus der Prüfung fällt.
-
-### Fixed
 
 - **Both ÖREB tools had been returning nothing at all, for every parcel in the
   country.** The nightly live suite caught it the first night it covered them

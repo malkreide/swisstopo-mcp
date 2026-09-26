@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name        = "swisstopo-mcp"
-version     = "0.4.1"
+version     = "0.5.0"
 description = "MCP server for Swiss federal geodata (Swisstopo APIs)"
 readme      = "README.md"
 license     = { file = "LICENSE" }
@@ -65,9 +65,9 @@ dev = [
     # driftet.
     #
     # Die Spanne liess `pip install -e ".[dev]"` auf 0.16.3 aufloesen, waehrend
-    # ci.yml `ruff==0.16.4` darueber installierte: lokaler Lauf und Gate waren
+    # ci.yml `ruff==0.16.5` darueber installierte: lokaler Lauf und Gate waren
     # sich also ueber die Version uneinig. Der CI-Schritt ist entfallen.
-    "ruff==0.16.4",
+    "ruff==0.16.5",
     # Ebenfalls exakt, aus demselben Grund. `mypy src/` ist ein Gate, mypy war
     # aber als `mypy>=1.10.0` voellig offen — das Argument ueber dem ruff-Pin
     # galt hier genauso und wurde nicht angewandt. 2.3.1 ist die Version, unter

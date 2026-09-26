@@ -344,3 +344,23 @@ ab, bevor sie etwas sagen.
 **Live-Tests:** `.github/workflows/live-test.yml`, nächtlich per Cron
 (`0 4 * * *`). Sie sind hier also nicht bloss per `-m "not live"`
 ausgeschlossen; DRIFT-005 ist erfüllt.
+
+**Release-Distanz:** `.github/workflows/release-distance.yml`, montags 05:40
+UTC. Kein Gate — es blockiert nichts und kann es nicht: «pyproject-Version ist
+auf PyPI schon vergeben und HEAD liegt hinter keinem Tag» trifft auf *jeden*
+PR nach einem Release zu, ein blockierender Check wäre dauerhaft rot. Der Lauf
+öffnet stattdessen ein Issue mit dem Label `release-distance`, sobald Commits
+an `src/` oder `pyproject.toml` jenseits des Tags stehen **und** die letzte
+Publikation älter als 14 Tage ist. Alles andere — `tests/`, `docs/`,
+`.github/` — erreicht über PyPI niemanden und zählt nicht.
+
+Lokal nachfahren mit `python scripts/check_release_distance.py`; das Skript ist
+stdlib-only und braucht Netz nur für PyPI. `--min-age-days 0` zeigt, was der
+Montagslauf melden würde, wenn die Schwelle fiele.
+
+Der Lauf hat drei Ausgänge. `unknown` heisst: die Messung hat nicht
+stattgefunden — dann wird der Job rot, **ohne** ein Issue anzulegen. Wer den
+Workflow anfasst, lässt `fetch-depth: 0` stehen: ohne Tags im Checkout ist die
+Distanz nicht messbar, und ein fehlender Tag sähe sonst aus wie «nichts
+unveröffentlicht» — genau die Verwechslung, gegen die der dritte Ausgang da
+ist.

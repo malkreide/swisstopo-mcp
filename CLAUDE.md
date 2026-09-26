@@ -320,6 +320,19 @@ Gate-Befehl selbst. Wer ihn prüfen will, zählt nach statt hier abzulesen:
 dabei eine Datei mehr als `ruff check`, weil 0.16 auch Markdown formatiert und
 damit `tests/fixtures/PROVENANCE.md` mitnimmt — zwei Zahlen, kein Fehler.
 
+**Der Versions-Sync prüft fünf Stellen, nicht vier.** Neben `pyproject.toml`
+(der Quelle), `server.json` zweimal und den beiden README-Badges zählt
+`uv.lock` mit — die Version des Wurzelpakets. Sie blieb beim Release 0.5.0 auf
+0.4.1 stehen, während die vier damals geprüften Stellen einvernehmlich richtig
+waren und das Gate grün meldete; `uv tree --frozen --package swisstopo-mcp` gab
+0.4.1 aus, und wer die Arbeitskopie über `uv sync --locked` oder
+`uv run --frozen` konsumiert, bekam die alte Nummer. Gefunden hat es ein
+Codex-Review, behoben hat es nicht der Check, sondern nebenbei ein
+Dependency-Bump, der die Lockfile neu schrieb.
+
+Die Lockfile nie von Hand editieren — `uv lock` neu laufen lassen. Repos ohne
+`uv.lock` überspringt der Check.
+
 **Ein achtes Gate hängt an jedem PR, ausserhalb von `ci.yml`:**
 `security.yml` fährt gitleaks. Sein Trigger nennt `branches: [master, main]` —
 beide, damit er eine Umbenennung des Default-Branchs überlebt. Lokal braucht

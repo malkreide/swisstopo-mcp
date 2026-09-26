@@ -68,11 +68,24 @@ def _muster(pin: str) -> re.Pattern[str]:
     Der Lookbehind schliesst Wortzeichen UND den Punkt aus, damit ein laengerer
     Wert den kuerzeren nicht ausloest: Stuende der Pin auf `0.16.3`, faende ein
     Muster ohne Grenze ihn auch in `10.16.3` und in einer fremden Version, die
-    mit denselben Stellen endet. Der Lookahead schliesst die Ziffer aus, damit
-    `0.16.30` nicht als `0.16.3` gilt. Ein Satzpunkt danach ist dagegen
-    erlaubt — `…auf 0.16.3.` nennt den Pin.
+    mit denselben Stellen endet.
+
+    Der Lookahead muss dasselbe nach hinten leisten, und zwar fuer mehr als
+    eine Ziffer. Er verwarf zuerst nur eine folgende Ziffer, womit `0.16.30`
+    richtig ausgeschlossen war — aber `foo==0.16.3.1`, `foo==0.16.3rc1`,
+    `foo==0.16.3.post1` und `foo==0.16.3+local` schlugen an, obwohl das
+    andere Versionen eines anderen Pakets sind. Der Test haette damit genau
+    das verboten, was sein Docstring ausdruecklich erlaubt. Gefunden hat das
+    ein Review-Bot am 26.9.2026, nachdem die Datei schon in 18 Projekten lag;
+    `test_fremde_zahlen_bleiben_erlaubt` deckte nur den Ziffern-Fall ab und
+    blieb deshalb gruen.
+
+    Jetzt verworfen wird jedes Wortzeichen, ein `+`, und ein Punkt, auf den
+    ein Wortzeichen folgt. Ein Satzpunkt bleibt erlaubt — `…auf 0.16.3.`
+    nennt den Pin, denn nach dem Punkt kommt kein Wortzeichen. Ein `-` ist
+    bewusst nicht verworfen: `0.16.3-0.16.7` ist eine Spanne und meint ruff.
     """
-    return re.compile(rf"(?<![\w.])v?{re.escape(pin)}(?!\d)")
+    return re.compile(rf"(?<![\w.])v?{re.escape(pin)}(?![\w+]|\.\w)")
 
 
 def _stellen(text: str, pin: str) -> list[str]:
@@ -147,6 +160,12 @@ def test_fremde_zahlen_bleiben_erlaubt() -> None:
         "Die Paketversion ist 9.9.9.",
         f"1{pin} ist eine andere Zahl.",
         f"{pin}0 ist eine andere Zahl.",
+        # Fremde Versionen, die den Pin VERLAENGERN. Der erste Lookahead
+        # verwarf nur eine folgende Ziffer und liess diese vier durch.
+        f"Das Paket foo ist auf `foo=={pin}.1` gepinnt.",
+        f"Das Paket foo ist auf `foo=={pin}.post1` gepinnt.",
+        f"Das Paket foo ist auf `foo=={pin}rc1` gepinnt.",
+        f"Das Paket foo ist auf `foo=={pin}+local` gepinnt.",
     ]
     fehlalarm = [z for z in erlaubt if _stellen(z, pin)]
     assert not fehlalarm, f"Erkenner schlaegt faelschlich an: {fehlalarm}"

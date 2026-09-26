@@ -42,6 +42,7 @@ except ModuleNotFoundError:  # Python 3.10 — tomllib kam erst mit 3.11
 ROOT = Path(__file__).resolve().parent.parent
 PYPROJECT = ROOT / "pyproject.toml"
 SERVER_JSON = ROOT / "server.json"
+UV_LOCK = ROOT / "uv.lock"
 SRC = ROOT / "src"
 
 # Shields.io-Badge: ![Version](https://img.shields.io/badge/version-X.Y.Z-blue)
@@ -128,7 +129,57 @@ def find_hardcoded(dist: str) -> list[tuple[str, int, str]]:
     return hits
 
 
-def collect_declared(expected: str) -> list[tuple[str, str]]:
+def normalise_dist(name: str) -> str:
+    """Paketname nach PEP 503 — `uv.lock` fuehrt die normalisierte Form.
+
+    `Foo_Bar.baz` und `foo-bar-baz` sind dasselbe Paket; ein woertlicher
+    Vergleich wuerde die Zeile nicht finden und die Pruefung still ueberspringen.
+    """
+    return re.sub(r"[-_.]+", "-", name).lower()
+
+
+def uv_lock_version(dist: str) -> str | None:
+    """Version des Wurzelpakets in `uv.lock`, oder `None` ohne Lockfile.
+
+    Die fuenfte Stelle, die dieselbe Nummer wiederholt — und die, die beim
+    Release 0.5.0 stehenblieb. `pyproject.toml`, `server.json` (zweimal) und
+    die beiden README-Badges wurden gebumpt, das Gate prueft genau diese vier,
+    und es war gruen. Wer die Arbeitskopie ueber `uv sync --locked` oder
+    `uv run --frozen` konsumiert, bekam daraufhin ein Wurzelpaket, das sich als
+    0.4.1 ausgab (gemeldet durch einen Codex-Review, nachgeprueft mit
+    `uv tree --frozen --package swisstopo-mcp`).
+
+    Behoben wurde es nicht durch diesen Check, sondern durch einen
+    Dependency-Bump, der die Lockfile nebenbei neu schrieb. Genau deshalb steht
+    sie jetzt hier: eine Korrektur als Nebenwirkung ist keine Zusicherung.
+
+    Kein Lockfile -> `None` und die Pruefung entfaellt; das Skript laeuft
+    unveraendert in Repos des Portfolios, die keines fuehren.
+    """
+    if not UV_LOCK.exists():
+        return None
+
+    text = UV_LOCK.read_text(encoding="utf-8")
+    ziel = normalise_dist(dist)
+
+    if tomllib is not None:
+        for pkg in tomllib.loads(text).get("package", []):
+            if normalise_dist(str(pkg.get("name", ""))) == ziel:
+                return str(pkg.get("version", ""))
+        return ""
+
+    # Python 3.10 (kein tomllib): den `[[package]]`-Block des Wurzelpakets
+    # abgreifen. Bewusst kein TOML-Parser von Hand — gesucht ist genau ein
+    # `version` unmittelbar nach dem passenden `name`, und nur dort.
+    for block in text.split("[[package]]"):
+        m = re.search(r'^name\s*=\s*"([^"]+)"', block, re.MULTILINE)
+        if m and normalise_dist(m.group(1)) == ziel:
+            v = re.search(r'^version\s*=\s*"([^"]+)"', block, re.MULTILINE)
+            return v.group(1) if v else ""
+    return ""
+
+
+def collect_declared(dist: str) -> list[tuple[str, str]]:
     """Alle Stellen, die die Version wiederholen — je (Bezeichnung, Wert)."""
     found: list[tuple[str, str]] = []
 
@@ -141,6 +192,10 @@ def collect_declared(expected: str) -> list[tuple[str, str]]:
     for readme in sorted(ROOT.glob("README*.md")):
         for match in _BADGE.finditer(readme.read_text(encoding="utf-8")):
             found.append((f"{readme.name} → Versions-Badge", match.group(1)))
+
+    lock = uv_lock_version(dist)
+    if lock is not None:
+        found.append(("uv.lock → Wurzelpaket", lock))
 
     return found
 
@@ -178,7 +233,7 @@ def main() -> None:
         print("Versions-Sync übersprungen: pyproject.toml nutzt eine dynamische Version.")
         return
 
-    found = collect_declared(version)
+    found = collect_declared(dist)
     mismatches = [(where, value) for where, value in found if value != version]
     if mismatches:
         print(
@@ -193,6 +248,13 @@ def main() -> None:
             "die committete Version bleibt trotzdem die, die Menschen lesen.",
             file=sys.stderr,
         )
+        if any(where.startswith("uv.lock") for where, _ in mismatches):
+            print(
+                "uv.lock wird nicht von Hand editiert: `uv lock` neu laufen "
+                "lassen. Ohne das meldet sich das Wurzelpaket unter "
+                "`uv sync --locked` / `uv run --frozen` mit der alten Nummer.",
+                file=sys.stderr,
+            )
         sys.exit(1)
 
     hardcoded = find_hardcoded(dist)

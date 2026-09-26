@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Der Versions-Sync war an `uv.lock` blind.** Beim Release 0.5.0 wurden vier
+  Stellen gebumpt — `pyproject.toml`, `server.json` (zweimal) und die beiden
+  README-Badges — und `scripts/check_version_sync.py` prüft genau diese vier.
+  Das Gate war grün, während das Wurzelpaket in `uv.lock` auf 0.4.1 stand:
+  `uv tree --frozen --package swisstopo-mcp` meldete 0.4.1, und wer die
+  Arbeitskopie über `uv sync --locked` oder `uv run --frozen` konsumiert, bekam
+  diese Nummer. Das ausgelieferte Wheel war nicht betroffen — hatchling baut es
+  aus `pyproject.toml`.
+
+  Dieselbe Mechanik wie der Anlass des Releases selbst, eine Ebene tiefer: ein
+  Check, der die Stellen vergleicht, die er kennt, kann nicht auffallen lassen,
+  dass er eine nicht kennt.
+
+  Gemeldet hat es ein Codex-Review auf PR #104 (P2). Behoben wurde die Drift
+  dann **nicht** durch den Check, sondern nebenbei durch den Dependency-Bump in
+  PR #106, der die Lockfile neu schrieb — eine Korrektur als Nebenwirkung, die
+  sich beim nächsten Release nicht wiederholt. `uv.lock` ist deshalb jetzt die
+  fünfte geprüfte Stelle; Repos ohne Lockfile überspringt der Check
+  unverändert.
+
+  Gegenproben, je einzeln gefahren: den Eintrag aus `collect_declared`
+  entfernen → zwei Tests fallen; die PEP-503-Normalisierung des Paketnamens
+  entfernen → die drei Schreibweisen-Fälle fallen; die echte `uv.lock` auf
+  0.4.1 zurückdrehen → das Gate endet mit 1 und benennt die Stelle.
+
 ## [0.5.0] - 2026-09-26
 
 ### Breaking

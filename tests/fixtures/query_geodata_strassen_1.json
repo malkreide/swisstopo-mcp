@@ -3,6 +3,46 @@
     {
       "layerBodId": "ch.swisstopo.amtliches-strassenverzeichnis",
       "layerName": "Amtliches Strassenverzeichnis",
+      "featureId": 10074874,
+      "id": 10074874,
+      "attributes": {
+        "str_esid": 10074874,
+        "stn_label": "Bahnhofplatz",
+        "zip_label": "8001 Zürich",
+        "com_name": "Zürich",
+        "com_fosnr": 261,
+        "str_official": 1,
+        "str_modified": "2024-07-23",
+        "str_type": "Platz",
+        "str_children": null,
+        "str_parent": null,
+        "str_status": "bestehend",
+        "label": "Bahnhofplatz"
+      }
+    },
+    {
+      "layerBodId": "ch.swisstopo.amtliches-strassenverzeichnis",
+      "layerName": "Amtliches Strassenverzeichnis",
+      "featureId": 10098540,
+      "id": 10098540,
+      "attributes": {
+        "str_esid": 10098540,
+        "stn_label": "Waisenhausstrasse",
+        "zip_label": "8001 Zürich",
+        "com_name": "Zürich",
+        "com_fosnr": 261,
+        "str_official": 1,
+        "str_modified": "2024-07-23",
+        "str_type": "Strasse",
+        "str_children": null,
+        "str_parent": null,
+        "str_status": "bestehend",
+        "label": "Waisenhausstrasse"
+      }
+    },
+    {
+      "layerBodId": "ch.swisstopo.amtliches-strassenverzeichnis",
+      "layerName": "Amtliches Strassenverzeichnis",
       "featureId": 10006937,
       "id": 10006937,
       "attributes": {
@@ -23,11 +63,31 @@
     {
       "layerBodId": "ch.swisstopo.amtliches-strassenverzeichnis",
       "layerName": "Amtliches Strassenverzeichnis",
-      "featureId": 10085861,
-      "id": 10085861,
+      "featureId": 10006622,
+      "id": 10006622,
       "attributes": {
-        "str_esid": 10085861,
-        "stn_label": "Werdmühlestrasse",
+        "str_esid": 10006622,
+        "stn_label": "Beatengasse",
+        "zip_label": "8001 Zürich",
+        "com_name": "Zürich",
+        "com_fosnr": 261,
+        "str_official": 1,
+        "str_modified": "2024-07-23",
+        "str_type": "Strasse",
+        "str_children": null,
+        "str_parent": null,
+        "str_status": "bestehend",
+        "label": "Beatengasse"
+      }
+    },
+    {
+      "layerBodId": "ch.swisstopo.amtliches-strassenverzeichnis",
+      "layerName": "Amtliches Strassenverzeichnis",
+      "featureId": 10006621,
+      "id": 10006621,
+      "attributes": {
+        "str_esid": 10006621,
+        "stn_label": "Bahnhofstrasse",
         "zip_label": "8001 Zürich",
         "com_name": "Zürich",
         "com_fosnr": 261,
@@ -37,67 +97,7 @@
         "str_children": null,
         "str_parent": null,
         "str_status": "bestehend",
-        "label": "Werdmühlestrasse"
-      }
-    },
-    {
-      "layerBodId": "ch.swisstopo.amtliches-strassenverzeichnis",
-      "layerName": "Amtliches Strassenverzeichnis",
-      "featureId": 10074875,
-      "id": 10074875,
-      "attributes": {
-        "str_esid": 10074875,
-        "stn_label": "Beatenplatz",
-        "zip_label": "8001 Zürich",
-        "com_name": "Zürich",
-        "com_fosnr": 261,
-        "str_official": 1,
-        "str_modified": "2026-06-04",
-        "str_type": "Platz",
-        "str_children": null,
-        "str_parent": null,
-        "str_status": "bestehend",
-        "label": "Beatenplatz"
-      }
-    },
-    {
-      "layerBodId": "ch.swisstopo.amtliches-strassenverzeichnis",
-      "layerName": "Amtliches Strassenverzeichnis",
-      "featureId": 10058767,
-      "id": 10058767,
-      "attributes": {
-        "str_esid": 10058767,
-        "stn_label": "Neumühlequai",
-        "zip_label": "8001 Zürich, 8006 Zürich",
-        "com_name": "Zürich",
-        "com_fosnr": 261,
-        "str_official": 1,
-        "str_modified": "2024-07-23",
-        "str_type": "Strasse",
-        "str_children": null,
-        "str_parent": null,
-        "str_status": "bestehend",
-        "label": "Neumühlequai"
-      }
-    },
-    {
-      "layerBodId": "ch.swisstopo.amtliches-strassenverzeichnis",
-      "layerName": "Amtliches Strassenverzeichnis",
-      "featureId": 10074874,
-      "id": 10074874,
-      "attributes": {
-        "str_esid": 10074874,
-        "stn_label": "Bahnhofplatz",
-        "zip_label": "8001 Zürich",
-        "com_name": "Zürich",
-        "com_fosnr": 261,
-        "str_official": 1,
-        "str_modified": "2024-07-23",
-        "str_type": "Platz",
-        "str_children": null,
-        "str_parent": null,
-        "str_status": "bestehend",
-        "label": "Bahnhofplatz"
+        "label": "Bahnhofstrasse"
       }
     }
   ]

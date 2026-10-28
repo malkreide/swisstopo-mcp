@@ -1,6 +1,6 @@
 # Herkunft der Fixtures
 
-Aufgezeichnet am **2026-08-15** mit `python scripts/record_fixtures.py`.
+Aufgezeichnet am **2026-10-28** mit `python scripts/record_fixtures.py`.
 
 Eine Antwort je **Anfrage**, nicht je Endpunkt: dieser Server spricht mit sieben
 Hosts, aber in weit mehr Abfrageformen — der `/rest/services`-Zweig allein
@@ -48,7 +48,7 @@ Sie lassen sich nicht auf Zuruf aufzeichnen und sind als Erfindung in Ordnung.
 - **Schluessel:** `https://api3.geo.admin.ch/rest/services/ech/SearchServer?type=locations&searchText=Bahnhofplatz+1%2C+8001+Z%C3%BCrich&sr=4326&limit=10&returnGeometry=true`
 - **Auswahl:** ungekuerzt
 - **Groesse:** 1102 Bytes
-- **SHA-256:** `1eab665579649ea65b01c8dc7df113da90d1ef451601c4ba758beeaaa212d856`
+- **SHA-256:** `c89fe007c1a4a57cd3f7cbaaa8e18c3870d74265bc9eeb4c1f24ae62776287dc`
 
 ## `get_collection_1.json`
 
@@ -56,7 +56,7 @@ Sie lassen sich nicht auf Zuruf aufzeichnen und sind als Erfindung in Ordnung.
 - **Schluessel:** `https://data.geo.admin.ch/api/stac/v0.9/collections/ch.swisstopo.swissalti3d`
 - **Auswahl:** 20 von 22 Listeneintraegen (je Liste die ersten 5), aus 1624 Bytes Rohantwort
 - **Groesse:** 1837 Bytes
-- **SHA-256:** `e8a45f6848c1e9282a62d2e3456c07e0a9cbf17bf8d689ea407995215b9de178`
+- **SHA-256:** `dd6d75a7133b46bab59dbf5fdea81b70bf141d7f886e8fa01e5d5da26cd24678`
 
 ## `get_egrid_1.json`
 
@@ -78,9 +78,9 @@ Sie lassen sich nicht auf Zuruf aufzeichnen und sind als Erfindung in Ordnung.
 
 - **Werkzeuge:** `list_available_layers_tool`
 - **Schluessel:** `https://geodienste.ch/info/services.json`
-- **Auswahl:** 130 von 1327 Listeneintraegen (je Liste die ersten 5), aus 3469919 Bytes Rohantwort
-- **Groesse:** 26072 Bytes
-- **SHA-256:** `c9f408843e96ea69ff16ca05235ab72307ed7295b5cf2516634607eca2ef6fd5`
+- **Auswahl:** 145 von 1342 Listeneintraegen (je Liste die ersten 5), aus 3519730 Bytes Rohantwort
+- **Groesse:** 26452 Bytes
+- **SHA-256:** `6ffc04fd277bfff4c4166213b981eba0b3d8cdd67cd08e563cca44e2c0179baa`
 
 ## `lookup_postal_code_1.json`
 
@@ -94,17 +94,17 @@ Sie lassen sich nicht auf Zuruf aufzeichnen und sind als Erfindung in Ordnung.
 
 - **Werkzeuge:** `swisstopo_map_query`
 - **Schluessel:** `https://api3.geo.admin.ch/rest/services/ech/MapServer/identify?geometry=8.5417%2C47.3769&geometryType=esriGeometryPoint&layers=all%3Ach.bfs.gebaeude_wohnungs_register&tolerance=10&sr=4326&returnGeometry=false&mapExtent=8.5317%2C47.3669%2C8.5517%2C47.3869&imageDisplay=100%2C100%2C96`
-- **Auswahl:** 25 von 164 Listeneintraegen (je Liste die ersten 5), aus 235575 Bytes Rohantwort
-- **Groesse:** 11724 Bytes
-- **SHA-256:** `6ef1fa86e00ef3d87797b59871386c345c49c529c54a9397a875b9c29b37413a`
+- **Auswahl:** 25 von 164 Listeneintraegen (je Liste die ersten 5), aus 235627 Bytes Rohantwort
+- **Groesse:** 11646 Bytes
+- **SHA-256:** `718b584525834ca00207bef7ddb82e80fbbf26ea3836badf4a5addf2a77c483e`
 
 ## `map_query_layer_info_1.json`
 
 - **Werkzeuge:** `swisstopo_map_query`
 - **Schluessel:** `https://api3.geo.admin.ch/rest/services/api/MapServer/ch.bfs.gebaeude_wohnungs_register`
-- **Auswahl:** 45 von 140 Listeneintraegen (je Liste die ersten 5), aus 10981 Bytes Rohantwort
-- **Groesse:** 1429 Bytes
-- **SHA-256:** `98935ad2bb492770ac392d644b0a995fb15777780687b158f57c501308796d41`
+- **Auswahl:** 25 von 99 Listeneintraegen (je Liste die ersten 5), aus 9804 Bytes Rohantwort
+- **Groesse:** 1118 Bytes
+- **SHA-256:** `fab6b56aa402e27177e11c0010825c3e06a245db11820b3396c5da43f0796429`
 
 ## `map_query_layer_info_2.txt`
 
@@ -112,13 +112,13 @@ Sie lassen sich nicht auf Zuruf aufzeichnen und sind als Erfindung in Ordnung.
 - **Schluessel:** `https://api3.geo.admin.ch/rest/services/all/MapServer/ch.bfs.gebaeude_wohnungs_register/legend?lang=de`
 - **Auswahl:** ungekuerzt
 - **Groesse:** 2194 Bytes
-- **SHA-256:** `5c769ab268cc91c496106adde592dd4867674b074bbbf61ba9161882f4585e98`
+- **SHA-256:** `b7ab1a7f216723a9636cdeda0e328ccdb8fe9706095e6ed9a69578627ea3fabf`
 
 ## `map_query_search_layers_1.json`
 
 - **Werkzeuge:** `swisstopo_map_query`
 - **Schluessel:** `https://api3.geo.admin.ch/rest/services/ech/SearchServer?type=layers&searchText=Geb%C3%A4ude&lang=de&limit=10`
-- **Auswahl:** 5 von 10 Listeneintraegen (je Liste die ersten 5), aus 13384 Bytes Rohantwort
+- **Auswahl:** 5 von 10 Listeneintraegen (je Liste die ersten 5), aus 16000 Bytes Rohantwort
 - **Groesse:** 6939 Bytes
 - **SHA-256:** `afd11399f76c65307dd560e71e441d3b9bd915a1bbfc575b3092bec86a2fb9f1`
 
@@ -134,9 +134,9 @@ Sie lassen sich nicht auf Zuruf aufzeichnen und sind als Erfindung in Ordnung.
 
 - **Werkzeuge:** `swisstopo_oereb_at`
 - **Schluessel:** `https://maps.zh.ch/oereb/v2/extract/json/?EGRID=CH119192997709&GEOMETRY=false&LANG=de`
-- **Auswahl:** 285 von 340 Listeneintraegen (je Liste die ersten 5), aus 81862 Bytes Rohantwort
-- **Groesse:** 75611 Bytes
-- **SHA-256:** `9e8f98d23c3b22a4174f177c80c1fde82454ef1adfde6f16c8e53127cc7dceb3`
+- **Auswahl:** 285 von 351 Listeneintraegen (je Liste die ersten 5), aus 81330 Bytes Rohantwort
+- **Groesse:** 77081 Bytes
+- **SHA-256:** `cebd0742118c1123affc4204a4fb14bf6944afe157ab766402b17c0691dcaabb`
 
 ## `query_geodata_oereb_1.json`
 
@@ -144,24 +144,24 @@ Sie lassen sich nicht auf Zuruf aufzeichnen und sind als Erfindung in Ordnung.
 - **Schluessel:** `https://api3.geo.admin.ch/rest/services/all/MapServer/identify?geometryType=esriGeometryPoint&geometry=2683304.0%2C1247925.6&sr=2056&tolerance=0&layers=all%3Ach.swisstopo-vd.stand-oerebkataster&mapExtent=2683254.0%2C1247875.6%2C2683354.0%2C1247975.6&imageDisplay=100%2C100%2C96&returnGeometry=false&lang=de`
 - **Auswahl:** ungekuerzt
 - **Groesse:** 2714 Bytes
-- **SHA-256:** `883af1dea6ebeac60695b74d791cee8256d3a738a9ffc5d91b592694cb1d487b`
+- **SHA-256:** `477289986f7e39f96d62f3a3cb69dff8d35e7118bdce758d6aaed475074fc839`
 
 ## `query_geodata_strassen_1.json`
 
 - **Werkzeuge:** `query_geodata_tool`
 - **Schluessel:** `https://api3.geo.admin.ch/rest/services/api/MapServer/identify?geometryType=esriGeometryPoint&geometry=2683304.0%2C1247925.6&sr=2056&tolerance=15&layers=all%3Ach.swisstopo.amtliches-strassenverzeichnis&mapExtent=2682304.0%2C1246925.6%2C2684304.0%2C1248925.6&imageDisplay=200%2C200%2C96&returnGeometry=false&lang=de`
 - **Auswahl:** 5 von 13 Listeneintraegen (je Liste die ersten 5), aus 6037 Bytes Rohantwort
-- **Groesse:** 3016 Bytes
-- **SHA-256:** `3db0737df228a0f534223f248cf4f2d5f94d635a43ec2a7cbf19220f380ecdd7`
+- **Groesse:** 3006 Bytes
+- **SHA-256:** `71590ddec2e5bd7acbce1dbda7c302453b6a0ff3cf3c2d1c02c641acc68597cd`
 
 ## `query_osm_1.json`
 
 - **Werkzeuge:** `query_osm_features_tool`
 - **Schluessel:** `https://overpass.osm.ch/api/interpreter#97a61bbc7858`
 - **Rumpf:** `data=[out:json][timeout:25];(node["amenity"="pharmacy"](around:500,47.3769,8.5417);way["amenity"="pharmacy"](around:500,47.3769,8.5417);relation["amenity"="pharmacy"](around:500,47.3769,8.5417););out center tags 50;`
-- **Auswahl:** 5 von 11 Listeneintraegen (je Liste die ersten 5), aus 7357 Bytes Rohantwort
+- **Auswahl:** 5 von 11 Listeneintraegen (je Liste die ersten 5), aus 7403 Bytes Rohantwort
 - **Groesse:** 4124 Bytes
-- **SHA-256:** `403a2638aca1c36b4b763ac47b3adff7f956590b69af1f81fd5cf7a7b8c98354`
+- **SHA-256:** `35a5788fc77f85a08116cbf5e8d33f3be37f9a5125ff66ec84101820f9944aac`
 
 ## `reverse_geocode_1.json`
 
@@ -169,7 +169,7 @@ Sie lassen sich nicht auf Zuruf aufzeichnen und sind als Erfindung in Ordnung.
 - **Schluessel:** `https://api3.geo.admin.ch/rest/services/ech/SearchServer?type=locations&origins=address&bbox=2682804.0346262627%2C1247425.5974930264%2C2683804.0346262627%2C1248425.5974930264&limit=5&sr=2056&returnGeometry=true`
 - **Auswahl:** ungekuerzt
 - **Groesse:** 5754 Bytes
-- **SHA-256:** `0f3f160223c56be71db3926b3ecd51435045f8cca9c2c2f0f78f1f6100aecefb`
+- **SHA-256:** `c0d0d51c475162dda4bcc6ab490fed6115c24b4364e3943de8055305aacda215`
 
 ## `search_address_1.json`
 
@@ -183,9 +183,9 @@ Sie lassen sich nicht auf Zuruf aufzeichnen und sind als Erfindung in Ordnung.
 
 - **Werkzeuge:** `swisstopo_search_geodata`
 - **Schluessel:** `https://data.geo.admin.ch/api/stac/v0.9/collections`
-- **Auswahl:** 100 von 205 Listeneintraegen (je Liste die ersten 5), aus 240323 Bytes Rohantwort
-- **Groesse:** 21782 Bytes
-- **SHA-256:** `8ad37f8dcb6b906f95f0d553f2e5177a4e6d2e23b6ff348e4c2f1c87817ceb07`
+- **Auswahl:** 100 von 207 Listeneintraegen (je Liste die ersten 5), aus 245347 Bytes Rohantwort
+- **Groesse:** 21786 Bytes
+- **SHA-256:** `206ab3230170ecb51227f7607496f490a5b9528fda3e03eec5324346d4172c9d`
 
 ## `zoning_at_1.json`
 

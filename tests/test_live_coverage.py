@@ -221,6 +221,30 @@ class TestTheFailureReportingPathIsRobust:
             "without a dedup check the job files one issue per night"
         )
 
+    def test_a_deduplicated_night_is_appended_not_dropped(self):
+        """Dedup used to mean `exit 0`. Issue #60 — a transient BE timeout on
+        2026-08-04 — stayed open, and every failing night after it left no
+        trace outside the run log, including the geodienste break of
+        2026-10-28. The dedup branch has to record the night before it exits.
+        """
+        script = self._report_step()["run"]
+        branch = script.split('if [ -n "$existing" ]; then', 1)
+        assert len(branch) == 2, "no dedup branch keyed on the open issue"
+        body = branch[1].split("fi", 1)[0]
+        assert "gh issue comment" in body, "the dedup branch files nothing"
+        assert body.index("gh issue comment") < body.index("exit 0"), (
+            "the dedup branch exits before it comments"
+        )
+
+    def test_the_report_names_the_failed_tests(self):
+        """The issue body linked a run whose log expires; the node ids do not."""
+        step = self._report_step()
+        assert "grep -E '^FAILED '" in step["run"]
+        # The reason goes through env, never `${{ }}` inside the script — it can
+        # carry a parser message about someone else's file.
+        assert "LIVE_REASON" in step.get("env", {})
+        assert "steps.verdict.outputs.reason" not in step["run"]
+
     def test_the_shell_script_parses(self):
         """`bash -n` on the actual script — a syntax error here surfaces only
         during a real failure otherwise."""

@@ -51,6 +51,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Jeder geodienste-Datensatz galt über Nacht als vertragspflichtig.** Die
+  nächtliche Live-Suite lief am 27.10. grün und am 28.10. rot — auf demselben
+  Commit `34017c4`. Geändert hatte sich die Quelle: der Katalog
+  `geodienste.ch/info/services.json` schreibt `contract_required_*` nicht mehr
+  als JSON-Boolean (`false`, so am 15.8. aufgezeichnet), sondern als deutschen
+  Text: `"Nein"` 725×, `"Ja"` 7×, `null` 405×. `_is_free` verlangte
+  `contract is False`; `"Nein" is False` ist nie wahr. Damit wies
+  `swisstopo_query_geodata` jeden geodienste-Layer ab, und
+  `swisstopo_list_available_layers` fand mit dem Default `free_only=True` für
+  keinen Kanton einen Layer.
+
+  Gelesen werden jetzt beide Schreibweisen (Boolean und `Ja`/`Nein`,
+  Gross-/Kleinschreibung und Leerraum egal). Alles andere gilt als *unlesbar*
+  und nicht als «vertragspflichtig» — eine Schreibweise, die dieser Code nicht
+  kennt, ist kein Befund über den Datensatz. Ganzzahlen zählen bewusst nicht
+  als Flag, obwohl `0 == False` in Python wahr ist: eine Quelle, die `0`
+  schickt, hat ihr Format erneut geändert.
+
+  Zwei Folgeschäden mitbehoben:
+
+  - **Die Fehlermeldung widersprach sich selbst.** Sie lautete «nicht ohne
+    Vertrag/Login frei nutzbar (opendata_terms: Freie Nutzung)» — sie nannte
+    nur das Feld, das in Ordnung war, und verschwieg das, das scheiterte. Sie
+    nennt jetzt das entscheidende Feld mit Rohwert: vertragspflichtig, nicht
+    frei lizenziert, ohne Angabe — oder, bei unbekannter Schreibweise,
+    ausdrücklich «Katalogformat vermutlich geändert».
+  - **Die leere Layer-Liste schickte den Aufrufer in die falsche Richtung.**
+    Der Hinweis riet, Filter wegzulassen. Hat der Katalog Einträge mit
+    unlesbarem Vertragsflag, steht jetzt das an erster Stelle, mit Anzahl und
+    Beispielwert.
+
+  Die Fixtures sind neu aufgezeichnet (2026-10-28); `list_layers_1.json` trägt
+  damit die neue Schreibweise, und ein neuer Recorded-Test fährt den Katalog
+  mit `free_only=True` — der bisherige umging die Freiheitsprüfung mit
+  `free_only=False` und hätte den Bruch nie sehen können. Die
+  Boolean-Schreibweise bleibt über die bestehenden Unit-Tests abgedeckt.
+
+- **Die Meldekette hat seit dem 4. August geschwiegen.** Der Report-Schritt
+  des Live-Workflows endete mit `exit 0`, sobald irgendein
+  `live-test-failure`-Issue offen war. Issue #60 — ein transienter
+  BE-ÖREB-Timeout vom 4.8. — blieb offen, und jede spätere Nacht verschwand
+  darin, auch der geodienste-Bruch vom 28.10.: der wurde nur sichtbar, weil
+  der Job rot war. Eine Nacht, die ein offenes Issue vorfindet, wird jetzt
+  dort als Kommentar angehängt, mit Klassifikationsgrund und den
+  Node-IDs der gescheiterten Tests — die überdauern das Run-Log, das abläuft.
+  Das folgt dem Muster, das `release-distance.yml` bereits hat.
+
 - **Der Versions-Sync war an `uv.lock` blind.** Beim Release 0.5.0 wurden vier
   Stellen gebumpt — `pyproject.toml`, `server.json` (zweimal) und die beiden
   README-Badges — und `scripts/check_version_sync.py` prüft genau diese vier.

@@ -76,6 +76,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          LIVE_REASON: ${{ steps.verdict.outputs.reason }}
         run: |
           set -euo pipefail
           # The label has to exist before it can be used, on the repository as
@@ -86,9 +87,32 @@ jobs:
           gh label create live-test-failure --force \
             --color B60205 \
             --description "Nightly live API suite failed against real upstreams"
-          # Deduplicate: one open issue at a time, not one per night.
-          if [ -n "$(gh issue list --label live-test-failure --state open --json number --jq '.[].number')" ]; then
-            echo "An open live-test-failure issue already exists; not filing another."
+
+          # Which tests failed, by node id — the line that answers "have we
+          # seen this before?" without opening a log that expires.
+          failed="$(grep -E '^FAILED ' live-output.txt | cut -d' ' -f2 || true)"
+          report="$(cat <<EOF
+          Run: ${RUN_URL}
+
+          ${LIVE_REASON}
+
+          Failed:
+          \`\`\`
+          ${failed:-(none listed in the pytest summary)}
+          \`\`\`
+          EOF
+          )"
+
+          # Deduplicate: one open issue at a time, not one per night — but a
+          # night that finds the issue already open is *appended*, not dropped.
+          # It used to `exit 0` here. Issue #60 (a transient BE timeout on
+          # 2026-08-04) stayed open, and every failure after it was swallowed:
+          # the geodienste break of 2026-10-28 reached nobody but the red job.
+          existing="$(gh issue list --label live-test-failure --state open \
+            --json number --jq '.[0].number // empty')"
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body "$report"
+            echo "Appended this night to open issue #$existing."
             exit 0
           fi
           gh issue create \
@@ -102,7 +126,7 @@ jobs:
           - a transient upstream outage,
           - the polynomial-vs-REFRAME deviation exceeding one metre.
 
-          Run: ${RUN_URL}
+          ${report}
           EOF
           )"
 

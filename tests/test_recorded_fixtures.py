@@ -393,6 +393,45 @@ async def test_der_kantonsfilter_greift_auf_dem_katalog(quelle):
     assert not fremde, f"der Filter laesst fremde Kantone durch: {fremde}"
 
 
+async def test_free_only_findet_in_der_aufzeichnung_freie_layer(quelle):
+    """Der Test darueber faehrt mit `free_only: False` und beruehrt damit die
+    Freiheitspruefung nie. Genau dort lag der Bruch vom 2026-10-28: der Katalog
+    schreibt `contract_required_wms` seither als "Nein" statt `false`, `_is_free`
+    verlangte `is False`, und jeder geodienste-Datensatz galt als
+    vertragspflichtig. `free_only` ist der Default — dieser Pfad ist der, den ein
+    Aufrufer ohne Zusatzwissen nimmt.
+
+    Der Kanton kommt aus der Aufzeichnung, und zwar einer, der dort mindestens
+    einen freien Eintrag mit OGC API hat — gezaehlt an den Rohfeldern, nicht an
+    `_is_free`, sonst pruefte der Test die Funktion an sich selbst.
+    """
+    katalog = fixture_json("list_layers_1.json")["services"]
+    kanton = next(
+        e["canton"]
+        for e in katalog
+        if e.get("canton")
+        and str(e.get("contract_required_wms")).strip().lower() in {"nein", "false"}
+        and str(e.get("opendata_terms_wms") or "").startswith("Freie Nutzung")
+        and e.get("ogc_api_features")
+    )
+
+    fn = server.list_available_layers_tool
+    modell = recorder()._eingabe(
+        recorder().Aufruf(
+            name="list_layers",
+            werkzeug="list_available_layers_tool",
+            klasse="ListLayersInput",
+            eingabe={"source": "geodienste", "canton": kanton, "free_only": True},
+        )
+    )
+    antwort = await fn(modell)
+    assert antwort.results, (
+        f"free_only=True findet fuer «{kanton}» nichts, obwohl die Aufzeichnung "
+        "dort einen freien Eintrag mit OGC API fuehrt — die Freiheitspruefung "
+        "liest das Vertragsflag nicht mehr"
+    )
+
+
 def test_die_aufzeichnungen_nennen_mehr_als_einen_host():
     """Sonst belegt der Ordner nur einen Teil des Servers."""
     hosts = {httpx.URL(s.split("#")[0]).host for s in schluesselverzeichnis()}

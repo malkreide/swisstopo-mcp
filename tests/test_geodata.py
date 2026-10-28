@@ -12,8 +12,11 @@ from swisstopo_mcp.geodata import (
     ListLayersInput,
     QueryGeodataInput,
     _bbox_from_point,
+    _contract_drift_note,
+    _contract_required,
     _find_geodienste_entry,
     _is_free,
+    _not_free_reason,
     list_available_layers,
     query_geodata,
 )
@@ -54,6 +57,147 @@ class TestIsFree:
         assert _is_free(e, "wms") is True
         e2 = {**FREE_OGC, "opendata_terms_wms": "keine Angabe"}
         assert _is_free(e2, "wms") is False
+
+
+# The same ZH entry as the live catalogue served it on 2026-10-28 — the
+# fields `_is_free` reads copied verbatim, the rest left out. FREE_OGC above
+# carries the boolean form recorded on 2026-08-15; this one carries the German
+# text that replaced it overnight and made every geodienste dataset read as
+# "contract required". Both stay, because the source has used both.
+FREE_OGC_2026_10_28 = {
+    "base_topic": "kataster_belasteter_standorte",
+    "topic": "kataster_belasteter_standorte_v1_5",
+    "version": "1.5",
+    "canton": "ZH",
+    "contract_required_wms": "Nein",
+    "contract_required_data": "Nein",
+    "opendata_terms_wms": "Freie Nutzung",
+    "opendata_terms_data": "Freie Nutzung",
+    "publication_wms": "Frei erhältlich",
+    "ogc_api_features": [
+        "https://geodienste.ch/db/kataster_belasteter_standorte_v1_5_0/deu/ogcapi"
+    ],
+}
+
+
+class TestContractFlagSpellings:
+    """`contract_required_*` was a JSON boolean until 2026-10-27 and German text
+    from 2026-10-28 on. `is False` turned "Nein" into "contract required"."""
+
+    @pytest.mark.parametrize(
+        ("raw", "expected"),
+        [
+            (False, False),
+            (True, True),
+            ("Nein", False),
+            ("Ja", True),
+            (" nein ", False),
+            ("JA", True),
+            (None, None),
+            ("", None),
+            ("vielleicht", None),
+            # An int is not a bool here: 0 == False in Python, and a source
+            # sending 0 has changed format again — that is worth seeing.
+            (0, None),
+            (1, None),
+        ],
+    )
+    def test_reads_both_spellings_and_nothing_else(self, raw, expected):
+        assert _contract_required(raw) is expected
+
+    def test_the_entry_the_live_catalogue_serves_today_is_free(self):
+        """The regression itself: this exact entry was refused on 2026-10-28."""
+        assert _is_free(FREE_OGC_2026_10_28, "wms") is True
+
+    def test_ja_is_still_a_contract(self):
+        """Loosening the parse must not loosen the rule."""
+        entry = {**FREE_OGC_2026_10_28, "contract_required_wms": "Ja"}
+        assert _is_free(entry, "wms") is False
+
+
+class TestNotFreeReasonNamesTheDecidingField:
+    """The old message printed only `opendata_terms` — on 2026-10-28 it said
+    «nicht ohne Vertrag/Login frei nutzbar (opendata_terms: Freie Nutzung)»,
+    blaming a field that was fine and hiding the one that failed."""
+
+    def test_a_contract_is_named_as_the_reason(self):
+        reason = _not_free_reason({**FREE_OGC_2026_10_28, "contract_required_wms": "Ja"})
+        assert "vertragspflichtig" in reason and "'Ja'" in reason
+        assert "Freie Nutzung" not in reason, "the terms were fine — do not cite them"
+
+    def test_an_unreadable_flag_is_reported_as_drift_not_as_a_contract(self):
+        reason = _not_free_reason({**FREE_OGC_2026_10_28, "contract_required_wms": "Unklar"})
+        assert "unbekannter Form" in reason and "'Unklar'" in reason
+        assert "vertragspflichtig" not in reason, (
+            "a spelling this code does not know is not evidence of a contract"
+        )
+
+    def test_non_free_terms_are_named_when_they_decide(self):
+        reason = _not_free_reason({**FREE_OGC_2026_10_28, "opendata_terms_wms": "keine Angabe"})
+        assert "nicht frei lizenziert" in reason and "keine Angabe" in reason
+
+    def test_a_missing_flag_is_not_called_drift(self):
+        """405 live entries carry null — not offered, not a format change."""
+        reason = _not_free_reason({**FREE_OGC_2026_10_28, "contract_required_wms": None})
+        assert "unbekannter Form" not in reason
+        assert "null" in reason
+
+    async def test_query_geodata_carries_the_reason(self, monkeypatch):
+        async def fake_catalog(force=False):
+            return [{**FREE_OGC_2026_10_28, "contract_required_wms": "Unklar"}]
+
+        monkeypatch.setattr(geodata, "load_geodienste_catalog", fake_catalog)
+        r = await query_geodata(
+            QueryGeodataInput(
+                layer="geodienste:kataster_belasteter_standorte:ZH", point="47.36,8.52"
+            )
+        )
+        assert r.is_error
+        assert "unbekannter Form" in r.summary
+
+
+class TestContractDriftIsVisibleInTheLayerList:
+    """`free_only` drops a dataset that needs a contract — and, before this, one
+    whose flag was spelled in a way nobody here anticipated. The two looked the
+    same: a shorter list, or on 2026-10-28 an empty one with a note telling the
+    caller to widen a filter that was not the problem."""
+
+    def test_known_spellings_raise_no_note(self):
+        catalog = [FREE_OGC, FREE_OGC_2026_10_28, CONTRACT_ENTRY, {"contract_required_wms": None}]
+        assert _contract_drift_note(catalog) is None
+
+    def test_an_unknown_spelling_is_counted_and_shown(self):
+        catalog = [
+            {**FREE_OGC_2026_10_28, "contract_required_wms": "nö"},
+            {**FREE_OGC_2026_10_28, "contract_required_wms": "nö"},
+            FREE_OGC_2026_10_28,
+        ]
+        note = _contract_drift_note(catalog)
+        assert note and note.startswith("2 ") and "'nö'" in note
+
+    async def test_the_tool_puts_drift_ahead_of_the_generic_hint(self, monkeypatch):
+        async def fake_catalog(force=False):
+            return [{**FREE_OGC_2026_10_28, "contract_required_wms": "nö"}]
+
+        monkeypatch.setattr(geodata, "load_geodienste_catalog", fake_catalog)
+        r = await list_available_layers(
+            ListLayersInput(source="geodienste", canton="ZH", free_only=True)
+        )
+        assert r.count == 0
+        assert r.note and "unbekannter Form" in r.note
+
+    async def test_today_s_catalogue_shape_lists_its_free_layer(self, monkeypatch):
+        async def fake_catalog(force=False):
+            return [FREE_OGC_2026_10_28]
+
+        monkeypatch.setattr(geodata, "load_geodienste_catalog", fake_catalog)
+        r = await list_available_layers(
+            ListLayersInput(source="geodienste", canton="ZH", free_only=True)
+        )
+        assert [rec["layer"] for rec in r.results] == [
+            "geodienste:kataster_belasteter_standorte:ZH"
+        ]
+        assert r.note is None
 
 
 class TestBboxFromPoint:
@@ -194,7 +338,9 @@ class TestQueryGeodataDispatch:
             QueryGeodataInput(layer="geodienste:rohrleitungsanlagen:ZH", point="47.3,8.5")
         )
         assert r.is_error
-        assert "frei" in r.summary.lower()
+        # Was `"frei" in summary` — which the self-contradicting message of
+        # 2026-10-28 also satisfied. The reason has to be the deciding field.
+        assert "vertragspflichtig" in r.summary
 
     async def test_geodienste_bad_layer_format(self):
         r = await query_geodata(QueryGeodataInput(layer="geodienste:onlytopic", point="47.3,8.5"))

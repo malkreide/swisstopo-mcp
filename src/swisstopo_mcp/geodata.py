@@ -113,13 +113,65 @@ _catalog: list[dict[str, Any]] | None = None
 _catalog_ts: float = 0.0
 
 
+# `contract_required_*` has had two spellings. Until 2026-10-27 it was a JSON
+# boolean (recorded 2026-08-15 in tests/fixtures/list_layers_1.json); since
+# 2026-10-28 it is German text — "Nein" 725×, "Ja" 7×, null 405× across the
+# 1137 entries. `is False` read every "Nein" as "contract required", so every
+# geodienste dataset in Switzerland became unusable overnight, with no line of
+# this code changed. Both spellings are read; anything else is reported as
+# unreadable rather than silently counted as a contract (see `_is_free`).
+_CONTRACT_NO = {False, "nein"}
+_CONTRACT_YES = {True, "ja"}
+
+
+def _contract_required(value: Any) -> bool | None:
+    """Read a ``contract_required_*`` flag: True, False, or None if unreadable.
+
+    None covers both a missing value — 405 catalogue entries carry null, all of
+    them with empty ``opendata_terms`` — and a spelling not seen before. The
+    caller tells the two apart, because only the second one means the source
+    changed under us.
+    """
+    key = value.strip().lower() if isinstance(value, str) else value
+    if isinstance(key, (bool, str)):
+        if key in _CONTRACT_NO:
+            return False
+        if key in _CONTRACT_YES:
+            return True
+    return None
+
+
 def _is_free(entry: dict[str, Any], kind: str = "wms") -> bool:
     """True if a catalogue entry is usable without a contract and under an open
     licence. ``opendata_terms_*`` is free text (not a bool) — a live-probe
     fundstück — so we check the contract flag *and* the terms prefix."""
-    contract = entry.get(f"contract_required_{kind}")
+    contract = _contract_required(entry.get(f"contract_required_{kind}"))
     terms = entry.get(f"opendata_terms_{kind}") or ""
     return contract is False and terms.startswith("Freie Nutzung")
+
+
+def _not_free_reason(entry: dict[str, Any], kind: str = "wms") -> str:
+    """Say *why* an entry is not free, naming the field that decided it.
+
+    The previous message printed only ``opendata_terms`` — so on 2026-10-28 it
+    read «nicht ohne Vertrag/Login frei nutzbar (opendata_terms: Freie
+    Nutzung)», a sentence that contradicts itself and points away from the
+    contract flag that actually failed.
+    """
+    raw = entry.get(f"contract_required_{kind}")
+    terms = entry.get(f"opendata_terms_{kind}") or ""
+    contract = _contract_required(raw)
+    if contract is None and raw is not None:
+        return (
+            f"geodienste.ch meldet den Vertragsstatus in unbekannter Form "
+            f"(contract_required_{kind}: {raw!r}) — das Katalogformat hat sich "
+            "vermutlich geändert; dies ist kein Befund über den Datensatz."
+        )
+    if contract is True:
+        return f"vertragspflichtig (contract_required_{kind}: {raw!r})"
+    if contract is None:
+        return f"ohne Angabe zum Vertragsstatus (contract_required_{kind}: null)"
+    return f"nicht frei lizenziert (opendata_terms_{kind}: {terms or 'keine Angabe'!r})"
 
 
 def _has_ogc_api(entry: dict[str, Any]) -> str | None:
@@ -524,8 +576,8 @@ async def _query_geodienste(params: QueryGeodataInput) -> ToolResponse:
         )
     if not _is_free(entry, "wms"):
         return ToolResponse.error(
-            f"Datensatz '{topic}' ({canton.upper()}) ist nicht ohne Vertrag/Login frei "
-            f"nutzbar (opendata_terms: {entry.get('opendata_terms_wms') or 'keine Angabe'})."
+            f"Datensatz '{topic}' ({canton.upper()}) ist über diesen Server nicht "
+            f"abrufbar: {_not_free_reason(entry, 'wms')}"
         )
     ogc_base = _has_ogc_api(entry)
     if not ogc_base:
@@ -694,8 +746,11 @@ async def list_available_layers(params: ListLayersInput) -> ToolResponse:
                     }
                 )
 
+        drift_note: str | None = None
         if params.source in (None, "geodienste"):
             catalog = await load_geodienste_catalog()
+            if params.free_only:
+                drift_note = _contract_drift_note(catalog)
             geodienste_records = _geodienste_layer_records(catalog, params)
             records.extend(geodienste_records)
             summary = _format_layer_catalog(records, params, catalog)
@@ -712,7 +767,10 @@ async def list_available_layers(params: ListLayersInput) -> ToolResponse:
             summary,
             records,
             match_type="exact" if records else "none",
-            note=(
+            # A drift note outranks the generic hint: on 2026-10-28 the generic
+            # one told the caller to widen a filter that was not the problem.
+            note=drift_note
+            or (
                 None
                 if records
                 else "Keine Layer für diesen Filter. source/topic/canton weglassen, um "
@@ -724,6 +782,30 @@ async def list_available_layers(params: ListLayersInput) -> ToolResponse:
         )
     except Exception as e:  # noqa: BLE001
         return ToolResponse.error(handle_api_error(e, "swisstopo_list_available_layers"))
+
+
+def _contract_drift_note(catalog: list[dict[str, Any]], kind: str = "wms") -> str | None:
+    """Name catalogue entries whose contract flag this code cannot read.
+
+    `free_only` hides them, which is right for a dataset that needs a contract
+    and wrong for a flag spelled in a way nobody here anticipated. Without this
+    the two look identical: an empty or shrunken layer list.
+    """
+    field = f"contract_required_{kind}"
+    odd = [
+        e.get(field)
+        for e in catalog
+        if e.get(field) is not None and _contract_required(e.get(field)) is None
+    ]
+    if not odd:
+        return None
+    examples = ", ".join(sorted({repr(v) for v in odd})[:3])
+    return (
+        f"{len(odd)} geodienste-Einträge melden den Vertragsstatus in unbekannter "
+        f"Form ({field}: {examples}) und fehlen deshalb bei free_only=True. Das "
+        "deutet auf ein geändertes Katalogformat hin, nicht auf vertragspflichtige "
+        "Daten; free_only=False zeigt sie."
+    )
 
 
 def _geodienste_layer_records(

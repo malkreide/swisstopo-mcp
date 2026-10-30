@@ -423,7 +423,7 @@
     },
     {
       "rel": "next",
-      "href": "https://data.geo.admin.ch/api/stac/v0.9/collections?cursor=cD1jaC5iYWZ1Lmdlb2NoZW1pc2NoZXItYm9kZW5hdGxhc19zY2h3ZWl6X3F1ZWNrc2lsYmVy"
+      "href": "https://data.geo.admin.ch/api/stac/v0.9/collections?cursor=cD1jaC5iYWZ1Lmdlb2NoZW1pc2NoZXItYm9kZW5hdGxhc19zY2h3ZWl6X21vbHliZGFlbg%3D%3D"
     }
   ]
 }

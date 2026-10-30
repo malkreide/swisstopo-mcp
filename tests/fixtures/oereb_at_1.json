@@ -1,7 +1,7 @@
 {
   "GetExtractByIdResponse": {
     "Extract": {
-      "CreationDate": "2026-08-15T19:17:56",
+      "CreationDate": "2026-10-28T17:28:23",
       "ConcernedTheme": [
         {
           "code": "ch.Nutzungsplanung",
@@ -64,7 +64,28 @@
           ]
         },
         {
+          "code": "ch.Nutzungsplanungproj",
+          "SubCode": "ch.ZH.NutzungsplanungGrundnutzung",
+          "Text": [
+            {
+              "Language": "de",
+              "Text": "Nutzungsplanung (kantonal/kommunal): Grundnutzungen"
+            }
+          ]
+        },
+        {
           "code": "ch.Gewaesserabstandslinien",
+          "SubCode": "ch.ZH.Gewaesserabstandslinien",
+          "Text": [
+            {
+              "Language": "de",
+              "Text": "Gewässerabstandslinien"
+            }
+          ]
+        },
+        {
+          "code": "ch.Gewaesserabstandslinienproj",
+          "SubCode": "ch.ZH.Gewaesserabstandslinien",
           "Text": [
             {
               "Language": "de",
@@ -80,28 +101,10 @@
               "Text": "Projektierungszonen Nationalstrassen"
             }
           ]
-        },
-        {
-          "code": "ch.BaulinienNationalstrassen",
-          "Text": [
-            {
-              "Language": "de",
-              "Text": "Baulinien Nationalstrassen"
-            }
-          ]
-        },
-        {
-          "code": "ch.ProjektierungszonenEisenbahnanlagen",
-          "Text": [
-            {
-              "Language": "de",
-              "Text": "Projektierungszonen Eisenbahnanlagen"
-            }
-          ]
         }
       ],
       "ThemeWithoutData": [],
-      "ExtractIdentifier": "20260815191756546",
+      "ExtractIdentifier": "20261028172823015",
       "GeneralInformation": [
         {
           "Language": "de",
@@ -207,11 +210,12 @@
             "LegendText": [
               {
                 "Language": "de",
-                "Text": "Kernzone"
+                "Text": "siehe gültige Bau- und Zonenordnung der Stadt Zürich (K)"
               }
             ],
             "Theme": {
               "code": "ch.Nutzungsplanung",
+              "SubCode": "ch.ZH.NutzungsplanungGrundnutzung",
               "Text": [
                 {
                   "Language": "de",
@@ -242,17 +246,18 @@
               ],
               "OtherLegend": [
                 {
-                  "SymbolRef": "https://maps.zh.ch/oereb/v2/images/C320101.png",
+                  "SymbolRef": "https://maps.zh.ch/oereb/v2/images/C130614.png",
                   "LegendText": [
                     {
                       "Language": "de",
-                      "Text": "Gewässer"
+                      "Text": "siehe gültige Bau- und Zonenordnung der Stadt Zürich (QI/6a)"
                     }
                   ],
-                  "TypeCode": "C320101",
+                  "TypeCode": "C130614",
                   "TypeCodelist": "https://maps.zh.ch/images/custom/oerebkatasterzh/legenden/np_261.pdf",
                   "Theme": {
                     "code": "ch.Nutzungsplanung",
+                    "SubCode": "ch.ZH.NutzungsplanungGrundnutzung",
                     "Text": [
                       {
                         "Language": "de",
@@ -266,13 +271,14 @@
                   "LegendText": [
                     {
                       "Language": "de",
-                      "Text": "Quartiererhaltungszone I: max. 7 Vollgeschosse, gebietsbezogene Vorschriften"
+                      "Text": "siehe gültige Bau- und Zonenordnung der Stadt Zürich (QI/7a)"
                     }
                   ],
                   "TypeCode": "C130618",
                   "TypeCodelist": "https://maps.zh.ch/images/custom/oerebkatasterzh/legenden/np_261.pdf",
                   "Theme": {
                     "code": "ch.Nutzungsplanung",
+                    "SubCode": "ch.ZH.NutzungsplanungGrundnutzung",
                     "Text": [
                       {
                         "Language": "de",
@@ -282,17 +288,18 @@
                   }
                 },
                 {
-                  "SymbolRef": "https://maps.zh.ch/oereb/v2/images/C130614.png",
+                  "SymbolRef": "https://maps.zh.ch/oereb/v2/images/C320101.png",
                   "LegendText": [
                     {
                       "Language": "de",
-                      "Text": "Quartiererhaltungszone I: max. 6 Vollgeschosse, gebietsbezogene Vorschriften"
+                      "Text": "Gewässer (GWS)"
                     }
                   ],
-                  "TypeCode": "C130614",
+                  "TypeCode": "C320101",
                   "TypeCodelist": "https://maps.zh.ch/images/custom/oerebkatasterzh/legenden/np_261.pdf",
                   "Theme": {
                     "code": "ch.Nutzungsplanung",
+                    "SubCode": "ch.ZH.NutzungsplanungGrundnutzung",
                     "Text": [
                       {
                         "Language": "de",
@@ -373,13 +380,13 @@
                 "Title": [
                   {
                     "Language": "de",
-                    "Text": "Bauordnung Stadt Zürich 2016 (V43 Stand 29.05.2024)"
+                    "Text": "Bauordnung Stadt Zürich 2016 (V45 Stand 15.04.2026)"
                   }
                 ],
                 "OfficialNumber": [
                   {
                     "Language": "de",
-                    "Text": "24.11.2021"
+                    "Text": "01.09.2026"
                   }
                 ],
                 "TextAtWeb": [
@@ -644,6 +651,7 @@
             ],
             "Theme": {
               "code": "ch.Nutzungsplanung",
+              "SubCode": "ch.ZH.NutzungsplaninhalteUeberlagernd",
               "Text": [
                 {
                   "Language": "de",
@@ -674,17 +682,18 @@
               ],
               "OtherLegend": [
                 {
-                  "SymbolRef": "https://maps.zh.ch/oereb/v2/images/C690402.png",
+                  "SymbolRef": "https://maps.zh.ch/oereb/v2/images/C691041.png",
                   "LegendText": [
                     {
                       "Language": "de",
-                      "Text": "Quartiererhaltungszonenplan"
+                      "Text": "Baumschutz"
                     }
                   ],
-                  "TypeCode": "C690402",
+                  "TypeCode": "C691041",
                   "TypeCodelist": "https://maps.zh.ch/images/custom/oerebkatasterzh/legenden/np_261.pdf",
                   "Theme": {
                     "code": "ch.Nutzungsplanung",
+                    "SubCode": "ch.ZH.NutzungsplaninhalteUeberlagernd",
                     "Text": [
                       {
                         "Language": "de",
@@ -705,6 +714,7 @@
                   "TypeCodelist": "https://maps.zh.ch/images/custom/oerebkatasterzh/legenden/np_261.pdf",
                   "Theme": {
                     "code": "ch.Nutzungsplanung",
+                    "SubCode": "ch.ZH.NutzungsplaninhalteUeberlagernd",
                     "Text": [
                       {
                         "Language": "de",
@@ -714,17 +724,18 @@
                   }
                 },
                 {
-                  "SymbolRef": "https://maps.zh.ch/oereb/v2/images/C691041.png",
+                  "SymbolRef": "https://maps.zh.ch/oereb/v2/images/C690402.png",
                   "LegendText": [
                     {
                       "Language": "de",
-                      "Text": "Baumschutz"
+                      "Text": "Quartiererhaltungszonenplan"
                     }
                   ],
-                  "TypeCode": "C691041",
+                  "TypeCode": "C690402",
                   "TypeCodelist": "https://maps.zh.ch/images/custom/oerebkatasterzh/legenden/np_261.pdf",
                   "Theme": {
                     "code": "ch.Nutzungsplanung",
+                    "SubCode": "ch.ZH.NutzungsplaninhalteUeberlagernd",
                     "Text": [
                       {
                         "Language": "de",
@@ -745,6 +756,7 @@
                   "TypeCodelist": "https://maps.zh.ch/images/custom/oerebkatasterzh/legenden/np_261.pdf",
                   "Theme": {
                     "code": "ch.Nutzungsplanung",
+                    "SubCode": "ch.ZH.NutzungsplaninhalteUeberlagernd",
                     "Text": [
                       {
                         "Language": "de",
@@ -756,64 +768,6 @@
               ]
             },
             "LegalProvisions": [
-              {
-                "Type": {
-                  "Code": "LegalProvision",
-                  "Text": {
-                    "Language": "de",
-                    "Text": "Rechtsvorschrift"
-                  }
-                },
-                "Title": [
-                  {
-                    "Language": "de",
-                    "Text": "Hochhausgebiete"
-                  }
-                ],
-                "OfficialNumber": [
-                  {
-                    "Language": "de",
-                    "Text": "5977"
-                  }
-                ],
-                "TextAtWeb": [
-                  {
-                    "Language": "de",
-                    "Text": "https://oerebdocs.zh.ch/getDoc?docid=12404"
-                  }
-                ],
-                "Lawstatus": {
-                  "Code": "changeWithPreEffect",
-                  "Text": [
-                    {
-                      "Language": "de",
-                      "Text": "Festsetzung"
-                    }
-                  ]
-                },
-                "Index": 1,
-                "ResponsibleOffice": {
-                  "Name": [
-                    {
-                      "Language": "de",
-                      "Text": "Stadt Zürich"
-                    }
-                  ],
-                  "OfficeAtWeb": [
-                    {
-                      "Language": "de",
-                      "Text": "http://www.stadt-zuerich.ch"
-                    }
-                  ],
-                  "UID": "CHE114889289",
-                  "Line1": "Stadtverwaltung",
-                  "Line2": "Postfach",
-                  "Street": "Stadthaus",
-                  "Number": null,
-                  "PostalCode": "8021",
-                  "City": "Zürich"
-                }
-              },
               {
                 "Type": {
                   "Code": "LegalProvision",
@@ -883,13 +837,71 @@
                 "Title": [
                   {
                     "Language": "de",
-                    "Text": "Bauordnung Stadt Zürich 2016 (V43 Stand 29.05.2024)"
+                    "Text": "Hochhausgebiete"
                   }
                 ],
                 "OfficialNumber": [
                   {
                     "Language": "de",
-                    "Text": "24.11.2021"
+                    "Text": "27.09.2026"
+                  }
+                ],
+                "TextAtWeb": [
+                  {
+                    "Language": "de",
+                    "Text": "https://oerebdocs.zh.ch/getDoc?docid=12404"
+                  }
+                ],
+                "Lawstatus": {
+                  "Code": "changeWithPreEffect",
+                  "Text": [
+                    {
+                      "Language": "de",
+                      "Text": "Festsetzung"
+                    }
+                  ]
+                },
+                "Index": 1,
+                "ResponsibleOffice": {
+                  "Name": [
+                    {
+                      "Language": "de",
+                      "Text": "Stadt Zürich"
+                    }
+                  ],
+                  "OfficeAtWeb": [
+                    {
+                      "Language": "de",
+                      "Text": "http://www.stadt-zuerich.ch"
+                    }
+                  ],
+                  "UID": "CHE114889289",
+                  "Line1": "Stadtverwaltung",
+                  "Line2": "Postfach",
+                  "Street": "Stadthaus",
+                  "Number": null,
+                  "PostalCode": "8021",
+                  "City": "Zürich"
+                }
+              },
+              {
+                "Type": {
+                  "Code": "LegalProvision",
+                  "Text": {
+                    "Language": "de",
+                    "Text": "Rechtsvorschrift"
+                  }
+                },
+                "Title": [
+                  {
+                    "Language": "de",
+                    "Text": "Bauordnung Stadt Zürich 2016 (V45 Stand 15.04.2026)"
+                  }
+                ],
+                "OfficialNumber": [
+                  {
+                    "Language": "de",
+                    "Text": "01.09.2026"
                   }
                 ],
                 "TextAtWeb": [
@@ -1090,6 +1102,7 @@
             ],
             "Theme": {
               "code": "ch.Nutzungsplanung",
+              "SubCode": "ch.ZH.NutzungsplaninhalteUeberlagernd",
               "Text": [
                 {
                   "Language": "de",
@@ -1120,17 +1133,18 @@
               ],
               "OtherLegend": [
                 {
-                  "SymbolRef": "https://maps.zh.ch/oereb/v2/images/C690402.png",
+                  "SymbolRef": "https://maps.zh.ch/oereb/v2/images/C691041.png",
                   "LegendText": [
                     {
                       "Language": "de",
-                      "Text": "Quartiererhaltungszonenplan"
+                      "Text": "Baumschutz"
                     }
                   ],
-                  "TypeCode": "C690402",
+                  "TypeCode": "C691041",
                   "TypeCodelist": "https://maps.zh.ch/images/custom/oerebkatasterzh/legenden/np_261.pdf",
                   "Theme": {
                     "code": "ch.Nutzungsplanung",
+                    "SubCode": "ch.ZH.NutzungsplaninhalteUeberlagernd",
                     "Text": [
                       {
                         "Language": "de",
@@ -1151,6 +1165,7 @@
                   "TypeCodelist": "https://maps.zh.ch/images/custom/oerebkatasterzh/legenden/np_261.pdf",
                   "Theme": {
                     "code": "ch.Nutzungsplanung",
+                    "SubCode": "ch.ZH.NutzungsplaninhalteUeberlagernd",
                     "Text": [
                       {
                         "Language": "de",
@@ -1160,17 +1175,18 @@
                   }
                 },
                 {
-                  "SymbolRef": "https://maps.zh.ch/oereb/v2/images/C691041.png",
+                  "SymbolRef": "https://maps.zh.ch/oereb/v2/images/C690402.png",
                   "LegendText": [
                     {
                       "Language": "de",
-                      "Text": "Baumschutz"
+                      "Text": "Quartiererhaltungszonenplan"
                     }
                   ],
-                  "TypeCode": "C691041",
+                  "TypeCode": "C690402",
                   "TypeCodelist": "https://maps.zh.ch/images/custom/oerebkatasterzh/legenden/np_261.pdf",
                   "Theme": {
                     "code": "ch.Nutzungsplanung",
+                    "SubCode": "ch.ZH.NutzungsplaninhalteUeberlagernd",
                     "Text": [
                       {
                         "Language": "de",
@@ -1191,6 +1207,7 @@
                   "TypeCodelist": "https://maps.zh.ch/images/custom/oerebkatasterzh/legenden/np_261.pdf",
                   "Theme": {
                     "code": "ch.Nutzungsplanung",
+                    "SubCode": "ch.ZH.NutzungsplaninhalteUeberlagernd",
                     "Text": [
                       {
                         "Language": "de",
@@ -1271,13 +1288,13 @@
                 "Title": [
                   {
                     "Language": "de",
-                    "Text": "Bauordnung Stadt Zürich 2016 (V43 Stand 29.05.2024)"
+                    "Text": "Bauordnung Stadt Zürich 2016 (V45 Stand 15.04.2026)"
                   }
                 ],
                 "OfficialNumber": [
                   {
                     "Language": "de",
-                    "Text": "24.11.2021"
+                    "Text": "01.09.2026"
                   }
                 ],
                 "TextAtWeb": [
@@ -1541,7 +1558,8 @@
               }
             ],
             "Theme": {
-              "code": "ch.Nutzungsplanung",
+              "code": "ch.Nutzungsplanungproj",
+              "SubCode": "ch.ZH.NutzungsplaninhalteUeberlagernd",
               "Text": [
                 {
                   "Language": "de",
@@ -1582,7 +1600,8 @@
                   "TypeCode": "np-proj_c691102",
                   "TypeCodelist": "https://maps.zh.ch/images/custom/oerebkatasterzh/legenden/np_261.pdf",
                   "Theme": {
-                    "code": "ch.Nutzungsplanung",
+                    "code": "ch.Nutzungsplanungproj",
+                    "SubCode": "ch.ZH.NutzungsplaninhalteUeberlagernd",
                     "Text": [
                       {
                         "Language": "de",
@@ -1602,7 +1621,8 @@
                   "TypeCode": "np-proj_c691041",
                   "TypeCodelist": "https://maps.zh.ch/images/custom/oerebkatasterzh/legenden/np_261.pdf",
                   "Theme": {
-                    "code": "ch.Nutzungsplanung",
+                    "code": "ch.Nutzungsplanungproj",
+                    "SubCode": "ch.ZH.NutzungsplaninhalteUeberlagernd",
                     "Text": [
                       {
                         "Language": "de",
@@ -1683,13 +1703,13 @@
                 "Title": [
                   {
                     "Language": "de",
-                    "Text": "Bauordnung Stadt Zürich 2016 (V43 Stand 29.05.2024)"
+                    "Text": "Bauordnung Stadt Zürich 2016 (V45 Stand 15.04.2026)"
                   }
                 ],
                 "OfficialNumber": [
                   {
                     "Language": "de",
-                    "Text": "24.11.2021"
+                    "Text": "01.09.2026"
                   }
                 ],
                 "TextAtWeb": [
@@ -1890,6 +1910,7 @@
             ],
             "Theme": {
               "code": "ch.ZH.Baulinien",
+              "SubCode": "ch.ZH.Baulinien",
               "Text": [
                 {
                   "Language": "de",
@@ -1897,7 +1918,7 @@
                 }
               ]
             },
-            "TypeCode": "baulinien-kommunal",
+            "TypeCode": "baulinien-0-kommunal",
             "TypeCodelist": "https://maps.zh.ch/images/custom/oerebkatasterzh/legenden/baulinie.pdf",
             "Lawstatus": {
               "Code": "inForce",
@@ -1908,6 +1929,7 @@
                 }
               ]
             },
+            "LengthShare": 4,
             "SymbolRef": "https://maps.zh.ch/oereb/v2/images/baulinien.png",
             "Map": {
               "ReferenceWMS": [
@@ -2155,7 +2177,7 @@
         "PostalCode": "8090",
         "City": "Zürich"
       },
-      "UpdateDateCS": "2026-08-15T19:17:57",
+      "UpdateDateCS": "2026-10-28T17:28:24",
       "LogoPLRCadastreRef": "http://maps.zh.ch/images/custom/oerebkatasterzh/logos/oereb_logo.jpg",
       "FederalLogoRef": "http://maps.zh.ch/images/custom/oerebkatasterzh/logos/bundeslogo.png",
       "CantonalLogoRef": "http://maps.zh.ch/images/custom/oerebkatasterzh/logos/zh_logo.png",

@@ -22,7 +22,7 @@
       "canton": "AG",
       "broker": null,
       "ilivalidator_version": "1.11.6",
-      "updated_at": "2026-08-14T10:49:54",
+      "updated_at": "2026-10-28T07:40:33",
       "cantonal_coverage": true,
       "data_update_cycle": "Täglich",
       "contact_geo": "Kanton Aargau\r\nDepartement Finanzen und Ressourcen, Informatik Aargau\r\nAGIS Service Center\r\nSuhrenmattstrasse 48\r\n5035 Unterentfelden\r\n\r\nhttp://www.ag.ch/geoportal \r\n",
@@ -32,12 +32,12 @@
       "publication_data": "Frei erhältlich",
       "dxf_geobau_supported": true,
       "monthly_price_data": null,
-      "contract_required_data": false,
+      "contract_required_data": "Nein",
       "terms_of_use_data": "https://www.ag.ch/geoportal/geodatenshop/Nutzungsbedingungen.aspx?Typ=NutzungsbedingungenAGIS1",
       "opendata_terms_data": "Freie Nutzung. Quellenangabe ist Pflicht.",
       "publication_wms": "Frei erhältlich",
       "monthly_price_wms": null,
-      "contract_required_wms": false,
+      "contract_required_wms": "Nein",
       "terms_of_use_wms": "https://www.ag.ch/geoportal/geodatenshop/Nutzungsbedingungen.aspx?Typ=NutzungsbedingungenAGIS1",
       "opendata_terms_wms": "Freie Nutzung. Quellenangabe ist Pflicht.",
       "planning_contact": "marco.campomori@ag.ch",
@@ -93,7 +93,12 @@
         "DM01AVCH24LV95D",
         "MD01MUCH24MN95I"
       ],
-      "catalog_names": null
+      "catalog_names": null,
+      "languages": [
+        "deu",
+        "fra",
+        "ita"
+      ]
     },
     {
       "topic_title": "Amtliche Vermessung",
@@ -117,7 +122,7 @@
       "canton": "AI",
       "broker": null,
       "ilivalidator_version": "1.14.3",
-      "updated_at": "2026-08-15T06:20:10",
+      "updated_at": "2026-10-28T05:45:14",
       "cantonal_coverage": true,
       "data_update_cycle": "Täglich",
       "contact_geo": "Kantonale Verwaltung \r\nAppenzell Innerrhoden \r\nAmt für Geoinformation\r\nGaiserstrasse 8 \r\n9050 Appenzell",
@@ -127,12 +132,12 @@
       "publication_data": "Frei erhältlich",
       "dxf_geobau_supported": true,
       "monthly_price_data": null,
-      "contract_required_data": false,
+      "contract_required_data": "Nein",
       "terms_of_use_data": "https://geodienste.ch/pdfs/AI/av/data/Nutzungsbedingungen_AI_annex-123-2.pdf",
       "opendata_terms_data": "Freie Nutzung. Quellenangabe ist Pflicht.",
       "publication_wms": "Frei erhältlich",
       "monthly_price_wms": null,
-      "contract_required_wms": false,
+      "contract_required_wms": "Nein",
       "terms_of_use_wms": "https://geodienste.ch/pdfs/AI/av/portrayal/Nutzungsbedingungen_AI_annex-123-2.pdf",
       "opendata_terms_wms": "Freie Nutzung. Quellenangabe ist Pflicht.",
       "planning_contact": "pascal.megert@lfd.ai.ch",
@@ -188,7 +193,12 @@
         "DM01AVCH24LV95D",
         "MD01MUCH24MN95I"
       ],
-      "catalog_names": null
+      "catalog_names": null,
+      "languages": [
+        "deu",
+        "fra",
+        "ita"
+      ]
     },
     {
       "topic_title": "Amtliche Vermessung",
@@ -212,7 +222,7 @@
       "canton": "AR",
       "broker": null,
       "ilivalidator_version": "1.11.9",
-      "updated_at": "2026-08-15T18:11:05",
+      "updated_at": "2026-10-27T18:14:17",
       "cantonal_coverage": true,
       "data_update_cycle": "Täglich",
       "contact_geo": "Amt für Raum und Wald \r\nGeoinformation \r\nKasernenstrasse 17A \r\n9102 Herisau\r\nTel.: +41 71 353 67 74\r\ngisfachstelle@ar.ch",
@@ -222,12 +232,12 @@
       "publication_data": "Frei erhältlich",
       "dxf_geobau_supported": true,
       "monthly_price_data": null,
-      "contract_required_data": false,
+      "contract_required_data": "Nein",
       "terms_of_use_data": "https://ar.ch/fileadmin/user_upload/Departement_Bau_Volkswirtschaft/Amt_fuer_Raum_Wald/Geoinformation_und_Vermessung/AR_Nutzungsbedingungen_Geodaten.pdf",
       "opendata_terms_data": "Freie Nutzung",
       "publication_wms": "Frei erhältlich",
       "monthly_price_wms": null,
-      "contract_required_wms": false,
+      "contract_required_wms": "Nein",
       "terms_of_use_wms": "https://ar.ch/fileadmin/user_upload/Departement_Bau_Volkswirtschaft/Amt_fuer_Raum_Wald/Geoinformation_und_Vermessung/AR_Nutzungsbedingungen_Geodaten.pdf",
       "opendata_terms_wms": "Freie Nutzung",
       "planning_contact": "gisfachstelle@ar.ch",
@@ -283,7 +293,12 @@
         "DM01AVCH24LV95D",
         "MD01MUCH24MN95I"
       ],
-      "catalog_names": null
+      "catalog_names": null,
+      "languages": [
+        "deu",
+        "fra",
+        "ita"
+      ]
     },
     {
       "topic_title": "Amtliche Vermessung",
@@ -307,7 +322,7 @@
       "canton": "BE",
       "broker": null,
       "ilivalidator_version": "1.11.6",
-      "updated_at": "2026-08-13T05:49:46",
+      "updated_at": "2026-10-22T05:08:19",
       "cantonal_coverage": true,
       "data_update_cycle": "Benutzerdefiniert",
       "contact_geo": "Geoportal des Kantons Bern / Géoportail du canton de Berne\r\n\r\nDirektion für Inneres und Justiz / Direction de l'intérieur et de la justice\r\nAmt für Geoinformation / Office de l'information géographique\r\nReiterstrasse 11\r\n3013 Bern\r\n\r\nnormierung.agi@be.ch",
@@ -317,12 +332,12 @@
       "publication_data": "Frei erhältlich",
       "dxf_geobau_supported": true,
       "monthly_price_data": null,
-      "contract_required_data": false,
+      "contract_required_data": "Nein",
       "terms_of_use_data": "https://geofiles.be.ch/internet/geo/geodaten/agi-dv-nutzungsbedingungen-de.pdf",
       "opendata_terms_data": "Freie Nutzung. Quellenangabe ist Pflicht.",
       "publication_wms": "Frei erhältlich",
       "monthly_price_wms": null,
-      "contract_required_wms": false,
+      "contract_required_wms": "Nein",
       "terms_of_use_wms": "https://geofiles.be.ch/internet/geo/geodaten/agi-dv-nutzungsbedingungen-de.pdf",
       "opendata_terms_wms": "Freie Nutzung. Quellenangabe ist Pflicht.",
       "planning_contact": "",
@@ -378,7 +393,12 @@
         "DM01AVCH24LV95D",
         "MD01MUCH24MN95I"
       ],
-      "catalog_names": null
+      "catalog_names": null,
+      "languages": [
+        "deu",
+        "fra",
+        "ita"
+      ]
     },
     {
       "topic_title": "Amtliche Vermessung",
@@ -402,7 +422,7 @@
       "canton": "BL",
       "broker": null,
       "ilivalidator_version": "1.11.6",
-      "updated_at": "2026-08-13T02:04:07",
+      "updated_at": "2026-10-22T02:04:09",
       "cantonal_coverage": true,
       "data_update_cycle": "Wöchentlich",
       "contact_geo": "Kanton Basel-Landschaft\r\nVolkswirtschafts- und Gesundheitsdirektion\r\nAmt für Geoinformation\r\nGIS-Fachstelle\r\nMühlemattstrasse 36\r\n4410 Liestal\r\nTel. 061 552 56 73\r\n support.gis@bl.ch \r\n",
@@ -412,12 +432,12 @@
       "publication_data": "Frei erhältlich",
       "dxf_geobau_supported": true,
       "monthly_price_data": "keine",
-      "contract_required_data": false,
+      "contract_required_data": "Nein",
       "terms_of_use_data": "https://www.baselland.ch/politik-und-behorden/direktionen/volkswirtschafts-und-gesundheitsdirektion/amt-fur-geoinformation/geoportal/geodaten/nutzung-von-geodaten",
       "opendata_terms_data": "Freie Nutzung. Quellenangabe ist Pflicht.",
       "publication_wms": "Frei erhältlich",
       "monthly_price_wms": "keine",
-      "contract_required_wms": false,
+      "contract_required_wms": "Nein",
       "terms_of_use_wms": "https://www.baselland.ch/politik-und-behorden/direktionen/volkswirtschafts-und-gesundheitsdirektion/amt-fur-geoinformation/geoportal/geodaten/nutzung-von-geodaten",
       "opendata_terms_wms": "Freie Nutzung. Quellenangabe ist Pflicht.",
       "planning_contact": "support.gis@bl.ch",
@@ -473,7 +493,12 @@
         "DM01AVCH24LV95D",
         "MD01MUCH24MN95I"
       ],
-      "catalog_names": null
+      "catalog_names": null,
+      "languages": [
+        "deu",
+        "fra",
+        "ita"
+      ]
     }
   ]
 }

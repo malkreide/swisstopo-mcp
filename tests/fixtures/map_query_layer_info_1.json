@@ -3,82 +3,58 @@
   "name": "GWR: Gebäudestatus",
   "fields": [
     {
-      "name": "gbaum",
-      "type": "SMALLINT",
-      "alias": "Baumonat des Gebäudes",
+      "name": "dplzname",
+      "type": "VARCHAR",
+      "alias": "Ortschaft",
       "values": [
-        null,
-        9,
-        1,
-        8,
-        7
+        "Brugg AG",
+        "Roggwil BE",
+        "Spiez",
+        "St. Margrethen SG",
+        "Zürich"
       ]
     },
     {
-      "name": "gwaerzh2",
+      "name": "gvolsce",
       "type": "SMALLINT",
-      "alias": "Wärmeerzeuger Heizung 2",
+      "alias": "Informationsquelle zum Gebäudevolumen",
       "values": [
         null,
-        7400,
-        7436,
-        7499
+        859,
+        869,
+        857
       ]
     },
     {
-      "name": "wstwk",
-      "type": "SMALLINT",
-      "alias": "Stockwerk",
-      "values": [
-        null,
-        [
-          3100,
-          3107,
-          3102,
-          3106,
-          3106
-        ],
-        [
-          3100
-        ],
-        [
-          3100,
-          3100,
-          3101,
-          3101,
-          3102
-        ],
-        [
-          3101,
-          3101,
-          3101,
-          3101,
-          3102
-        ]
-      ]
-    },
-    {
-      "name": "gwaerdatw1",
+      "name": "dexpdat",
       "type": "DATETIME",
-      "alias": "Aktualisierungsdatum Warmwasser 1",
+      "alias": "Datenstand",
       "values": [
-        "-",
-        "12.03.2020",
-        "23.11.2018",
-        "25.08.2023",
-        "29.11.2001"
+        "26.10.2026"
       ]
     },
     {
-      "name": "gwaerdatw2",
-      "type": "DATETIME",
-      "alias": "Aktualisierungsdatum Warmwasser 2",
+      "name": "ggdename",
+      "type": "VARCHAR",
+      "alias": "Gemeindename",
       "values": [
-        "-",
-        "02.08.2021",
-        "21.12.2017",
-        "25.08.2023",
-        "29.11.2001"
+        "Brugg",
+        "Roggwil (BE)",
+        "Spiez",
+        "St. Margrethen",
+        "Zürich"
+      ]
+    },
+    {
+      "name": "egid",
+      "type": "VARCHAR",
+      "alias": "Eidg. Gebäudeidentifikator (EGID)",
+      "values": [
+        "1088943",
+        "1394491",
+        "169829",
+        "191400303",
+        "568622"
       ]
     }
   ]

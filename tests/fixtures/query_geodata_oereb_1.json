@@ -3,8 +3,8 @@
     {
       "layerBodId": "ch.swisstopo-vd.stand-oerebkataster",
       "layerName": "Verfügbarkeit des ÖREB-Katasters",
-      "featureId": 635347,
-      "id": 635347,
+      "featureId": 655579,
+      "id": 655579,
       "attributes": {
         "fid": "261",
         "number": "AA8048",
@@ -35,8 +35,8 @@
     {
       "layerBodId": "ch.swisstopo-vd.stand-oerebkataster",
       "layerName": "Verfügbarkeit des ÖREB-Katasters",
-      "featureId": 635348,
-      "id": 635348,
+      "featureId": 655580,
+      "id": 655580,
       "attributes": {
         "fid": "261",
         "number": "AA8048",

@@ -221,6 +221,10 @@ class TestReframeLive:
         official = await convert_coordinates(
             ConvertCoordinatesInput(easting=WGS84_LON, northing=WGS84_LAT)
         )
+        # Without this a REFRAME failure surfaced as `IndexError` on the empty
+        # results (2026-11-16, a 403): the report named neither the status nor
+        # that the deviation had not been measured at all.
+        assert official.is_error is False, official.summary
         ref_e = official.results[0]["easting"]
         ref_n = official.results[0]["northing"]
         poly_e, poly_n = wgs84_to_lv95(WGS84_LAT, WGS84_LON)

@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Ein REFRAME-Ausfall meldete sich im Live-Bericht als `IndexError`.** Am
+  16.11.2026 antwortete `geodesy.geo.admin.ch` eine Nacht lang mit 403.
+  `test_roundtrip_matches_input` nannte den Status, aber
+  `test_polynomial_stays_within_a_metre_of_reframe` griff ohne Prüfung auf
+  `results[0]` zu und fiel mit «list index out of range». Der Bericht in #114
+  liess damit offen, ob die Abweichung Polynom–REFRAME über einen Meter lag —
+  gemessen worden war sie gar nicht. Der Test prüft jetzt zuerst den Fehler
+  und nennt die Meldung des Werkzeugs.
+
+  Gegenprobe mit einem auf 403 gestellten REFRAME: vorher `IndexError`, jetzt
+  «Zugriff verweigert (403)»; live laufen beide Tests weiter grün. Am
+  ausgelieferten Paket ändert sich nichts. Nachgemessen am 22.11.: dieselbe
+  Anfrage liefert 200, ein ungültiger Parameter 400 — der 403 war keine
+  feste Absage der Quelle.
+
 ## [0.5.1] - 2026-10-30
 
 ### Added
